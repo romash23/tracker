@@ -9833,7 +9833,7 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .plan-table-wrap{flex:1 1 320px;min-width:280px;max-width:640px;}
 .plan-table-caption{font-weight:700;font-size:1.05rem;margin-bottom:8px;color:#0f172a;}
 .plan-table-scroll{overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fff;}
-.plan-table{border-collapse:collapse;width:auto;table-layout:fixed;font-size:0.95rem;}
+.plan-table{border-collapse:collapse;width:auto;table-layout:auto;font-size:0.95rem;}
 .plan-table th,.plan-table td{border:1px solid #e2e8f0;padding:8px 10px;text-align:center;white-space:nowrap;}
 .plan-table thead th{background:#f1f5f9;color:#0f172a;font-weight:700;position:sticky;top:0;}
 .plan-rowhead{text-align:left !important;background:#f8fafc;font-weight:600;color:#334155;position:sticky;left:0;z-index:1;}
@@ -9842,7 +9842,8 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .plan-bankabbr{font-weight:600;letter-spacing:0.3px;}
 .plan-bankcol:hover{background:#eef2ff;color:#1d4ed8;}
 .plan-table th,.plan-table td{padding:7px 6px;}
-.plan-rowhead{min-width:108px;width:108px;white-space:normal !important;word-break:break-word;line-height:1.25;}
+.plan-rowhead{white-space:nowrap !important;width:auto;min-width:0;max-width:none;overflow:visible;}
+.plan-corner{width:auto;background:#f8fafc;position:sticky;left:0;z-index:2;border-right:1px solid #e2e8f0;}
 .plan-coef-row td{background:#fffdf5;}
 .plan-poss-row td{background:#eef6ff;font-weight:700;color:#1d4ed8;}
 .plan-coef-input{width:46px;padding:3px 2px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;font-size:0.9rem;background:#fff;}
@@ -9850,3 +9851,19 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .plan-poss{color:#1d4ed8;}
 .plan-empty{padding:16px;color:#94a3b8;text-align:center;}
 .plan-hint{margin-top:14px;font-size:0.9rem;color:#64748b;font-style:italic;}
+/* ===== Календарь планирования (12 мес., недели раскрываются) ===== */
+.plan-cal-caption{margin-top:16px;margin-bottom:6px;font-weight:700;font-size:0.95rem;color:#334155;}
+.plan-cal-scroll{overflow-x:auto;}
+.plan-cal-table{width:auto;table-layout:auto;}
+.plan-cal-table th,.plan-cal-table td{border:1px solid #e2e8f0;padding:5px 6px;text-align:center;white-space:nowrap;font-size:0.9rem;}
+.plan-cal-mrow{cursor:pointer;}
+.plan-cal-mrow:hover td{background:#f1f5f9;}
+.plan-cal-mhead{text-align:left !important;background:#f8fafc;font-weight:700;color:#0f172a;position:sticky;left:0;z-index:1;white-space:nowrap;}
+.plan-cal-caret{display:inline-block;width:12px;color:#64748b;margin-right:4px;}
+.plan-cal-mname{font-weight:700;}
+.plan-cal-myear{margin-left:5px;font-size:0.78rem;color:#94a3b8;font-weight:600;}
+.plan-cal-wrow td{background:#fcfdff;}
+.plan-cal-whead{text-align:left !important;background:#f8fafc;color:#475569;position:sticky;left:0;z-index:1;font-size:0.82rem;padding-left:20px !important;white-space:nowrap;}
+.plan-cal-red{background:#fee2e2 !important;color:#b91c1c;font-weight:700;}
+.plan-cal-green{background:#dcfce7 !important;color:#15803d;font-weight:700;}
+

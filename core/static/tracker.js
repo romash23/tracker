@@ -17919,8 +17919,8 @@ setTimeout(buildGanttTab, 1500);
     if (!tbl) return;
     var deps = (st().departments || []);
     if (!deps.length){ tbl.innerHTML = '<tbody><tr><td class="plan-empty">Нет банков</td></tr></tbody>'; return; }
-    /* шапка: тер банки по столбцам */
-    var head = '<thead><tr><th class="plan-rowhead">Показатель</th>';
+    /* шапка: тер банки по столбцам; угловая ячейка «Показатель» вырезана */
+    var head = '<thead><tr><th class="plan-corner"></th>';
     deps.forEach(function(d){
       head += '<th class="plan-bankcol" title="'+esc(d.name)+'">'+'<span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span>'+'<span class="plan-bankabbr">'+esc(planAbbr(d.name))+'</span></th>';
     });
@@ -17953,9 +17953,152 @@ setTimeout(buildGanttTab, 1500);
     tbl.innerHTML = head + body;
   }
 
+
+  /* ===== Календарь планирования: остаток ресурса по неделям/месяцам ===== */
+  var PLAN_TYPE = { retail: 'розничная', corp: 'корпоративная' };
+  var PLAN_MON_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  var planExpanded = {}; /* ключ 'dir:y-m' -> развёрнут ли месяц */
+
+  function _pd(s){ var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||'')); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+  function _ymd(dt){ var mm=('0'+(dt.getMonth()+1)).slice(-2), dd=('0'+dt.getDate()).slice(-2); return dt.getFullYear()+'-'+mm+'-'+dd; }
+  function _ovl(a,b,ps,pe){ return a&&b&&a<=pe&&b>=ps; }
+
+  function planAuditWeight(t, ps, pe){
+    var w=0;
+    (t.stages||[]).forEach(function(s){
+      if(!s.start) return;
+      var a=_pd(s.start), b=_pd(s.end||t.deadline||s.start);
+      if(_ovl(a,b,ps,pe)) w=Math.max(w, Number(s.weight)||0);
+    });
+    return w;
+  }
+  function planLeadCoef(t, bankId){
+    if((t.lead_department||'')!==bankId) return 1.0;
+    var tp=t.task_type||'';
+    if(tp==='розничная') return 2.0;
+    if(tp==='корпоративная') return 1.5;
+    return 1.0;
+  }
+  /* нагрузка банка по направлению на неделю (понедельник mon) */
+  function planBankDirLoad(bankId, dir, mon){
+    var tasks=(st().tasks||[]);
+    var ps=new Date(mon.getTime()), pe=new Date(mon.getTime()); pe.setDate(pe.getDate()+6);
+    var bl=0;
+    tasks.forEach(function(t){
+      if((t.department_ids||[]).indexOf(bankId)<0) return;
+      if((t.task_kind||'audit')!=='audit') return;
+      if((t.task_type||'')!==PLAN_TYPE[dir]) return;
+      var w=planAuditWeight(t,ps,pe);
+      if(w>0) bl+=w*planLeadCoef(t,bankId);
+    });
+    return Math.round(bl*100)/100;
+  }
+  function planPossible(dep, dir){
+    var norm=normByDir(dep,dir), coef=coefByDir(dep,dir);
+    if(norm===null||coef===null) return null;
+    return norm*coef;
+  }
+  /* ближайший будущий понедельник от сегодня (если сегодня пн — следующий) */
+  function planNextMonday(){
+    var t=new Date(); t.setHours(0,0,0,0);
+    var wd=(t.getDay()+6)%7; /* 0=пн */
+    var delta=(7-wd)%7; if(delta===0) delta=7;
+    t.setDate(t.getDate()+delta);
+    return t;
+  }
+  /* все понедельники, принадлежащие месяцу (y,m0) по своему понедельнику */
+  function planWeeksOfMonth(y, m0){
+    var first=new Date(y,m0,1);
+    var mon=new Date(first.getTime()); mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+    var res=[];
+    while(mon.getFullYear()<y || (mon.getFullYear()===y && mon.getMonth()<=m0)){
+      if(mon.getMonth()===m0 && mon.getFullYear()===y) res.push(new Date(mon.getTime()));
+      mon.setDate(mon.getDate()+7);
+      if(mon.getFullYear()>y+1) break;
+    }
+    return res;
+  }
+  /* 12 месяцев от месяца ближайшего понедельника */
+  function planMonths(){
+    var nm=planNextMonday(); var y=nm.getFullYear(), m=nm.getMonth(); var out=[];
+    for(var i=0;i<12;i++){ out.push([y,m]); m++; if(m>11){m=0;y++;} }
+    return out;
+  }
+  function planCellClass(rem){
+    if(rem===null) return '';
+    if(rem<0) return 'plan-cal-red';
+    if(rem>2) return 'plan-cal-green';
+    return '';
+  }
+  function planFmtRem(rem){ return rem===null?'–':(''+(Math.round(rem*100)/100)); }
+
+  function buildPlanCalendar(containerId, dir){
+    var box=document.getElementById(containerId);
+    if(!box) return;
+    var deps=(st().departments||[]);
+    if(!deps.length){ box.innerHTML='<div class="plan-empty">Нет банков</div>'; return; }
+    var months=planMonths();
+    /* шапка: угловая ячейка + банки (те же аббревиатуры, что в верхней таблице) */
+    var head='<thead><tr><th class="plan-corner"></th>';
+    deps.forEach(function(d){
+      head+='<th class="plan-bankcol" title="'+esc(d.name)+'"><span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span><span class="plan-bankabbr">'+esc(planAbbr(d.name))+'</span></th>';
+    });
+    head+='</tr></thead>';
+    var body='<tbody>';
+    months.forEach(function(ym){
+      var y=ym[0], m0=ym[1];
+      var key=dir+':'+y+'-'+m0;
+      var open=!!planExpanded[key];
+      var weeks=planWeeksOfMonth(y,m0);
+      /* строка месяца: среднее остатка по неделям месяца для каждого банка */
+      body+='<tr class="plan-cal-mrow" data-planmonth="'+key+'">';
+      body+='<td class="plan-cal-mhead"><span class="plan-cal-caret">'+(open?'▾':'▸')+'</span>'
+          + '<span class="plan-cal-mname">'+PLAN_MON_RU[m0]+'</span><span class="plan-cal-myear">'+y+'</span></td>';
+      deps.forEach(function(d){
+        var poss=planPossible(d,dir);
+        if(poss===null){ body+='<td>–</td>'; return; }
+        var sum=0,n=0;
+        weeks.forEach(function(mon){ sum+=(poss-planBankDirLoad(d.id,dir,mon)); n++; });
+        var avg=n?Math.round((sum/n)*100)/100:null;
+        body+='<td class="'+planCellClass(avg)+'">'+planFmtRem(avg)+'</td>';
+      });
+      body+='</tr>';
+      /* строки недель (видны, если месяц развёрнут) */
+      if(open){
+        weeks.forEach(function(mon){
+          var we=new Date(mon.getTime()); we.setDate(we.getDate()+6);
+          var lab=('0'+mon.getDate()).slice(-2)+'.'+('0'+(mon.getMonth()+1)).slice(-2)
+                + '–'+('0'+we.getDate()).slice(-2)+'.'+('0'+(we.getMonth()+1)).slice(-2);
+          body+='<tr class="plan-cal-wrow"><td class="plan-cal-whead">'+lab+'</td>';
+          deps.forEach(function(d){
+            var poss=planPossible(d,dir);
+            if(poss===null){ body+='<td>–</td>'; return; }
+            var rem=Math.round((poss-planBankDirLoad(d.id,dir,mon))*100)/100;
+            body+='<td class="'+planCellClass(rem)+'">'+planFmtRem(rem)+'</td>';
+          });
+          body+='</tr>';
+        });
+      }
+    });
+    body+='</tbody>';
+    box.innerHTML='<table class="plan-table plan-cal-table">'+head+body+'</table>';
+  }
+
+  /* делегированный клик по месяцу — разворот/сворот */
+  document.addEventListener('click', function(e){
+    var mh=e.target && e.target.closest && e.target.closest('.plan-cal-mrow');
+    if(!mh) return;
+    var key=mh.getAttribute('data-planmonth');
+    if(!key) return;
+    planExpanded[key]=!planExpanded[key];
+    render();
+  });
+
   function render(){
     buildTable('planCorpTable', 'corp');
     buildTable('planRetailTable', 'retail');
+    buildPlanCalendar('planCorpCalendar', 'corp');
+    buildPlanCalendar('planRetailCalendar', 'retail');
   }
   window.__trkPlanRender = render;
 
