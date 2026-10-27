@@ -2481,7 +2481,8 @@ function openDepartmentModal(dep) {
     g('dep_id', dep ? dep.id : '');
     g('dep_name', dep ? dep.name : '');
     g('dep_color', (dep && dep.color) || '#00897b');
-    g('dep_headcount', (dep && dep.headcount !== null && dep.headcount !== undefined) ? dep.headcount : '');
+    g('dep_headcount_retail', (dep && dep.headcount_retail !== null && dep.headcount_retail !== undefined) ? dep.headcount_retail : '');
+    g('dep_headcount_corp', (dep && dep.headcount_corp !== null && dep.headcount_corp !== undefined) ? dep.headcount_corp : '');
     var headSel = $('dep_head');
     if (headSel) {
         headSel.innerHTML = '<option value="">— не указан —</option>'
@@ -2497,12 +2498,22 @@ function openDepartmentModal(dep) {
 function saveDepartment() {
     var name = $('dep_name') ? $('dep_name').value.trim() : '';
     if (!name) { notify('❌ Укажите название', 'error'); return; }
+    var _hr = ($('dep_headcount_retail') && $('dep_headcount_retail').value !== '') ? parseFloat($('dep_headcount_retail').value) : null;
+    var _hc = ($('dep_headcount_corp') && $('dep_headcount_corp').value !== '') ? parseFloat($('dep_headcount_corp').value) : null;
+    if (_hr !== null || _hc !== null) {
+        var _tot = (_hr || 0) + (_hc || 0);
+        if (Math.abs(_tot - Math.round(_tot)) > 1e-9) {
+            notify('❌ Общая численность штата не может быть дробным числом', 'error');
+            return;
+        }
+    }
     var payload = {
         id: $('dep_id') ? ($('dep_id').value || '') : '',
         name: name,
         color: $('dep_color') ? $('dep_color').value : '#00897b',
         head_employee_id: $('dep_head') ? ($('dep_head').value || '') : '',
-        headcount: ($('dep_headcount') && $('dep_headcount').value !== '') ? $('dep_headcount').value : null,
+        headcount_retail: _hr,
+        headcount_corp: _hc,
     };
     apiJson('/api/tracker/department/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -17851,4 +17862,141 @@ if (document.readyState === 'loading') {
 setTimeout(buildGanttTab, 600);
 setTimeout(buildGanttTab, 1500);
 
+})();
+
+
+/* ===== PATCH planning: Вкладка «Планирование проверок» (две таблицы корп/розн) ===== */
+(function(){
+  var esc = (typeof window.esc === 'function') ? window.esc : function(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  };
+  var apiJson = (typeof window.apiJson === 'function') ? window.apiJson : function(url, options){
+    options = options || {};
+    options.headers = Object.assign({}, options.headers || {});
+    if (window.REESTR_CSRF && options.method && options.method !== 'GET')
+      options.headers['X-CSRF-Token'] = window.REESTR_CSRF;
+    if (!options.credentials) options.credentials = 'same-origin';
+    return fetch(url, options).then(function(r){ return r.json(); });
+  };
+  function st(){ return window.__trkState || {}; }
+  function num(v){ var n = Number(v); return isFinite(n) ? n : 0; }
+  function fmt(v){ var r = Math.round(num(v)*100)/100; return (''+r); }
+
+  /* фактическая численность по направлению: Σ dir_* не уволенных сотрудников банка */
+  function factByDir(depId, dir){
+    var emps = (st().employees || []);
+    var s = 0;
+    emps.forEach(function(e){
+      if (e.department_id !== depId || e.fired) return;
+      s += num(dir === 'retail' ? e.dir_retail : e.dir_corp);
+    });
+    return Math.round(s*100)/100;
+  }
+  /* нормативная (штатная) численность по направлению */
+  function normByDir(dep, dir){
+    var v = (dir === 'retail') ? dep.headcount_retail : dep.headcount_corp;
+    return (v === null || v === undefined || v === '') ? null : num(v);
+  }
+  function coefByDir(dep, dir){
+    var v = (dir === 'retail') ? dep.expert_coef_retail : dep.expert_coef_corp;
+    return (v === null || v === undefined || v === '') ? null : num(v);
+  }
+
+  function buildTable(tableId, dir){
+    var tbl = document.getElementById(tableId);
+    if (!tbl) return;
+    var deps = (st().departments || []);
+    if (!deps.length){ tbl.innerHTML = '<tbody><tr><td class="plan-empty">Нет банков</td></tr></tbody>'; return; }
+    /* шапка: тер банки по столбцам */
+    var head = '<thead><tr><th class="plan-rowhead">Показатель</th>';
+    deps.forEach(function(d){
+      head += '<th class="plan-bankcol"><span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span>'+esc(d.name)+'</th>';
+    });
+    head += '</tr></thead>';
+    /* строки */
+    function row(label, cells, cls){
+      var h = '<tr'+(cls?' class="'+cls+'"':'')+'><td class="plan-rowhead">'+label+'</td>';
+      h += cells.join('');
+      return h + '</tr>';
+    }
+    var normCells=[], factCells=[], coefCells=[], possCells=[];
+    deps.forEach(function(d){
+      var norm = normByDir(d, dir);
+      var fact = factByDir(d.id, dir);
+      var coef = coefByDir(d, dir);
+      normCells.push('<td>'+(norm===null?'–':fmt(norm))+'</td>');
+      factCells.push('<td>'+fmt(fact)+'</td>');
+      coefCells.push('<td><input class="plan-coef-input" type="number" step="0.1" min="0" '
+        + 'data-dep="'+esc(d.id)+'" data-dir="'+dir+'" '
+        + 'value="'+(coef===null?'':fmt(coef))+'" placeholder="–"></td>');
+      var poss = (norm===null || coef===null) ? null : (norm*coef);
+      possCells.push('<td class="plan-poss">'+(poss===null?'–':fmt(poss))+'</td>');
+    });
+    var body = '<tbody>'
+      + row('Нормативная численность', normCells)
+      + row('Фактическая численность', factCells)
+      + row('Экспертный коэффициент', coefCells, 'plan-coef-row')
+      + row('Возможное число проверок', possCells, 'plan-poss-row')
+      + '</tbody>';
+    tbl.innerHTML = head + body;
+  }
+
+  function render(){
+    buildTable('planCorpTable', 'corp');
+    buildTable('planRetailTable', 'retail');
+  }
+  window.__trkPlanRender = render;
+
+  /* сохранение экспертного коэффициента по blur / Enter */
+  function saveCoef(inp){
+    var depId = inp.getAttribute('data-dep');
+    var dir = inp.getAttribute('data-dir');
+    var deps = (st().departments || []);
+    var dep = deps.filter(function(x){ return x.id === depId; })[0];
+    if (!dep) return;
+    var raw = inp.value.trim();
+    var val = (raw === '') ? null : num(raw);
+    /* локально обновим state, чтобы «возможное число» пересчиталось мгновенно */
+    if (dir === 'retail') dep.expert_coef_retail = val; else dep.expert_coef_corp = val;
+    var payload = {
+      id: dep.id, name: dep.name, color: dep.color || '#00897b',
+      head_employee_id: dep.head_employee_id || '',
+      headcount_retail: (dep.headcount_retail===undefined?null:dep.headcount_retail),
+      headcount_corp: (dep.headcount_corp===undefined?null:dep.headcount_corp),
+      expert_coef_retail: (dep.expert_coef_retail===undefined?null:dep.expert_coef_retail),
+      expert_coef_corp: (dep.expert_coef_corp===undefined?null:dep.expert_coef_corp)
+    };
+    apiJson('/api/tracker/department/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    }).then(function(d){
+      if (!d || !d.success){ try{ if(window.notify) notify('❌ '+((d&&d.error)||'Ошибка'),'error'); }catch(e){} }
+    }).catch(function(){});
+    render();
+  }
+
+  document.addEventListener('blur', function(e){
+    if (e.target && e.target.classList && e.target.classList.contains('plan-coef-input')) saveCoef(e.target);
+  }, true);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('plan-coef-input')){
+      e.preventDefault(); e.target.blur();
+    }
+  });
+
+  /* автозапуск при открытии вкладки (panel-calendar теперь = планирование) */
+  function bootIfActive(){
+    var p = document.getElementById('panel-calendar');
+    if (p && p.classList.contains('active') && document.getElementById('planCorpTable')) render();
+  }
+  document.addEventListener('click', function(e){
+    if (e.target && e.target.closest && e.target.closest('.tracker-tab[data-tab="calendar"]')){
+      setTimeout(render, 60);
+    }
+  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootIfActive);
+  else bootIfActive();
+  setTimeout(bootIfActive, 500);
 })();

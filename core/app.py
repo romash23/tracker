@@ -975,6 +975,15 @@ def create_app():
             print('[INIT] departments.headcount добавлено')
     except Exception as _e:
         print(f'[INIT] migration headcount: {_e}')
+    # PATCH — миграция: штатная численность и экспертный коэф по направлениям
+    try:
+        cols = [r['name'] for r in db.query('PRAGMA table_info(departments)')]
+        for _col in ('headcount_retail', 'headcount_corp', 'expert_coef_retail', 'expert_coef_corp'):
+            if _col not in cols:
+                db.exec("ALTER TABLE departments ADD COLUMN %s REAL DEFAULT NULL" % _col)
+                print('[INIT] departments.%s добавлено' % _col)
+    except Exception as _e:
+        print(f'[INIT] migration headcount_dir: {_e}')
     # PATCH v1.0.3 — миграция: hired_date в employees
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(employees)')]
@@ -1421,6 +1430,30 @@ def create_app():
                     headcount = 0
             except (TypeError, ValueError):
                 headcount = None
+        # PATCH — штатная численность по направлениям + экспертный коэф
+        def _num_or_none(v, lo=0.0):
+            if v in (None, ''):
+                return None
+            try:
+                f = float(v)
+            except (TypeError, ValueError):
+                return None
+            if f < lo:
+                f = lo
+            return f
+        headcount_retail = _num_or_none(body.get('headcount_retail'))
+        headcount_corp = _num_or_none(body.get('headcount_corp'))
+        expert_coef_retail = _num_or_none(body.get('expert_coef_retail'))
+        expert_coef_corp = _num_or_none(body.get('expert_coef_corp'))
+        # общая штатная численность = розн + корп; должна быть целой
+        _hr = headcount_retail or 0
+        _hc = headcount_corp or 0
+        if headcount_retail is not None or headcount_corp is not None:
+            _total = _hr + _hc
+            if abs(_total - round(_total)) > 1e-9:
+                return jsonify({'success': False,
+                                'error': 'Общая численность штата не может быть дробным числом'}), 400
+            headcount = int(round(_total))
         if not name:
             return jsonify({'success': False, 'error': 'Название обязательно'}), 400
         u = current_user(db)
@@ -1446,6 +1479,14 @@ def create_app():
                 created = db.upsert_department(dep_id, name, color, head_employee_id)
             except TypeError:
                 created = db.upsert_department(dep_id, name, color)
+        # PATCH — сохраняем штатную численность по направлениям и экспертные коэффициенты
+        try:
+            db.exec('UPDATE departments SET headcount_retail=?, headcount_corp=?, '
+                    'expert_coef_retail=?, expert_coef_corp=? WHERE id=?',
+                    (headcount_retail, headcount_corp,
+                     expert_coef_retail, expert_coef_corp, dep_id))
+        except Exception as _e:
+            print(f'[dept save] headcount_dir update: {_e}')
         _audit(db, u, 'create' if created else 'update', 'department', dep_id,
                {'name': name, 'head_employee_id': head_employee_id})
         return jsonify({'success': True, 'id': dep_id, 'created': created})

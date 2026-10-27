@@ -9825,3 +9825,23 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 /* PATCH ref-layout: фикс высота списков правой колонки (банки/команды/праздники) */
 .dict-list-fixed { max-height: 400px; min-height: 125px; overflow-y: auto; }
 .dict-list-fixed.dict-holidays-compact { min-height: 120px; max-height: 180px; }
+
+/* ===== PATCH planning: вкладка «Планирование проверок» ===== */
+.plan-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.plan-title{font-size:1.25rem;font-weight:700;color:#1e293b;}
+.plan-tables{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;}
+.plan-table-wrap{flex:1 1 440px;min-width:360px;}
+.plan-table-caption{font-weight:700;font-size:1.05rem;margin-bottom:8px;color:#0f172a;}
+.plan-table-scroll{overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fff;}
+.plan-table{border-collapse:collapse;width:100%;font-size:0.95rem;}
+.plan-table th,.plan-table td{border:1px solid #e2e8f0;padding:8px 10px;text-align:center;white-space:nowrap;}
+.plan-table thead th{background:#f1f5f9;color:#0f172a;font-weight:700;position:sticky;top:0;}
+.plan-rowhead{text-align:left !important;background:#f8fafc;font-weight:600;color:#334155;position:sticky;left:0;z-index:1;}
+.plan-bankcol .plan-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.plan-coef-row td{background:#fffdf5;}
+.plan-poss-row td{background:#eef6ff;font-weight:700;color:#1d4ed8;}
+.plan-coef-input{width:72px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;font-size:0.92rem;background:#fff;}
+.plan-coef-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
+.plan-poss{color:#1d4ed8;}
+.plan-empty{padding:16px;color:#94a3b8;text-align:center;}
+.plan-hint{margin-top:14px;font-size:0.9rem;color:#64748b;font-style:italic;}

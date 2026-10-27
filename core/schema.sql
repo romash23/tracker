@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS departments (
   name TEXT NOT NULL,
   color TEXT DEFAULT '#00897b',
   head_employee_id TEXT DEFAULT '',
-  headcount INTEGER DEFAULT NULL
+  headcount INTEGER DEFAULT NULL,
+  headcount_retail REAL DEFAULT NULL,
+  headcount_corp REAL DEFAULT NULL,
+  expert_coef_retail REAL DEFAULT NULL,
+  expert_coef_corp REAL DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS employees (

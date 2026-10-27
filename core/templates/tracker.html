@@ -55,7 +55,7 @@
         </div>
     </div>
     <div class="tracker-tabs">
-        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>📅</span><span>Календарь</span></button>{% endif %}
+        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>📋</span><span>Задачи</span></button>{% endif %}
         {# PATCH: «План проверок» вставляется сюда JS-ом buildGanttTab() — между «Задачи» и «Тепловая карта» #}
         {% if P.get('tab.heatmap') %}<button class="tracker-tab{% if AT == 'heatmap' %} active{% endif %}" data-tab="heatmap"><span>🔥</span><span>Тепловая карта сотрудников</span></button>{% endif %}
@@ -66,22 +66,8 @@
     <!-- ============================== КАЛЕНДАРЬ ============================== -->
     {% if P.get('tab.calendar') %}
     <div class="tracker-panel{% if AT == 'calendar' %} active{% endif %}" id="panel-calendar">
-        <div class="cal-toolbar">
-            <div class="cal-nav">
-                <button class="cal-nav-btn" id="calPrevBtn">◀</button>
-                <button class="cal-nav-btn" id="calTodayBtn">Сегодня</button>
-                <button class="cal-nav-btn" id="calNextBtn">▶</button>
-            </div>
-            <div class="cal-month-title" id="calMonthTitle">—</div>
-            <div class="segmented" id="calViewMode">
-                <button class="active" data-mode="tasks">📋 Задачи</button>
-                <button data-mode="employees">👥 Сотрудники</button>
-            </div>
-            <button class="theme-toggle-btn" id="calExpandToggle"
-                    title="Разворачивать ячейку дня при наведении">
-                <span id="calExpandIcon">⤢</span>
-                <span id="calExpandLabel">Разворот дня: вкл</span>
-            </button>
+        <div class="plan-toolbar">
+            <div class="plan-title">🗓️ Планирование проверок</div>
             <div class="export-menu-wrap" style="position:relative;display:inline-block;">
                 <button class="dict-add-btn" id="exportMenuBtn" style="background:linear-gradient(135deg,#27ae60,#229954);">📥 Экспорт ▾</button>
                 <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
@@ -89,28 +75,19 @@
                     <div class="export-menu-item" data-form="debtors" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">⚠️ Кто не заполнил отчёт (сегодня)</div>
                 </div>
             </div>
-            {% if P.get('block.calendar.dept_filter') %}
-            <label class="cal-emp-filter" style="margin-left:auto;" title="Отдел">
-                <span>🏢</span><select id="calDeptFilter"><option value="">Отделы</option></select>
-            </label>
-            {% endif %}
-            {% if P.get('block.calendar.team_filter') %}
-            <label class="cal-emp-filter" title="Команда">
-                <span>👥</span><select id="calTeamFilter"><option value="">Команды</option></select>
-            </label>
-            {% endif %}
-            {% if P.get('block.calendar.employee_filter') %}
-            <label class="cal-emp-filter" title="Сотрудник">
-                <span>👤</span><select id="calEmployeeFilter"><option value="">Сотрудники</option></select>
-            </label>
-            {% endif %}
         </div>
-        <div class="cal-grid" id="calGrid" data-expand="on">
-            <div class="cal-dow">Пн</div><div class="cal-dow">Вт</div><div class="cal-dow">Ср</div>
-            <div class="cal-dow">Чт</div><div class="cal-dow">Пт</div><div class="cal-dow">Сб</div>
-            <div class="cal-dow">Вс</div>
+        <div class="plan-tables">
+            <div class="plan-table-wrap">
+                <div class="plan-table-caption">🏢 Корпоративное направление</div>
+                <div class="plan-table-scroll"><table class="plan-table" id="planCorpTable"></table></div>
+            </div>
+            <div class="plan-table-wrap">
+                <div class="plan-table-caption">🔴 Розничное направление</div>
+                <div class="plan-table-scroll"><table class="plan-table" id="planRetailTable"></table></div>
+            </div>
         </div>
-    </div>
+        <div class="plan-hint">Экспертный коэффициент редактируется прямо в ячейке (кликните и введите число, сохранение по выходу из поля). Возможное число проверок = нормативная (штатная) численность направления × экспертный коэффициент.</div>
+        </div>
     {% endif %}
     <!-- ============================== ЗАДАЧИ ============================== -->
     {% if P.get('tab.tasks') %}
@@ -401,9 +378,12 @@
     <input type="hidden" id="dep_id">
     <div class="form-group"><label>Название *</label><input type="text" id="dep_name" maxlength="80"></div>
     <div class="form-group"><label>Цвет</label><input type="color" id="dep_color" value="#00897b" style="height:38px;padding:2px;width:80px;"></div>
-    <div class="form-group"><label>👥 Штатная численность</label>
-        <input type="number" id="dep_headcount" min="0" step="1" placeholder="например: 8">
-        <small style="color:#64748b;">Плановое число ставок. Пусто — не задано (покажется «–»).</small>
+    <div class="form-group"><label>👥 Штатная численность (розничное направление)</label>
+        <input type="number" id="dep_headcount_retail" min="0" step="0.5" placeholder="например: 2.5">
+    </div>
+    <div class="form-group"><label>🏢 Штатная численность (корпоративное направление)</label>
+        <input type="number" id="dep_headcount_corp" min="0" step="0.5" placeholder="например: 3.5">
+        <small style="color:#64748b;">Общая штатная численность = розн + корп и должна быть целой. Пусто — не задано.</small>
     </div>
     <div class="form-group"><label>👤 Начальник банка</label>
         <select id="dep_head"><option value="">— не указан —</option></select>
