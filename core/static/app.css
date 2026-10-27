@@ -9776,6 +9776,18 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .hm-emp-row td.hm-emp-sub { padding-left:30px; }
 .hm-emp-dir { color:#9ca3af; font-size:0.89rem; }
 .hm-emp-cell { font-variant-numeric:tabular-nums; min-width:48px; }
+/* п.4: объединённая левая ячейка банка (имя + штатная численность, rowspan=2) */
+.hm-emp-table td.hm-bank-name { vertical-align:middle; background:#f8fafc; }
+.hm-bank-title { font-size:1.05rem; }
+.hm-bank-title b { color:#1f2937; }
+.hm-emp-table td.hm-bank-name .hm-staff-meta {
+  margin-top:3px; font-style:italic; font-size:0.96rem; color:#4b5563;
+  display:flex; flex-wrap:wrap; }
+/* строка нагрузки банка (верхняя из пары) — числа как в «Нагрузка по тер банкам», без подсветки */
+.hm-bank-row td.hm-bank-cell { font-weight:600; color:#1f2937; background:#eef2ff; }
+.hm-bank-row2 td.hm-bank-cell2 { background:#eef2ff; }
+/* красная подсветка перегруза сотрудника (>=1.5) */
+.hm-emp-cell.hm-cell-hot { background:#fee2e2; color:#b91c1c; font-weight:700; }
 
 /* ===== Справочник: группировка сотрудников по банкам ===== */
 .dict-emp-group { margin-bottom: 6px; }

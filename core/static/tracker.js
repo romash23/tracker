@@ -17774,24 +17774,35 @@ function openTaskFromUrl(){
     d.banks.forEach(function(b){
       if (Object.keys(HM.bank).length && !HM.bank[b.id]) return;
       var exp = !!HM.expanded[b.id];
-      var colspan = periods.length + 1;
+      var load = b.load || [];
+      /* Левая ячейка (имя банка + штатная численность) объединена на 2 строки (rowspan=2),
+         как «Объединить и поместить в центре» в Excel. Справа сверху — нагрузка банка. */
       h += '<tr class="hm-bank-row" data-bank="'+esc(b.id)+'">'
-         + '<td class="hm-emp-name"><span class="hm-caret">'+(exp?'▾':'▸')+'</span> <b>'+esc(b.name)+'</b></td>';
-      periods.forEach(function(){ h += '<td class="hm-emp-cell hm-bank-cell"></td>'; });
+         + '<td class="hm-emp-name hm-bank-name" rowspan="2">'
+         +   '<div class="hm-bank-title"><span class="hm-caret">'+(exp?'▾':'▸')+'</span> <b>'+esc(b.name)+'</b></div>'
+         +   '<div class="hm-staff-meta">'
+         +     '<span class="hm-staff-item">общая <b>'+b.total+'</b></span>'
+         +     '<span class="hm-staff-item">розн '+staffPips(b.retail,'🔴')+' <b>'+b.retail+'</b></span>'
+         +     '<span class="hm-staff-item">корп '+staffPips(b.corp,'🔵')+' <b>'+b.corp+'</b></span>'
+         +   '</div>'
+         + '</td>';
+      periods.forEach(function(_p, i){
+        var v = load[i];
+        h += '<td class="hm-emp-cell hm-bank-cell">'+(v? (Math.round((+v)*100)/100) : '')+'</td>';
+      });
       h += '</tr>';
-      /* Всегда видимая строка численности: курсив, смайлики-пипсы (целые + половинка) */
-      h += '<tr class="hm-staff-row"><td class="hm-emp-name hm-staff-meta" colspan="'+colspan+'">'
-         + '<span class="hm-staff-item">общая <b>'+b.total+'</b></span>'
-         + '<span class="hm-staff-item">розн '+staffPips(b.retail,'🔴')+' <b>'+b.retail+'</b></span>'
-         + '<span class="hm-staff-item">корп '+staffPips(b.corp,'🔵')+' <b>'+b.corp+'</b></span>'
-         + '</td></tr>';
+      /* Вторая строка пары (пустая справа — слева её закрывает rowspan). */
+      h += '<tr class="hm-bank-row2" data-bank="'+esc(b.id)+'">';
+      periods.forEach(function(){ h += '<td class="hm-emp-cell hm-bank-cell2"></td>'; });
+      h += '</tr>';
       if (exp){
         (b.rows||[]).forEach(function(r){
           if (!dirVisible(r.kind)) return;
           h += '<tr class="hm-emp-row"><td class="hm-emp-name hm-emp-sub">'
              + dirEmoji(r.kind)+' '+esc(r.name)+' <span class="hm-emp-dir">('+dirLabel(r.kind)+')</span></td>';
           (r.cells||[]).forEach(function(c){
-            h += '<td class="hm-emp-cell">'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
+            var hot = (Number(c)||0) >= 1.5 ? ' hm-cell-hot' : '';
+            h += '<td class="hm-emp-cell'+hot+'">'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
           });
           h += '</tr>';
         });
@@ -17799,7 +17810,7 @@ function openTaskFromUrl(){
     });
     h += '</tbody></table>';
     wrap.innerHTML = h;
-    wrap.querySelectorAll('.hm-bank-row').forEach(function(tr){
+    wrap.querySelectorAll('.hm-bank-row, .hm-bank-row2').forEach(function(tr){
       tr.onclick = function(){ var id=tr.getAttribute('data-bank'); HM.expanded[id]=!HM.expanded[id]; hmRender(); };
     });
   }

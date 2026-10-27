@@ -86,18 +86,59 @@ def _heatmap_compute(data, d1, d2, mode):
             b = pe
         return _ov(a, b, ps, pe)
 
+    def _vac_absent(e, ps, pe, mode):
+        # Отсутствие (отпуск/больничный). В недельном режиме берём понедельник
+        # недели (как договорились — аппроксимация). В дневном — сам день ps.
+        chk = ps if mode == 'day' else ps  # ps в неделе уже понедельник
+        for v in (e.get('vacations') or []):
+            a = _d(v.get('from'))
+            b = _d(v.get('to'))
+            if a is None or b is None:
+                continue
+            if a <= chk <= b:
+                return True
+        return False
+
     banks = []
     for dep in sorted(emp_by_dep.keys(), key=lambda d: dept_name.get(d, d).lower()):
         if not dep:
             continue
         es = emp_by_dep[dep]
-        r_cnt, c_cnt = dir_counts(dep)
+        r_cnt, c_cnt = dir_counts(dep)  # штатная численность направлений (без учёта отпусков)
+
+        # Нагрузка банка по периодам (как в таблице «Нагрузка по тер банкам»):
+        # сумма веса активных этапов аудиторских проверок * leadCoef.
+        bank_load = []
+        for (ps, pe, _lab) in periods:
+            bl = 0.0
+            for t in tasks:
+                if dep not in (t.get('department_ids') or []):
+                    continue
+                if (t.get('task_kind') or 'audit') != 'audit':
+                    continue
+                w = audit_weight(t, ps, pe)
+                if w > 0:
+                    bl += w * lead_coef(t, dep)
+            bank_load.append(round(bl, 2))
+
         rows = []
         for e in sorted(es, key=lambda x: (x.get('name') or '').lower()):
             dr = float(e.get('dir_retail') or 0)
             dc = float(e.get('dir_corp') or 0)
             cells = []
-            for (ps, pe, _lab) in periods:
+            for pi, (ps, pe, _lab) in enumerate(periods):
+                # Если сотрудник в отпуске в этом периоде — его ячейка 0,
+                # а знаменатель направления уменьшается на его доли.
+                if _vac_absent(e, ps, pe, mode):
+                    cells.append(0.0)
+                    continue
+                # Численность направлений в этом периоде = штат минус отсутствующие.
+                r_av = r_cnt
+                c_av = c_cnt
+                for e2 in es:
+                    if _vac_absent(e2, ps, pe, mode):
+                        r_av -= float(e2.get('dir_retail') or 0)
+                        c_av -= float(e2.get('dir_corp') or 0)
                 lr = 0.0
                 lc = 0.0
                 oth = 0.0
@@ -117,8 +158,8 @@ def _heatmap_compute(data, d1, d2, mode):
                     else:
                         if e['id'] in (t.get('assignees') or []) and other_active(t, ps, pe):
                             oth += float(t.get('load_coef') or 0)
-                val = (dr * (lr / r_cnt if r_cnt else 0)
-                       + dc * (lc / c_cnt if c_cnt else 0)
+                val = (dr * (lr / r_av if r_av > 0 else 0)
+                       + dc * (lc / c_av if c_av > 0 else 0)
                        + oth)
                 cells.append(round(val, 2))
             kind = ('hybrid' if (dr > 0 and dc > 0)
@@ -128,6 +169,7 @@ def _heatmap_compute(data, d1, d2, mode):
         banks.append({'id': dep, 'name': dept_name.get(dep, dep),
                       'total': round(r_cnt + c_cnt, 2),
                       'retail': round(r_cnt, 2), 'corp': round(c_cnt, 2),
+                      'load': bank_load,
                       'rows': rows})
     return {'periods': [p[2] for p in periods], 'banks': banks}
 
