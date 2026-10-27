@@ -74,7 +74,7 @@ body.login-body {
 .login-link:hover { color: var(--trk-accent-2); }
 
 /* ============ TRACKER ============ */
-.tracker-container { max-width: 1700px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.tracker-container { width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .tracker-header {
     display: flex; align-items: center; gap: 14px; padding: 12px 18px;
     background: var(--trk-glass-bg);
@@ -1025,7 +1025,7 @@ body.login-body {
 .tracker-notification.error { background: rgba(231,76,60,0.95); }
 
 /* ============ SETTINGS ============ */
-.settings-container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.settings-container { width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 
 .settings-panel.active { display: block; }
 
@@ -8326,7 +8326,7 @@ body.trk-theme-light .task-card-extra .txi-order { background: rgba(168, 114, 10
 .hm-dept-pills .tag-chip.active { background: var(--trk-filter-active-bg); border-style: solid; border-color: var(--trk-filter-active); color: var(--trk-filter-active); box-shadow: 0 0 0 1px var(--trk-filter-active-bg); }
 .hm-dept-pills .tag-clear { background: transparent; border: none; color: var(--trk-meta); font-size: 0.85rem; cursor: pointer; padding: 0 4px; font-family: inherit; border-radius: 8px; }
 .hm-dept-pills .tag-clear:hover { color: var(--trk-err); background: rgba(231,76,60,0.10); }
-.hm-toolbar > label.sum-filter:has(#hmDeptPills) { max-width: 620px; flex: 1 1 320px; }
+.hm-toolbar > label.sum-filter:has(#hmDeptPills) { max-width: none; flex: 1 1 320px; width: 100%; min-width: 0; }
 #hmPeriodSeg button { padding: 4px 10px; font-size: 0.75rem; }
 body.trk-theme-light .hm-dept-pills .tag-chip.active { background: rgba(0,137,123,0.12); color: #00695c; }
 
@@ -9829,8 +9829,8 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 /* ===== PATCH planning: вкладка «Планирование проверок» ===== */
 .plan-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
 .plan-title{font-size:1.25rem;font-weight:700;color:#1e293b;}
-.plan-tables{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;}
-.plan-table-wrap{flex:1 1 320px;min-width:280px;max-width:640px;}
+.plan-tables{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:start;width:100%;}
+.plan-table-wrap{display:flex;flex-direction:column;min-width:0;max-width:none;width:100%;}
 .plan-table-caption{font-weight:700;font-size:1.05rem;margin-bottom:8px;color:#0f172a;}
 .plan-table-scroll{overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fff;}
 .plan-table{border-collapse:collapse;width:auto;table-layout:auto;font-size:0.95rem;}
@@ -9867,3 +9867,8 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .plan-cal-red{background:#fee2e2 !important;color:#b91c1c;font-weight:700;}
 .plan-cal-green{background:#dcfce7 !important;color:#15803d;font-weight:700;}
 
+
+/* PATCH fluid-layout — снять жёсткие капы основных контейнеров */
+.hm-dept-pills{max-width:none;width:100%;}
+.plan-table-scroll,.plan-cal-scroll{width:100%;}
+.plan-table,.plan-cal-table{min-width:100%;}
