@@ -9830,17 +9830,22 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .plan-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
 .plan-title{font-size:1.25rem;font-weight:700;color:#1e293b;}
 .plan-tables{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;}
-.plan-table-wrap{flex:1 1 440px;min-width:360px;}
+.plan-table-wrap{flex:1 1 320px;min-width:280px;max-width:640px;}
 .plan-table-caption{font-weight:700;font-size:1.05rem;margin-bottom:8px;color:#0f172a;}
 .plan-table-scroll{overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fff;}
-.plan-table{border-collapse:collapse;width:100%;font-size:0.95rem;}
+.plan-table{border-collapse:collapse;width:auto;table-layout:fixed;font-size:0.95rem;}
 .plan-table th,.plan-table td{border:1px solid #e2e8f0;padding:8px 10px;text-align:center;white-space:nowrap;}
 .plan-table thead th{background:#f1f5f9;color:#0f172a;font-weight:700;position:sticky;top:0;}
 .plan-rowhead{text-align:left !important;background:#f8fafc;font-weight:600;color:#334155;position:sticky;left:0;z-index:1;}
 .plan-bankcol .plan-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.plan-bankcol{width:48px;min-width:48px;max-width:56px;cursor:help;overflow:hidden;}
+.plan-bankabbr{font-weight:600;letter-spacing:0.3px;}
+.plan-bankcol:hover{background:#eef2ff;color:#1d4ed8;}
+.plan-table th,.plan-table td{padding:7px 6px;}
+.plan-rowhead{min-width:108px;width:108px;white-space:normal !important;word-break:break-word;line-height:1.25;}
 .plan-coef-row td{background:#fffdf5;}
 .plan-poss-row td{background:#eef6ff;font-weight:700;color:#1d4ed8;}
-.plan-coef-input{width:72px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;font-size:0.92rem;background:#fff;}
+.plan-coef-input{width:46px;padding:3px 2px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;font-size:0.9rem;background:#fff;}
 .plan-coef-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
 .plan-poss{color:#1d4ed8;}
 .plan-empty{padding:16px;color:#94a3b8;text-align:center;}

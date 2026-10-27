@@ -17904,6 +17904,16 @@ setTimeout(buildGanttTab, 1500);
     return (v === null || v === undefined || v === '') ? null : num(v);
   }
 
+  function planAbbr(name){
+    var s = String(name||'').trim();
+    if (!s) return '—';
+    s = s.replace(/\s*банк\s*$/i,'').trim();   /* убираем хвост "банк" */
+    if (!s) s = String(name||'').trim();
+    /* первые 3 буквы, заглавными */
+    var base = s.replace(/[^A-Za-zА-Яа-яЁё]/g,'');
+    var ab = (base || s).slice(0,3).toUpperCase();
+    return ab;
+  }
   function buildTable(tableId, dir){
     var tbl = document.getElementById(tableId);
     if (!tbl) return;
@@ -17912,7 +17922,7 @@ setTimeout(buildGanttTab, 1500);
     /* шапка: тер банки по столбцам */
     var head = '<thead><tr><th class="plan-rowhead">Показатель</th>';
     deps.forEach(function(d){
-      head += '<th class="plan-bankcol"><span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span>'+esc(d.name)+'</th>';
+      head += '<th class="plan-bankcol" title="'+esc(d.name)+'">'+'<span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span>'+'<span class="plan-bankabbr">'+esc(planAbbr(d.name))+'</span></th>';
     });
     head += '</tr></thead>';
     /* строки */
