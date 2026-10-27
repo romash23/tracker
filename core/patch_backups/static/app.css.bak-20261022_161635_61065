@@ -1169,7 +1169,7 @@ body.trk-theme-light .perms-group-title { border-bottom-color: rgba(0,0,0,0.16);
 .dict-grid .dict-section .dict-list { flex: 1; }
 .dict-holidays-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 0.5fr 0.5fr 0.5fr 0.5fr;
     gap: 6px;
 }
 @media (max-width: 900px) {

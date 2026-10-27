@@ -323,7 +323,7 @@ body.login-body {
 .dict-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .dict-grid-tasks-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 900px) { .dict-grid-tasks-2col { grid-template-columns: 1fr; } }
-.dict-section { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dict-section { flex-direction: column; gap: 8px; min-width: 0; }
 .dict-section-head {
     display: flex; align-items: center; gap: 8px; padding-bottom: 6px;
     border-bottom: 1px solid var(--trk-card-border);
@@ -1169,7 +1169,7 @@ body.trk-theme-light .perms-group-title { border-bottom-color: rgba(0,0,0,0.16);
 .dict-grid .dict-section .dict-list { flex: 1; }
 .dict-holidays-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 0.5fr 0.5fr 0.5fr;
     gap: 6px;
 }
 @media (max-width: 900px) {
@@ -9811,5 +9811,5 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 }
 
 /* PATCH ref-layout: фикс высота списков правой колонки (банки/команды/праздники) */
-.dict-list-fixed { max-height: 400px; min-height: 200px; overflow-y: auto; }
+.dict-list-fixed { max-height: 400px; min-height: 125px; overflow-y: auto; }
 .dict-list-fixed.dict-holidays-compact { min-height: 120px; max-height: 180px; }
