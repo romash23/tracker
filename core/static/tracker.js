@@ -18290,13 +18290,13 @@ setTimeout(buildGanttTab, 1500);
     }
     html += '</div></div>';
 
-    var mNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    var mNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
     html += '<div class="vac-year-wrap">'+
       '<div class="vac-year-head">'+
         '<span class="vac-year-title">Календарь отсутствий по году</span>'+
         '<div class="vac-year-ctrl"><button type="button" id="vacYPrev">◀</button><span class="vac-year-num">'+selYear+'</span><button type="button" id="vacYNext">▶</button></div>'+
       '</div>'+
-      '<div class="vac-year-strip">';
+      '<div class="vac-year-grid">';
 
     var findDayEmoji = function(ds){
       for(var i=0; i<rawVacs.length; i++){
@@ -18310,7 +18310,6 @@ setTimeout(buildGanttTab, 1500);
     for(var m=1; m<=12; m++){
       var daysInMonth = new Date(selYear, m, 0).getDate();
       var mm = m<10 ? '0'+m : ''+m;
-      html += '<div class="vac-mblock"><div class="vac-mhead">'+mNames[m-1]+'</div><div class="vac-mgrid5x3">';
       for(var cell=1; cell<=15; cell++){
         var d1 = (cell-1)*2 + 1;
         var d2 = (cell===15) ? daysInMonth : (d1 + 1);
@@ -18329,9 +18328,11 @@ setTimeout(buildGanttTab, 1500);
         } else {
           tip = '—';
         }
-        html += '<div class="vac-mcell'+(em?' has-em':'')+(d1>daysInMonth?' out-month':'')+'" title="'+tip+'">'+em+'</div>';
+        var gr = Math.ceil(cell/3);
+        var gc = (m-1)*3 + ((cell-1)%3) + 1;
+        html += '<div class="vac-mcell'+(em?' has-em':'')+(d1>daysInMonth?' out-month':'')+'" style="grid-row:'+gr+';grid-column:'+gc+'" title="'+tip+'">'+em+'</div>';
       }
-      html += '</div></div>';
+      html += '<div class="vac-mlabel" style="grid-row:6;grid-column:'+((m-1)*3+1)+' / span 3">'+mNames[m-1]+'</div>';
     }
     html += '</div></div>';
 
