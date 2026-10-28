@@ -18153,3 +18153,125 @@ setTimeout(buildGanttTab, 1500);
   else bootIfActive();
   setTimeout(bootIfActive, 500);
 })();
+
+// --- VACATIONS TAB LOGIC ---
+(function(){
+    var state = window.__trkState || {departments:{}, employees:{}};
+    var selectedEmp = null;
+    var selectedType = 'vacation';
+
+    window.buildVacationsTab = function() {
+        var sb = document.getElementById('vacBanksList');
+        if(!sb) return;
+        sb.innerHTML = '';
+        var banks = Object.values(state.departments || {}).sort((a,b)=>a.name.localeCompare(b.name));
+        banks.forEach(b => {
+            var bdiv = document.createElement('div');
+            bdiv.className = 'vac-bank-item';
+            
+            var title = document.createElement('div');
+            title.className = 'vac-bank-title';
+            title.innerText = b.name;
+            title.onclick = () => {
+                var isExp = bdiv.classList.contains('expanded');
+                document.querySelectorAll('.vac-bank-item').forEach(x=>x.classList.remove('expanded'));
+                if(!isExp) bdiv.classList.add('expanded');
+            };
+            bdiv.appendChild(title);
+
+            var elist = document.createElement('div');
+            elist.className = 'vac-emp-list';
+            var emps = Object.values(state.employees || {}).filter(e => e.department_id == b.id && !e.fired);
+            emps.forEach(e => {
+                var ediv = document.createElement('div');
+                ediv.className = 'vac-emp-item';
+                ediv.innerText = e.name;
+                ediv.onclick = (ev) => {
+                    ev.stopPropagation();
+                    document.querySelectorAll('.vac-emp-item').forEach(x=>x.classList.remove('active'));
+                    document.querySelectorAll('.vac-bank-item').forEach(x=>x.classList.remove('active'));
+                    ediv.classList.add('active');
+                    bdiv.classList.add('active');
+                    selectedEmp = e;
+                    renderVacForm();
+                };
+                elist.appendChild(ediv);
+            });
+            bdiv.appendChild(elist);
+            sb.appendChild(bdiv);
+        });
+    };
+
+    function renderVacForm() {
+        var wa = document.getElementById('vacWorkArea');
+        if(!selectedEmp) { wa.style.display = 'none'; return; }
+        wa.style.display = 'block';
+        
+        var types = [
+            {k:'vacation', l:'🏖 Отпуск'},
+            {k:'sick_leave', l:'🤒 Больничный'},
+            {k:'business_trip', l:'✈️ Командировка'},
+            {k:'remote', l:'🏠 Удаленка'},
+            {k:'other', l:'📝 Другое'}
+        ];
+
+        var html = `<h2 style="margin-bottom:20px; color:#0f172a;">${selectedEmp.name} (Ввод отсутствия)</h2>`;
+        html += `<div class="vac-types">` + types.map(t=> `<button class="vac-type-btn ${selectedType==t.k?'active':''}" data-type="${t.k}">${t.l}</button>`).join('') + `</div>`;
+        html += `<div class="vac-form-row">
+                    <div class="vac-form-group"><label>Начало (С)</label><input type="date" id="vacDateFrom"></div>
+                    <div class="vac-form-group"><label>Окончание (По)</label><input type="date" id="vacDateTo"></div>
+                 </div>`;
+        html += `<div class="vac-form-group"><label>Комментарий / Обоснование</label><textarea id="vacComment" rows="3" placeholder="Необязательно"></textarea></div>`;
+        html += `<div class="vac-actions">
+                    <button class="btn btn-primary" id="vacSubmit" style="padding: 10px 24px; font-size:1rem;">Добавить запись</button>
+                    <button class="btn btn-secondary" id="vacSubmitMore" style="display:none; padding: 10px 24px; font-size:1rem;">Внести еще</button>
+                    <span id="vacMsg" style="color:#15803d; font-weight:500;"></span>
+                 </div>`;
+        wa.innerHTML = html;
+
+        wa.querySelectorAll('.vac-type-btn').forEach(btn => {
+            btn.onclick = () => {
+                selectedType = btn.dataset.type;
+                renderVacForm();
+            };
+        });
+
+        document.getElementById('vacSubmit').onclick = () => {
+            var df = document.getElementById('vacDateFrom').value;
+            var dt = document.getElementById('vacDateTo').value;
+            var cm = document.getElementById('vacComment').value;
+            if(!df || !dt) { alert('Пожалуйста, укажите даты начала и окончания.'); return; }
+            if(df > dt) { alert('Дата начала не может быть позже даты окончания.'); return; }
+            
+            fetch('/api/tracker/employee/vacation/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ employee_id: selectedEmp.id, reason: selectedType, date_from: df, date_to: dt, comment: cm })
+            }).then(r=>r.json()).then(res=>{
+                if(res.status==='ok') {
+                    document.getElementById('vacMsg').innerText = 'Успешно сохранено!';
+                    document.getElementById('vacSubmit').style.display = 'none';
+                    document.getElementById('vacSubmitMore').style.display = 'block';
+                } else {
+                    alert(res.message || 'Ошибка сохранения');
+                }
+            }).catch(e => alert('Сетевая ошибка: ' + e.message));
+        };
+
+        document.getElementById('vacSubmitMore').onclick = () => {
+            document.getElementById('vacDateFrom').value = '';
+            document.getElementById('vacDateTo').value = '';
+            document.getElementById('vacComment').value = '';
+            document.getElementById('vacMsg').innerText = '';
+            document.getElementById('vacSubmit').style.display = 'block';
+            document.getElementById('vacSubmitMore').style.display = 'none';
+        };
+    }
+
+    // Bind to render to ensure banks are built when state loads
+    var oldRender = window.render;
+    window.render = function() {
+        if(oldRender) oldRender();
+        buildVacationsTab();
+    };
+})();
