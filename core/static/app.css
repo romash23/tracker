@@ -9966,13 +9966,13 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 
 #panel-vacations .vac-year-wrap{margin-top:22px;border-top:1px solid #e5e7eb;padding-top:14px;}
 #panel-vacations .vac-year-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
-#panel-vacations .vac-year-title{font-weight:700;font-size:.92rem;color:#374151;}
+#panel-vacations .vac-year-title{font-weight:700;font-size:1.3rem;color:#111827;}
 #panel-vacations .vac-year-ctrl{display:inline-flex;align-items:center;gap:10px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:3px 8px;}
 #panel-vacations .vac-year-ctrl button{border:none;background:transparent;cursor:pointer;font-size:.9rem;color:#4f46e5;padding:2px 6px;border-radius:4px;font-weight:700;}
 #panel-vacations .vac-year-ctrl button:hover{background:#e0e7ff;}
 #panel-vacations .vac-year-num{font-weight:700;font-size:.95rem;color:#111827;min-width:44px;text-align:center;}
 #panel-vacations .vac-year-grid{display:grid;grid-template-columns:repeat(36,minmax(0,1fr));grid-template-rows:repeat(5,1fr) auto;gap:2px;overflow-x:auto;padding-bottom:4px;width:100%;}
-#panel-vacations .vac-mcell{width:100%;aspect-ratio:1;border-radius:4px;background:rgba(226,232,240,.38);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;user-select:none;}
-#panel-vacations .vac-mlabel{font-size:.68rem;font-weight:600;color:#64748b;white-space:nowrap;text-align:center;padding-top:2px;}
+#panel-vacations .vac-mcell{width:100%;aspect-ratio:1;border-radius:4px;background:rgba(226,232,240,.38);display:flex;align-items:center;justify-content:center;container-type:inline-size;font-size:clamp(10px,62cqi,42px);line-height:1;user-select:none;overflow:hidden;}
+#panel-vacations .vac-mlabel{font-size:1.25rem;font-weight:bold;color:#64748b;white-space:nowrap;text-align:center;padding-top:4px;}
 #panel-vacations .vac-mcell.has-em{background:#eef2ff;border:1px solid #c7d2fe;}
 #panel-vacations .vac-mcell.out-month{background:transparent;}

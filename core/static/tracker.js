@@ -18293,7 +18293,7 @@ setTimeout(buildGanttTab, 1500);
     var mNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
     html += '<div class="vac-year-wrap">'+
       '<div class="vac-year-head">'+
-        '<span class="vac-year-title">Календарь отсутствий по году</span>'+
+        '<span class="vac-year-title">Календарь отсутствий</span>'+
         '<div class="vac-year-ctrl"><button type="button" id="vacYPrev">◀</button><span class="vac-year-num">'+selYear+'</span><button type="button" id="vacYNext">▶</button></div>'+
       '</div>'+
       '<div class="vac-year-grid">';
@@ -18332,7 +18332,7 @@ setTimeout(buildGanttTab, 1500);
         var gc = (m-1)*3 + ((cell-1)%3) + 1;
         html += '<div class="vac-mcell'+(em?' has-em':'')+(d1>daysInMonth?' out-month':'')+'" style="grid-row:'+gr+';grid-column:'+gc+'" title="'+tip+'">'+em+'</div>';
       }
-      html += '<div class="vac-mlabel" style="grid-row:6;grid-column:'+((m-1)*3+1)+' / span 3">'+mNames[m-1]+'</div>';
+      html += '<div class="vac-mlabel" style="grid-row:6;grid-column:'+((m-1)*3+1)+' / span 3; font-size: 1.25rem; font-weight: bold;">'+mNames[m-1]+'</div>';
     }
     html += '</div></div>';
 
