@@ -9946,3 +9946,33 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 #panel-vacations .vac-msg{font-size:.9rem;}
 #panel-vacations .vac-msg.ok{color:#15803d;}
 #panel-vacations .vac-msg.err{color:#b91c1c;}
+
+/* === VACATIONS LIST & 12-MONTH 5x3 STRIP === */
+#panel-vacations .vac-list-wrap{margin-top:22px;border-top:1px solid #e5e7eb;padding-top:14px;}
+#panel-vacations .vac-list-title{font-weight:700;font-size:.92rem;color:#374151;margin-bottom:8px;}
+#panel-vacations .vac-list-box{max-height:195px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;}
+#panel-vacations .vac-list-empty{color:#9ca3af;font-size:.88rem;font-style:italic;padding:8px 2px;}
+#panel-vacations .vac-list-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 11px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;font-size:.9rem;color:#1f2937;}
+#panel-vacations .vac-list-item.past{background:#f1f5f9;border-color:#e5e7eb;color:#9ca3af;opacity:.62;filter:grayscale(85%);}
+#panel-vacations .vac-list-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;}
+#panel-vacations .vac-list-badge{font-weight:600;white-space:nowrap;}
+#panel-vacations .vac-list-dates{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86rem;color:#334155;white-space:nowrap;}
+#panel-vacations .vac-list-item.past .vac-list-dates{color:#9ca3af;}
+#panel-vacations .vac-list-cm{color:#64748b;font-size:.85rem;}
+#panel-vacations .vac-del-btn{border:none;background:transparent;color:#ef4444;cursor:pointer;font-size:.95rem;padding:2px 6px;border-radius:5px;opacity:.65;flex-shrink:0;}
+#panel-vacations .vac-del-btn:hover{opacity:1;background:#fee2e2;}
+
+#panel-vacations .vac-year-wrap{margin-top:22px;border-top:1px solid #e5e7eb;padding-top:14px;}
+#panel-vacations .vac-year-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+#panel-vacations .vac-year-title{font-weight:700;font-size:.92rem;color:#374151;}
+#panel-vacations .vac-year-ctrl{display:inline-flex;align-items:center;gap:10px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:3px 8px;}
+#panel-vacations .vac-year-ctrl button{border:none;background:transparent;cursor:pointer;font-size:.9rem;color:#4f46e5;padding:2px 6px;border-radius:4px;font-weight:700;}
+#panel-vacations .vac-year-ctrl button:hover{background:#e0e7ff;}
+#panel-vacations .vac-year-num{font-weight:700;font-size:.95rem;color:#111827;min-width:44px;text-align:center;}
+#panel-vacations .vac-year-strip{display:grid;grid-template-columns:repeat(12,minmax(68px,1fr));gap:8px;overflow-x:auto;padding-bottom:4px;}
+#panel-vacations .vac-mblock{background:#fafafa;border:1px solid #eef2f7;border-radius:8px;padding:6px 5px;display:flex;flex-direction:column;align-items:center;}
+#panel-vacations .vac-mhead{font-size:.76rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+#panel-vacations .vac-mgrid5x3{display:grid;grid-template-columns:repeat(3,20px);grid-template-rows:repeat(5,20px);gap:2px;}
+#panel-vacations .vac-mcell{width:20px;height:20px;border-radius:4px;background:rgba(226,232,240,.38);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;user-select:none;}
+#panel-vacations .vac-mcell.has-em{background:#eef2ff;border:1px solid #c7d2fe;}
+#panel-vacations .vac-mcell.out-month{background:transparent;}

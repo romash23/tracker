@@ -18154,20 +18154,27 @@ setTimeout(buildGanttTab, 1500);
   setTimeout(bootIfActive, 500);
 })();
 
-// --- VACATIONS TAB (clean rebuild v2) ---
+// --- VACATIONS TAB (clean rebuild v3) ---
 (function(){
   'use strict';
-  if (window.__trkVacTabV2) return;
-  window.__trkVacTabV2 = true;
+  if (window.__trkVacTabV3) return;
+  window.__trkVacTabV3 = true;
   var ABS_TYPES = [
-    ['vacation','\ud83c\udfd6 \u041e\u0442\u043f\u0443\u0441\u043a'],
-    ['sick_leave','\ud83e\udd12 \u0411\u043e\u043b\u044c\u043d\u0438\u0447\u043d\u044b\u0439'],
-    ['business_trip','\u2708\ufe0f \u041a\u043e\u043c\u0430\u043d\u0434\u0438\u0440\u043e\u0432\u043a\u0430'],
-    ['remote','\ud83c\udfe0 \u0423\u0434\u0430\u043b\u0435\u043d\u043a\u0430'],
-    ['other','\ud83d\udcdd \u0414\u0440\u0443\u0433\u043e\u0435']
+    ['vacation','🏖 Отпуск'],
+    ['sick_leave','🤒 Больничный'],
+    ['business_trip','✈️ Командировка'],
+    ['remote','🏠 Удаленка'],
+    ['other','📝 Другое']
   ];
-  var selEmp = null, selType = 'vacation';
-  function st(){ return window.__trkState || {departments:{}, employees:{}}; }
+  var EMOJI_MAP = {
+    'vacation': '🏖',
+    'sick_leave': '🤒',
+    'business_trip': '✈️',
+    'remote': '🏠',
+    'other': '📝'
+  };
+  var selEmp = null, selType = 'vacation', selYear = new Date().getFullYear();
+  function st(){ return window.__trkState || {departments:[], employees:[]}; }
   function ensureTab(){
     var tabs = document.querySelector('.tracker-tabs');
     if (!tabs) return;
@@ -18176,7 +18183,7 @@ setTimeout(buildGanttTab, 1500);
       var btn = document.createElement('button');
       btn.className = 'tracker-tab';
       btn.setAttribute('data-tab','vacations');
-      btn.innerHTML = '<span>\ud83c\udfd6</span><span>\u041e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0438\u044f</span>';
+      btn.innerHTML = '<span>🏖</span><span>Отсутствия</span>';
       if (anchor && anchor.parentNode===tabs) tabs.insertBefore(btn, anchor);
       else tabs.appendChild(btn);
       btn.addEventListener('click', function(e){ e.preventDefault(); activate(); });
@@ -18186,10 +18193,10 @@ setTimeout(buildGanttTab, 1500);
       var panel = document.createElement('div');
       panel.className = 'tracker-panel'; panel.id = 'panel-vacations';
       panel.innerHTML =
-        '<div class="vac-toolbar"><div class="vac-title">\ud83c\udfd6 \u0412\u0432\u043e\u0434 \u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0438\u0439</div></div>'+
+        '<div class="vac-toolbar"><div class="vac-title">🏖 Ввод отсутствий</div></div>'+
         '<div class="vac-container">'+
           '<div class="vac-sidebar" id="vacBanksList"></div>'+
-          '<div class="vac-workarea" id="vacWorkArea"><div class="vac-empty">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430 \u0441\u043b\u0435\u0432\u0430</div></div>'+
+          '<div class="vac-workarea" id="vacWorkArea"><div class="vac-empty">Выберите сотрудника слева</div></div>'+
         '</div>';
       if (host && host.parentNode) host.parentNode.appendChild(panel);
       else document.body.appendChild(panel);
@@ -18200,6 +18207,7 @@ setTimeout(buildGanttTab, 1500);
     document.querySelectorAll('.tracker-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tab')==='vacations'); });
     document.querySelectorAll('.tracker-panel').forEach(function(p){ p.classList.toggle('active', p.id==='panel-vacations'); });
     renderBanks();
+    if(selEmp) renderForm();
   }
   function renderBanks(){
     var sb = document.getElementById('vacBanksList'); if(!sb) return;
@@ -18210,7 +18218,7 @@ setTimeout(buildGanttTab, 1500);
     banks.forEach(function(b){
       var item=document.createElement('div'); item.className='vac-bank-item';
       var title=document.createElement('div'); title.className='vac-bank-title';
-      var caret=document.createElement('span'); caret.className='vac-caret'; caret.textContent='\u25b8';
+      var caret=document.createElement('span'); caret.className='vac-caret'; caret.textContent='▸';
       var label=document.createElement('span'); label.textContent=b.name;
       title.appendChild(caret); title.appendChild(label);
       var list=document.createElement('div'); list.className='vac-emp-list';
@@ -18221,51 +18229,231 @@ setTimeout(buildGanttTab, 1500);
         row.onclick=function(){ selEmp=e; renderBanks(); renderForm(); };
         list.appendChild(row);
       });
-      if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='\u043d\u0435\u0442 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432'; list.appendChild(em); }
-      title.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'\u25be':'\u25b8'; };
-      if(selEmp && mine.some(function(e){return e.id===selEmp.id;})){ item.classList.add('expanded'); caret.textContent='\u25be'; }
+      if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='нет сотрудников'; list.appendChild(em); }
+      title.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'▾':'▸'; };
+      if(selEmp && mine.some(function(e){return e.id===selEmp.id;})){ item.classList.add('expanded'); caret.textContent='▾'; }
       item.appendChild(title); item.appendChild(list); sb.appendChild(item);
     });
   }
+  function fmtDateRu(iso){
+    if(!iso) return '';
+    var p = iso.split('-');
+    return p.length===3 ? (p[2]+'.'+p[1]+'.'+p[0]) : iso;
+  }
   function renderForm(){
-    var wa=document.getElementById('vacWorkArea'); if(!wa) return;
-    if(!selEmp){ wa.innerHTML='<div class="vac-empty">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430 \u0441\u043b\u0435\u0432\u0430</div>'; return; }
-    var types=ABS_TYPES.map(function(t){ return '<button type="button" class="vac-type-btn'+(selType===t[0]?' active':'')+'" data-vtype="'+t[0]+'">'+t[1]+'</button>'; }).join('');
-    wa.innerHTML=
-      '<div class="vac-form-head">'+selEmp.name+'</div>'+
-      '<div class="vac-types">'+types+'</div>'+
+    var wa = document.getElementById('vacWorkArea'); if(!wa) return;
+    if(!selEmp){ wa.innerHTML='<div class="vac-empty">Выберите сотрудника слева</div>'; return; }
+    var freshEmp = Object.values(st().employees||{}).find(function(x){ return x.id===selEmp.id; });
+    if(freshEmp) selEmp = freshEmp;
+
+    var prevFrom = document.getElementById('vacFrom') ? document.getElementById('vacFrom').value : '';
+    var prevTo   = document.getElementById('vacTo') ? document.getElementById('vacTo').value : '';
+    var prevCm   = document.getElementById('vacComment') ? document.getElementById('vacComment').value : '';
+
+    var html = '<div class="vac-form-head">'+(selEmp.name||'')+'</div><div class="vac-types">';
+    ABS_TYPES.forEach(function(t){
+      html += '<button type="button" class="vac-type-btn '+(selType===t[0]?'active':'')+'" data-vtype="'+t[0]+'">'+t[1]+'</button>';
+    });
+    html += '</div>'+
       '<div class="vac-fields">'+
-        '<label class="vac-fld"><span>\u0421 \u0434\u0430\u0442\u044b</span><input type="date" id="vacFrom"></label>'+
-        '<label class="vac-fld"><span>\u041f\u043e \u0434\u0430\u0442\u0443</span><input type="date" id="vacTo"></label>'+
+        '<label class="vac-fld"><span>С</span><input type="date" id="vacFrom" value="'+prevFrom+'"></label>'+
+        '<label class="vac-fld"><span>По</span><input type="date" id="vacTo" value="'+prevTo+'"></label>'+
       '</div>'+
-      '<label class="vac-fld vac-fld-wide"><span>\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</span><input type="text" id="vacComment" placeholder="\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e"></label>'+
-      '<div class="vac-actions"><button type="button" class="vac-save-btn" id="vacSaveBtn">\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button><span class="vac-msg" id="vacMsg"></span></div>';
-    wa.querySelectorAll('.vac-type-btn').forEach(function(btn){ btn.onclick=function(){ selType=btn.getAttribute('data-vtype'); renderForm(); }; });
-    wa.querySelector('#vacSaveBtn').onclick=save;
+      '<div class="vac-fields"><label class="vac-fld vac-fld-wide"><span>Комментарий</span><input type="text" id="vacComment" placeholder="необязательно" value="'+prevCm.replace(/"/g,'&quot;')+'"></label></div>'+
+      '<div class="vac-actions"><button type="button" class="vac-save-btn" id="vacSaveBtn">Сохранить</button><span class="vac-msg" id="vacMsg"></span></div>';
+
+    var rawVacs = (selEmp.vacations||[]).map(function(v, origIdx){
+      return { id: v.id, from: v.from||'', to: v.to||'', type: v.type||'vacation', comment: v.comment||'', origIdx: origIdx };
+    });
+    rawVacs.sort(function(a,b){ return a.from.localeCompare(b.from) || a.to.localeCompare(b.to); });
+
+    var todayStr = (st().today) || new Date().toISOString().split('T')[0];
+
+    html += '<div class="vac-list-wrap"><div class="vac-list-title">Список отсутствий ('+rawVacs.length+')</div><div class="vac-list-box">';
+    if(!rawVacs.length){
+      html += '<div class="vac-list-empty">Записей об отсутствиях пока нет</div>';
+    } else {
+      rawVacs.forEach(function(v){
+        var tPair = ABS_TYPES.find(function(x){ return x[0]===v.type; });
+        var tLabel = tPair ? tPair[1] : ('🏖 ' + v.type);
+        var isPast = v.to && v.to < todayStr;
+        var cls = 'vac-list-item' + (isPast ? ' past' : '');
+        html += '<div class="'+cls+'">'+
+          '<div class="vac-list-main">'+
+            '<span class="vac-list-badge">'+tLabel+'</span>'+
+            '<span class="vac-list-dates">'+fmtDateRu(v.from)+' — '+fmtDateRu(v.to)+'</span>'+
+            (v.comment ? '<span class="vac-list-cm">· '+v.comment.replace(/</g,'&lt;')+'</span>' : '')+
+          '</div>'+
+          '<button type="button" class="vac-del-btn" data-idx="'+v.origIdx+'" data-vid="'+(v.id!=null?v.id:'')+'" title="Удалить">✕</button>'+
+        '</div>';
+      });
+    }
+    html += '</div></div>';
+
+    var mNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    html += '<div class="vac-year-wrap">'+
+      '<div class="vac-year-head">'+
+        '<span class="vac-year-title">Календарь отсутствий по году</span>'+
+        '<div class="vac-year-ctrl"><button type="button" id="vacYPrev">◀</button><span class="vac-year-num">'+selYear+'</span><button type="button" id="vacYNext">▶</button></div>'+
+      '</div>'+
+      '<div class="vac-year-strip">';
+
+    var findDayEmoji = function(ds){
+      for(var i=0; i<rawVacs.length; i++){
+        if(rawVacs[i].from <= ds && ds <= rawVacs[i].to){
+          return EMOJI_MAP[rawVacs[i].type] || '🏖';
+        }
+      }
+      return '';
+    };
+
+    for(var m=1; m<=12; m++){
+      var daysInMonth = new Date(selYear, m, 0).getDate();
+      var mm = m<10 ? '0'+m : ''+m;
+      html += '<div class="vac-mblock"><div class="vac-mhead">'+mNames[m-1]+'</div><div class="vac-mgrid5x3">';
+      for(var cell=1; cell<=15; cell++){
+        var d1 = (cell-1)*2 + 1;
+        var d2 = (cell===15) ? daysInMonth : (d1 + 1);
+        var em = '';
+        var tip = '';
+        if(d1 <= daysInMonth){
+          var daysList = [];
+          for(var d=d1; d<=Math.min(d2, daysInMonth); d++) daysList.push(d);
+          tip = daysList.map(function(d){ return (d<10?'0'+d:d)+'.'+mm+'.'+selYear; }).join(', ');
+          for(var k=0; k<daysList.length; k++){
+            var dd = daysList[k]<10 ? '0'+daysList[k] : ''+daysList[k];
+            var ds = selYear + '-' + mm + '-' + dd;
+            var found = findDayEmoji(ds);
+            if(found){ em = found; break; }
+          }
+        } else {
+          tip = '—';
+        }
+        html += '<div class="vac-mcell'+(em?' has-em':'')+(d1>daysInMonth?' out-month':'')+'" title="'+tip+'">'+em+'</div>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div></div>';
+
+    wa.innerHTML = html;
+
+    wa.querySelectorAll('.vac-type-btn').forEach(function(btn){
+      btn.onclick = function(){ selType = btn.getAttribute('data-vtype'); renderForm(); };
+    });
+    wa.querySelector('#vacSaveBtn').onclick = save;
+    wa.querySelectorAll('.vac-del-btn').forEach(function(btn){
+      btn.onclick = function(){
+        delVac(btn.getAttribute('data-vid'), btn.getAttribute('data-idx'));
+      };
+    });
+    wa.querySelector('#vacYPrev').onclick = function(){ selYear--; renderForm(); };
+    wa.querySelector('#vacYNext').onclick = function(){ selYear++; renderForm(); };
   }
-  function csrf(){
-    var m=document.querySelector('meta[name="csrf-token"]'); if(m) return m.getAttribute('content');
-    var i=document.querySelector('input[name="csrf_token"]'); return i?i.value:'';
+
+  function getCsrfToken(){
+    if(window.REESTR_CSRF) return window.REESTR_CSRF;
+    var m = document.querySelector('meta[name="csrf-token"]');
+    if(m && m.getAttribute('content')) return m.getAttribute('content');
+    var i = document.querySelector('input[name="csrf_token"]');
+    return i ? i.value : '';
   }
-  function save(){
-    var msg=document.getElementById('vacMsg');
-    var frm=document.getElementById('vacFrom').value, to=document.getElementById('vacTo').value, cm=document.getElementById('vacComment').value;
+
+  function postJson(url, payload){
+    if(typeof window.apiJson === 'function'){
+      return window.apiJson(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+    }
+    var tok = getCsrfToken();
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': tok,
+        'X-CSRFToken': tok
+      },
+      body: JSON.stringify(payload)
+    }).then(function(r){ return r.json(); });
+  }
+
+  function delVac(vid, idx){
     if(!selEmp) return;
-    if(!frm||!to){ if(msg){msg.textContent='\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0434\u0430\u0442\u044b'; msg.className='vac-msg err';} return; }
-    if(to<frm){ if(msg){msg.textContent='\u041f\u043e \u0434\u0430\u0442\u0443 \u0440\u0430\u043d\u044c\u0448\u0435 \u043d\u0430\u0447\u0430\u043b\u0430'; msg.className='vac-msg err';} return; }
-    var payload={employee_id:selEmp.id, vac_type:selType, date_from:frm, date_to:to, comment:cm};
-    fetch('/api/tracker/employee/vacation/add',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},body:JSON.stringify(payload)})
-      .then(function(r){return r.json().catch(function(){return {};});})
-      .then(function(res){
-        if(res && res.ok){
-          if(msg){msg.textContent='\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e \u2713'; msg.className='vac-msg ok';}
-          var f=document.getElementById('vacFrom'),t=document.getElementById('vacTo'),c=document.getElementById('vacComment');
-          if(f)f.value=''; if(t)t.value=''; if(c)c.value='';
-          if(typeof window.fetchState==='function') window.fetchState();
-        } else { if(msg){msg.textContent=(res&&res.error)||'\u041e\u0448\u0438\u0431\u043a\u0430'; msg.className='vac-msg err';} }
-      }).catch(function(){ if(msg){msg.textContent='\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0442\u0438'; msg.className='vac-msg err';} });
+    var payload = { employee_id: selEmp.id };
+    if(vid !== null && vid !== undefined && vid !== '' && vid !== 'undefined'){
+      payload.id = parseInt(vid, 10);
+    } else {
+      payload.index = parseInt(idx, 10);
+    }
+    postJson('/api/tracker/employee/vacation/delete', payload).then(function(res){
+      if(res && res.success){
+        if(typeof window.trkRefreshAll === 'function'){
+          window.trkRefreshAll().then(function(){ renderBanks(); renderForm(); });
+        } else {
+          renderForm();
+        }
+      } else {
+        var msg = document.getElementById('vacMsg');
+        if(msg){ msg.textContent = (res && res.error) || 'Ошибка удаления'; msg.className = 'vac-msg err'; }
+      }
+    }).catch(function(e){
+      var msg = document.getElementById('vacMsg');
+      if(msg){ msg.textContent = (e && e.message) || 'Ошибка удаления'; msg.className = 'vac-msg err'; }
+    });
   }
+
+  function save(){
+    var msg = document.getElementById('vacMsg');
+    var fEl = document.getElementById('vacFrom'), tEl = document.getElementById('vacTo'), cEl = document.getElementById('vacComment');
+    var frm = fEl ? fEl.value : '', to = tEl ? tEl.value : '', cm = cEl ? cEl.value : '';
+    if(!selEmp) return;
+    if(!frm || !to){
+      if(msg){ msg.textContent = 'Укажите даты'; msg.className = 'vac-msg err'; }
+      return;
+    }
+    if(to < frm){
+      if(msg){ msg.textContent = 'Дата окончания раньше начала'; msg.className = 'vac-msg err'; }
+      return;
+    }
+    var payload = {
+      employee_id: selEmp.id,
+      type: selType,
+      from: frm,
+      to: to,
+      comment: cm
+    };
+    postJson('/api/tracker/employee/vacation/add', payload).then(function(res){
+      if(res && (res.success || res.ok)){
+        if(fEl) fEl.value = '';
+        if(tEl) tEl.value = '';
+        if(cEl) cEl.value = '';
+        var afterRefresh = function(){
+          renderBanks();
+          renderForm();
+          var m2 = document.getElementById('vacMsg');
+          if(m2){ m2.textContent = 'Сохранено ✓'; m2.className = 'vac-msg ok'; }
+        };
+        if(typeof window.trkRefreshAll === 'function'){
+          window.trkRefreshAll().then(afterRefresh);
+        } else {
+          afterRefresh();
+        }
+      } else {
+        if(msg){ msg.textContent = (res && res.error) || 'Ошибка'; msg.className = 'vac-msg err'; }
+      }
+    }).catch(function(e){
+      if(msg){ msg.textContent = (e && e.message) || 'Ошибка сети'; msg.className = 'vac-msg err'; }
+    });
+  }
+
   function boot(){ ensureTab(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-  var _or=window.render; window.render=function(){ if(_or) _or(); if(selEmp) renderBanks(); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  var _or = window.render;
+  window.render = function(){
+    if(_or) _or();
+    if(selEmp){ renderBanks(); renderForm(); }
+  };
 })();
