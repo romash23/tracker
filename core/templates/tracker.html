@@ -59,10 +59,36 @@
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>📋</span><span>Задачи</span></button>{% endif %}
         {# PATCH: «План проверок» вставляется сюда JS-ом buildGanttTab() — между «Задачи» и «Тепловая карта» #}
         {% if P.get('tab.heatmap') %}<button class="tracker-tab{% if AT == 'heatmap' %} active{% endif %}" data-tab="heatmap"><span>🔥</span><span>Тепловая карта сотрудников</span></button>{% endif %}
+        {# PATCH DASHBOARDS: Вкладка песочницы #}
+        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'dashboards' %} active{% endif %}" data-tab="dashboards" id="tabDashboardsBtn"><span>📊</span><span>Дашборды</span></button>{% endif %}
+
         {# PATCH: кнопка «Свод» убрана из верхнего ряда — теперь пункт меню «Статистика» (панель #panel-summary остаётся в DOM). #}
         {% if P.get('tab.stats') %}<button class="tracker-tab{% if AT == 'stats' %} active{% endif %}" data-tab="stats"><span>📈</span><span>Статистика</span></button>{% endif %}
         {% if P.get('tab.dicts') %}<button class="tracker-tab{% if AT == 'dicts' %} active{% endif %}" data-tab="dicts"><span>⚙️</span><span>Справочники</span></button>{% endif %}
     </div>
+
+    <!-- ============================== ДАШБОРДЫ ============================== -->
+    <div class="tracker-panel{% if AT == 'dashboards' %} active{% endif %}" id="panel-dashboards">
+        <div class="plan-toolbar">
+            <div class="plan-title">📊 Песочница планирования</div>
+            <div class="export-menu-wrap" style="flex:1; display:flex; justify-content:flex-end;">
+                <button class="btn" style="background:#4CAF50; color:#fff;" id="dashSaveBtn">Сохранить изменения</button>
+            </div>
+        </div>
+        <div style="padding: 20px;">
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight:bold; margin-right:10px;">Задача:</label>
+                <select id="dashTaskSelector" class="form-control" style="width: 300px; display:inline-block;"></select>
+            </div>
+            <div id="dashGanttContainer" style="border: 1px solid #ddd; padding: 20px; background: #fff; min-height: 100px;">
+                <!-- Сюда JS будет рендерить колбаску -->
+            </div>
+            <div id="dashLoadContainer" style="border: 1px solid #ddd; border-top: none; padding: 20px; background: #fafafa; min-height: 200px;">
+                <!-- Сюда JS будет рендерить график нагрузки -->
+            </div>
+        </div>
+    </div>
+
     <!-- ============================== КАЛЕНДАРЬ ============================== -->
     {% if P.get('tab.calendar') %}
     <div class="tracker-panel{% if AT == 'calendar' %} active{% endif %}" id="panel-calendar">
