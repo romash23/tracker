@@ -18488,7 +18488,24 @@ setTimeout(buildGanttTab, 1500);
         draft: null // { id, name, type, start, deadline, stages, dept_shares, lead_dept, lead_emp }
     };
     
+    
+    function ensureDashboardsTab() {
+        var tabs = document.querySelector('.tracker-tabs');
+        if (!tabs) return;
+        if (!tabs.querySelector('[data-tab="dashboards"]')) {
+            var anchor = tabs.querySelector('.tracker-tab[data-tab="stats"]');
+            var btn = document.createElement('button');
+            btn.className = 'tracker-tab';
+            btn.setAttribute('data-tab', 'dashboards');
+            btn.id = 'tabDashboardsBtn';
+            btn.innerHTML = '<span>📊</span><span>Дашборды</span>';
+            if (anchor && anchor.parentNode === tabs) tabs.insertBefore(btn, anchor);
+            else tabs.appendChild(btn);
+        }
+    }
+
     function init() {
+        ensureDashboardsTab();
         var btn = $('tabDashboardsBtn');
         if(btn) btn.addEventListener('click', function(){ window.switchTab('dashboards'); renderSelector(); });
     }
