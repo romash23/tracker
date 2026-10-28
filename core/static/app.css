@@ -9976,3 +9976,8 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 #panel-vacations .vac-mlabel{font-size: 1.25rem;font-weight: 700;color:#64748b;white-space:nowrap;text-align:center;padding-top:4px;}
 #panel-vacations .vac-mcell.has-em{background:#eef2ff;border:1px solid #c7d2fe;}
 #panel-vacations .vac-mcell.out-month{background:transparent;}
+
+.task-stage-check { display:flex; align-items:center; }
+.task-stage-check input { width:16px; height:16px; cursor:pointer; margin:0; }
+.task-stage-disabled .task-stage-name, .task-stage-disabled .task-stage-f { opacity: 0.4; pointer-events: none; }
+.task-stage-disabled input[type="date"] { border-color: transparent; background: transparent; }

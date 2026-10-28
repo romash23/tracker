@@ -3166,7 +3166,9 @@ function renderTaskStages() {
         var minAttr = minS ? ' min="' + minS + '"' : '';
         var maxAttr = maxS ? ' max="' + maxS + '"' : '';
         var rowCls = 'task-stage-row' + (conflicts[idx] ? ' task-stage-conflict' : '');
+        var checked = (start !== '' || (idx===1 && !start && !_taskStagesDraft[key])) ? ' checked' : ''; // default проверка_нжя
         html += '<div class="' + rowCls + '">';
+        html +=   '<label class="task-stage-check"><input type="checkbox" class="task-stage-active" data-stage="' + key + '"' + checked + '></label>';
         html +=   '<span class="task-stage-chip" style="background:' + col + '"></span>';
         html +=   '<span class="task-stage-name">' + escapeHtml(TASK_STAGE_LABELS[key] || key) + '</span>';
         html +=   '<label class="task-stage-f">\u043d\u0430\u0447. <input type="date" class="task-stage-start" data-stage="' + key + '" data-stage-idx="' + idx + '" value="' + start + '"' + minAttr + maxAttr + '></label>';
@@ -3176,6 +3178,20 @@ function renderTaskStages() {
         html += '</div>';
     });
     box.innerHTML = html;
+    box.querySelectorAll('.task-stage-active').forEach(function(cb) {
+        var row = cb.closest('.task-stage-row');
+        if (!cb.checked) row.classList.add('task-stage-disabled');
+        cb.addEventListener('change', function() {
+            var key = this.getAttribute('data-stage');
+            if (this.checked) {
+                // Инициализация при включении (базовая заглушка, чтобы появился start, если пусто)
+                _taskStagesDraft[key] = $('task_start_date') ? $('task_start_date').value || todayISO() : todayISO();
+            } else {
+                _taskStagesDraft[key] = ''; // отключаем этап = нет старта
+            }
+            renderTaskStages();
+        });
+    });
     box.querySelectorAll('.task-stage-start').forEach(function(inp){
         inp.addEventListener('change', function(){
             var key = this.getAttribute('data-stage');
@@ -3368,6 +3384,7 @@ function saveTask() {
         orders: (_taskOrdersDraft || []).slice(),
         task_type: $('task_type') ? $('task_type').value : '',
         pocket: $('task_pocket') ? $('task_pocket').value.trim() : '',
+        department_shares: window.__taskDepSharesDraft || {},
         stages: (function(){ var o = {}; TASK_STAGE_ORDER.forEach(function(k){ o[k] = _taskStagesDraft[k] || ''; }); return o; })(),
     };
     // PATCH v1.0.15: закрываем карточку СРАЗУ — пользователь видит

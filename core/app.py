@@ -1007,6 +1007,10 @@ def create_app():
     # PATCH v1.0.9 — миграция: auto_closed_at в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'auto_closed_at' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN auto_closed_at TEXT DEFAULT ''")
             print('[INIT] tasks.auto_closed_at добавлено')
@@ -1015,6 +1019,10 @@ def create_app():
     # PATCH v1.0.18 — миграция: is_urgent в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'is_urgent' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN is_urgent INTEGER NOT NULL DEFAULT 0")
             print('[INIT] tasks.is_urgent добавлено')
@@ -1023,6 +1031,10 @@ def create_app():
     # PATCH v1.0.19 — миграция: links_json в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'links_json' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN links_json TEXT DEFAULT ''")
             print('[INIT] tasks.links_json добавлено')
@@ -1031,6 +1043,10 @@ def create_app():
     # PATCH v1.0.32 — миграция: orders_json в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'orders_json' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN orders_json TEXT DEFAULT ''")
             print('[INIT] tasks.orders_json добавлено')
@@ -1039,6 +1055,10 @@ def create_app():
     # PATCH v1.0.4 — миграция: extra_meta в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'extra_meta' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN extra_meta TEXT DEFAULT ''")
             print('[INIT] tasks.extra_meta добавлено')
@@ -1048,6 +1068,10 @@ def create_app():
     try:
         from db import TASK_STAGE_COLS as _STAGE_COLS
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'task_type' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT ''")
             print('[INIT] tasks.task_type добавлено')
@@ -1063,6 +1087,10 @@ def create_app():
     # PATCH tasks-lead — миграция: руководитель проверки (банк + сотрудник) в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        td_cols = [r['name'] for r in db.query('PRAGMA table_info(task_departments)')]
+        if 'share' not in td_cols:
+            db.exec("ALTER TABLE task_departments ADD COLUMN share REAL DEFAULT 100")
+            print('[INIT] task_departments.share добавлено')
         if 'lead_department' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN lead_department TEXT DEFAULT ''")
             print('[INIT] tasks.lead_department добавлено')

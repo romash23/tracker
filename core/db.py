@@ -334,14 +334,17 @@ class TrackerDB:
         asg_map = {}
         for a in assigns:
             asg_map.setdefault(a['task_id'], []).append(a['employee_id'])
-        tdep = self.query('SELECT task_id, department_id FROM task_departments')
+        tdep = self.query('SELECT task_id, department_id, share FROM task_departments')
         tdep_map = {}
+        tdep_shares = {}
         for td in tdep:
             tdep_map.setdefault(td['task_id'], []).append(td['department_id'])
+            tdep_shares.setdefault(td['task_id'], {})[td['department_id']] = td.get('share', 100)
         for t in tasks:
             t['tags'] = tag_map.get(t['id'], [])
             t['assignees'] = asg_map.get(t['id'], [])
             t['department_ids'] = tdep_map.get(t['id'], [])
+            t['department_shares'] = tdep_shares.get(t['id'], {})
             # PATCH v1.0.19: links_json -> список {url, description}
             try:
                 _lks = json.loads(t.get('links_json') or '[]')
@@ -597,9 +600,12 @@ class TrackerDB:
                 tx.exec('INSERT OR IGNORE INTO task_assignees (task_id,employee_id) VALUES (?,?)',
                         (task_id, a))
             tx.exec('DELETE FROM task_departments WHERE task_id=?', (task_id,))
+            _shares = payload.get('department_shares') or {}
             for d in payload['department_ids']:
-                tx.exec('INSERT OR IGNORE INTO task_departments (task_id,department_id) VALUES (?,?)',
-                        (task_id, d))
+                _s = _shares.get(d)
+                if _s is None: _s = 100
+                tx.exec('INSERT OR IGNORE INTO task_departments (task_id,department_id,share) VALUES (?,?,?)',
+                        (task_id, d, _s))
         return created
 
     def delete_task(self, task_id, drop_logs=False):
