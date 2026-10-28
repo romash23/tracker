@@ -9896,3 +9896,18 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .vac-form-group input, .vac-form-group textarea { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; font-size: 1rem; }
 .vac-form-group input:focus, .vac-form-group textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
 .vac-actions { display: flex; gap: 16px; margin-top: 24px; align-items: center; }
+
+/* VACATIONS TAB */
+.vac-container { display: flex; gap: 20px; padding: 20px; align-items: flex-start; }
+.vac-sidebar { width: 300px; border-right: 1px solid #e2e8f0; padding-right: 20px; }
+.vac-main { flex: 1; max-width: 600px; }
+.vac-dept { font-weight: bold; margin-top: 15px; cursor: pointer; }
+.vac-emp { padding: 5px 10px; cursor: pointer; border-radius: 4px; }
+.vac-emp:hover { background: #f1f5f9; }
+.vac-emp.active { background: #e2e8f0; font-weight: bold; }
+.vac-types { display: flex; gap: 10px; margin: 15px 0; }
+.vac-type-btn { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; background: white; }
+.vac-type-btn.active { border-color: #3b82f6; background: #eff6ff; }
+.vac-dates { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+.vac-dates input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; }
+#vacComment { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 4px; }

@@ -18275,3 +18275,74 @@ setTimeout(buildGanttTab, 1500);
         buildVacationsTab();
     };
 })();
+
+/* VACATIONS LOGIC */
+let vacSelectedEmp = null;
+let vacSelectedType = 'vacation';
+
+function renderVacations() {
+    const depts = Object.values(__trkState.departments).sort((a,b)=>a.name.localeCompare(b.name));
+    const emps = Object.values(__trkState.employees).filter(e=>!e.fired);
+    let html = '';
+    depts.forEach(d => {
+        const depEmps = emps.filter(e=>e.department_id === d.id).sort((a,b)=>a.name.localeCompare(b.name));
+        if (depEmps.length === 0) return;
+        html += `<div class="vac-dept">${d.name}</div>`;
+        depEmps.forEach(e => {
+            html += `<div class="vac-emp" onclick="selectVacEmp('${e.id}')" id="vac-emp-${e.id}">${e.name}</div>`;
+        });
+    });
+    document.getElementById('vacSidebar').innerHTML = html;
+}
+
+window.selectVacEmp = function(id) {
+    document.querySelectorAll('.vac-emp').forEach(el=>el.classList.remove('active'));
+    document.getElementById('vac-emp-'+id).classList.add('active');
+    vacSelectedEmp = __trkState.employees[id];
+    document.getElementById('vacMain').style.display = 'block';
+    document.getElementById('vacEmpName').innerText = vacSelectedEmp.name;
+    renderVacTypes();
+};
+
+function renderVacTypes() {
+    const types = {vacation: '🏖 Отпуск', sick_leave: '🤒 Больничный', business_trip: '✈️ Командировка', remote: '🏠 Удаленка', other: '📝 Другое'};
+    let html = '';
+    for (let k in types) {
+        html += `<button class="vac-type-btn ${k===vacSelectedType?'active':''}" onclick="vacSelectedType='${k}';renderVacTypes()">${types[k]}</button>`;
+    }
+    document.getElementById('vacTypes').innerHTML = html;
+}
+
+window.__vacSave = function() {
+    const dFrom = document.getElementById('vacDateFrom').value;
+    const dTo = document.getElementById('vacDateTo').value;
+    const comment = document.getElementById('vacComment').value;
+    if(!dFrom || !dTo) return alert('Укажите даты');
+    
+    fetch('/api/tracker/employee/vacation/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            employee_id: vacSelectedEmp.id,
+            reason: vacSelectedType,
+            date_from: dFrom,
+            date_to: dTo,
+            comment: comment
+        })
+    }).then(r=>r.json()).then(res=>{
+        if(res.ok) {
+            alert('Сохранено!');
+            document.getElementById('vacDateFrom').value = '';
+            document.getElementById('vacDateTo').value = '';
+            document.getElementById('vacComment').value = '';
+            // refresh data
+            fetchState();
+        } else {
+            alert(res.error || 'Ошибка');
+        }
+    });
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelector('.tracker-tab[data-tab="vacations"]').addEventListener('click', renderVacations);
+});
