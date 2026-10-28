@@ -9972,7 +9972,7 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 #panel-vacations .vac-year-ctrl button:hover{background:#e0e7ff;}
 #panel-vacations .vac-year-num{font-weight:700;font-size:.95rem;color:#111827;min-width:44px;text-align:center;}
 #panel-vacations .vac-year-grid{display:grid;grid-template-columns:repeat(36,minmax(0,1fr));grid-template-rows:repeat(5,1fr) auto;gap:2px;overflow-x:auto;padding-bottom:4px;width:100%;}
-#panel-vacations .vac-mcell{width:100%;aspect-ratio:1;border-radius:4px;background:rgba(226,232,240,.38);display:flex;align-items:center;justify-content:center;container-type:inline-size;font-size:clamp(10px,62cqi,42px);line-height:1;user-select:none;overflow:hidden;}
+#panel-vacations .vac-mcell{width:100%;aspect-ratio:1;border-radius:4px;background:rgba(226,232,240,.38);display:flex;align-items:center;justify-content:center;font-size:clamp(11px,min(2vw,2vh),20px);line-height:1;user-select:none;overflow:hidden;}
 #panel-vacations .vac-mlabel{font-size: 1.25rem;font-weight: 700;color:#64748b;white-space:nowrap;text-align:center;padding-top:4px;}
 #panel-vacations .vac-mcell.has-em{background:#eef2ff;border:1px solid #c7d2fe;}
 #panel-vacations .vac-mcell.out-month{background:transparent;}
