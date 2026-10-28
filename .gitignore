@@ -1,6 +1,6 @@
 __pycache__/
 runtime/
-сore/patch_backups/
+core/patch_backups/
 *.pyc
 tools/wheels/
 task_tracker.db
