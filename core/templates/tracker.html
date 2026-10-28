@@ -69,23 +69,38 @@
 
     <!-- ============================== ДАШБОРДЫ ============================== -->
     <div class="tracker-panel{% if AT == 'dashboards' %} active{% endif %}" id="panel-dashboards">
-        <div class="plan-toolbar">
+        <div class="plan-toolbar dash-toolbar">
             <div class="plan-title">📊 Песочница планирования</div>
-            <div class="export-menu-wrap" style="flex:1; display:flex; justify-content:flex-end;">
-                <button class="btn" style="background:#4CAF50; color:#fff;" id="dashSaveBtn">Сохранить изменения</button>
+            <div class="dash-toolbar-right">
+                <button class="btn dash-save-btn" id="dashSaveBtn">Сохранить изменения</button>
             </div>
         </div>
-        <div style="padding: 20px;">
-            <div style="margin-bottom: 20px;">
-                <label style="font-weight:bold; margin-right:10px;">Задача:</label>
-                <select id="dashTaskSelector" class="form-control" style="width: 300px; display:inline-block;"></select>
+        <div class="dash-wrap">
+            <div class="dash-topbar">
+                <div class="dash-field dash-field-task">
+                    <label class="dash-label" for="dashTaskSelector">Проверка</label>
+                    <div class="dash-task-row">
+                        <select id="dashTaskSelector" class="form-control"></select>
+                        <button class="btn btn-secondary" id="dashCreateTaskBtn" type="button">+ Создать проверку</button>
+                    </div>
+                </div>
+                <div class="dash-field">
+                    <label class="dash-label">Направление</label>
+                    <div class="btn-seg" id="dashDirSwitch">
+                        <button class="btn-seg-btn active" type="button" data-dir="retail">Розн</button>
+                        <button class="btn-seg-btn" type="button" data-dir="corp">Корп</button>
+                    </div>
+                </div>
+                <div class="dash-field">
+                    <label class="dash-label">Масштаб</label>
+                    <div class="btn-seg" id="dashModeSwitch">
+                        <button class="btn-seg-btn active" type="button" data-mode="week">Недели</button>
+                        <button class="btn-seg-btn" type="button" data-mode="day">Дни</button>
+                    </div>
+                </div>
             </div>
-            <div id="dashGanttContainer" style="border: 1px solid #ddd; padding: 20px; background: #fff; min-height: 100px;">
-                <!-- Сюда JS будет рендерить колбаску -->
-            </div>
-            <div id="dashLoadContainer" style="border: 1px solid #ddd; border-top: none; padding: 20px; background: #fafafa; min-height: 200px;">
-                <!-- Сюда JS будет рендерить график нагрузки -->
-            </div>
+            <div id="dashGanttContainer" class="dash-gantt-container"></div>
+            <div id="dashLoadContainer" class="dash-load-container"></div>
         </div>
     </div>
 
