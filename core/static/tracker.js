@@ -18475,3 +18475,58 @@ setTimeout(buildGanttTab, 1500);
     if(selEmp){ renderBanks(); renderForm(); }
   };
 })();
+
+
+/* =========================================================================
+   PATCH DASHBOARDS (Песочница планирования)
+   ========================================================================= */
+(function(){
+    var stateDash = {
+        task: null,
+        mode: 'week', // week | day
+        banks: [],
+        draft: null // { id, name, type, start, deadline, stages, dept_shares, lead_dept, lead_emp }
+    };
+    
+    function init() {
+        var btn = $('tabDashboardsBtn');
+        if(btn) btn.addEventListener('click', function(){ window.switchTab('dashboards'); renderSelector(); });
+    }
+    
+    function renderSelector() {
+        var sel = $('dashTaskSelector');
+        if (!sel) return;
+        var opts = ['<option value="">-- Выберите задачу --</option>'];
+        (state.tasks || []).filter(function(t){ return t.task_kind !== 'other'; }).forEach(function(t){
+            opts.push('<option value="'+escapeHtml(t.id)+'">'+escapeHtml(t.name)+'</option>');
+        });
+        sel.innerHTML = opts.join('');
+        sel.onchange = function() {
+            var tid = this.value;
+            if(!tid) { stateDash.task = null; stateDash.draft = null; renderGantt(); return; }
+            stateDash.task = state.tasks.find(function(x){return x.id===tid;});
+            loadDraft(stateDash.task);
+        };
+    }
+    
+    function loadDraft(t) {
+        stateDash.draft = JSON.parse(JSON.stringify(t));
+        // Ensure default stage if missing
+        if (!stateDash.draft.stages || !stateDash.draft.stages.length) {
+            stateDash.draft.stages = [{key: 'проверка_нжя', start: t.start_date || todayISO(), weight: 1.0}];
+        }
+        renderGantt();
+    }
+    
+    function renderGantt() {
+        var c = $('dashGanttContainer');
+        if (!stateDash.draft) {
+            c.innerHTML = '<div style="color:#9ca3af; text-align:center;">Выберите задачу для начала планирования</div>';
+            return;
+        }
+        c.innerHTML = '<div>Тут будет колбаска: ' + escapeHtml(stateDash.draft.name) + '</div>';
+        // Basic placeholder. Complete interactive render will take more code.
+    }
+    
+    setTimeout(init, 500);
+})();
