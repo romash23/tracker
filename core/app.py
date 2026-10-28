@@ -47,6 +47,7 @@ ABSENCE_TYPES = {
     'sick_leave':    '🤒 Больничный',
     'business_trip': '✈️ Командировка',
     'remote':        '🏠 Удаленка',
+    'other':         '📝 Другое',
 }
 WORK_WEEKDAYS = {0, 1, 2, 3, 4}
 EXEMPT_ROLES_MARKERS = ('начальник отдела', 'head of department', 'руководитель отдела')

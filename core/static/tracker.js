@@ -18154,195 +18154,118 @@ setTimeout(buildGanttTab, 1500);
   setTimeout(bootIfActive, 500);
 })();
 
-// --- VACATIONS TAB LOGIC ---
+// --- VACATIONS TAB (clean rebuild v2) ---
 (function(){
-    var state = window.__trkState || {departments:{}, employees:{}};
-    var selectedEmp = null;
-    var selectedType = 'vacation';
-
-    window.buildVacationsTab = function() {
-        var sb = document.getElementById('vacBanksList');
-        if(!sb) return;
-        sb.innerHTML = '';
-        var banks = Object.values(state.departments || {}).sort((a,b)=>a.name.localeCompare(b.name));
-        banks.forEach(b => {
-            var bdiv = document.createElement('div');
-            bdiv.className = 'vac-bank-item';
-            
-            var title = document.createElement('div');
-            title.className = 'vac-bank-title';
-            title.innerText = b.name;
-            title.onclick = () => {
-                var isExp = bdiv.classList.contains('expanded');
-                document.querySelectorAll('.vac-bank-item').forEach(x=>x.classList.remove('expanded'));
-                if(!isExp) bdiv.classList.add('expanded');
-            };
-            bdiv.appendChild(title);
-
-            var elist = document.createElement('div');
-            elist.className = 'vac-emp-list';
-            var emps = Object.values(state.employees || {}).filter(e => e.department_id == b.id && !e.fired);
-            emps.forEach(e => {
-                var ediv = document.createElement('div');
-                ediv.className = 'vac-emp-item';
-                ediv.innerText = e.name;
-                ediv.onclick = (ev) => {
-                    ev.stopPropagation();
-                    document.querySelectorAll('.vac-emp-item').forEach(x=>x.classList.remove('active'));
-                    document.querySelectorAll('.vac-bank-item').forEach(x=>x.classList.remove('active'));
-                    ediv.classList.add('active');
-                    bdiv.classList.add('active');
-                    selectedEmp = e;
-                    renderVacForm();
-                };
-                elist.appendChild(ediv);
-            });
-            bdiv.appendChild(elist);
-            sb.appendChild(bdiv);
-        });
-    };
-
-    function renderVacForm() {
-        var wa = document.getElementById('vacWorkArea');
-        if(!selectedEmp) { wa.style.display = 'none'; return; }
-        wa.style.display = 'block';
-        
-        var types = [
-            {k:'vacation', l:'🏖 Отпуск'},
-            {k:'sick_leave', l:'🤒 Больничный'},
-            {k:'business_trip', l:'✈️ Командировка'},
-            {k:'remote', l:'🏠 Удаленка'},
-            {k:'other', l:'📝 Другое'}
-        ];
-
-        var html = `<h2 style="margin-bottom:20px; color:#0f172a;">${selectedEmp.name} (Ввод отсутствия)</h2>`;
-        html += `<div class="vac-types">` + types.map(t=> `<button class="vac-type-btn ${selectedType==t.k?'active':''}" data-type="${t.k}">${t.l}</button>`).join('') + `</div>`;
-        html += `<div class="vac-form-row">
-                    <div class="vac-form-group"><label>Начало (С)</label><input type="date" id="vacDateFrom"></div>
-                    <div class="vac-form-group"><label>Окончание (По)</label><input type="date" id="vacDateTo"></div>
-                 </div>`;
-        html += `<div class="vac-form-group"><label>Комментарий / Обоснование</label><textarea id="vacComment" rows="3" placeholder="Необязательно"></textarea></div>`;
-        html += `<div class="vac-actions">
-                    <button class="btn btn-primary" id="vacSubmit" style="padding: 10px 24px; font-size:1rem;">Добавить запись</button>
-                    <button class="btn btn-secondary" id="vacSubmitMore" style="display:none; padding: 10px 24px; font-size:1rem;">Внести еще</button>
-                    <span id="vacMsg" style="color:#15803d; font-weight:500;"></span>
-                 </div>`;
-        wa.innerHTML = html;
-
-        wa.querySelectorAll('.vac-type-btn').forEach(btn => {
-            btn.onclick = () => {
-                selectedType = btn.dataset.type;
-                renderVacForm();
-            };
-        });
-
-        document.getElementById('vacSubmit').onclick = () => {
-            var df = document.getElementById('vacDateFrom').value;
-            var dt = document.getElementById('vacDateTo').value;
-            var cm = document.getElementById('vacComment').value;
-            if(!df || !dt) { alert('Пожалуйста, укажите даты начала и окончания.'); return; }
-            if(df > dt) { alert('Дата начала не может быть позже даты окончания.'); return; }
-            
-            fetch('/api/tracker/employee/vacation/add', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ employee_id: selectedEmp.id, reason: selectedType, date_from: df, date_to: dt, comment: cm })
-            }).then(r=>r.json()).then(res=>{
-                if(res.status==='ok') {
-                    document.getElementById('vacMsg').innerText = 'Успешно сохранено!';
-                    document.getElementById('vacSubmit').style.display = 'none';
-                    document.getElementById('vacSubmitMore').style.display = 'block';
-                } else {
-                    alert(res.message || 'Ошибка сохранения');
-                }
-            }).catch(e => alert('Сетевая ошибка: ' + e.message));
-        };
-
-        document.getElementById('vacSubmitMore').onclick = () => {
-            document.getElementById('vacDateFrom').value = '';
-            document.getElementById('vacDateTo').value = '';
-            document.getElementById('vacComment').value = '';
-            document.getElementById('vacMsg').innerText = '';
-            document.getElementById('vacSubmit').style.display = 'block';
-            document.getElementById('vacSubmitMore').style.display = 'none';
-        };
+  'use strict';
+  if (window.__trkVacTabV2) return;
+  window.__trkVacTabV2 = true;
+  var ABS_TYPES = [
+    ['vacation','\ud83c\udfd6 \u041e\u0442\u043f\u0443\u0441\u043a'],
+    ['sick_leave','\ud83e\udd12 \u0411\u043e\u043b\u044c\u043d\u0438\u0447\u043d\u044b\u0439'],
+    ['business_trip','\u2708\ufe0f \u041a\u043e\u043c\u0430\u043d\u0434\u0438\u0440\u043e\u0432\u043a\u0430'],
+    ['remote','\ud83c\udfe0 \u0423\u0434\u0430\u043b\u0435\u043d\u043a\u0430'],
+    ['other','\ud83d\udcdd \u0414\u0440\u0443\u0433\u043e\u0435']
+  ];
+  var selEmp = null, selType = 'vacation';
+  function st(){ return window.__trkState || {departments:{}, employees:{}}; }
+  function ensureTab(){
+    var tabs = document.querySelector('.tracker-tabs');
+    if (!tabs) return;
+    if (!tabs.querySelector('[data-tab="vacations"]')){
+      var anchor = tabs.querySelector('.tracker-tab[data-tab="dicts"]');
+      var btn = document.createElement('button');
+      btn.className = 'tracker-tab';
+      btn.setAttribute('data-tab','vacations');
+      btn.innerHTML = '<span>\ud83c\udfd6</span><span>\u041e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0438\u044f</span>';
+      if (anchor && anchor.parentNode===tabs) tabs.insertBefore(btn, anchor);
+      else tabs.appendChild(btn);
+      btn.addEventListener('click', function(e){ e.preventDefault(); activate(); });
     }
-
-    // Bind to render to ensure banks are built when state loads
-    var oldRender = window.render;
-    window.render = function() {
-        if(oldRender) oldRender();
-        buildVacationsTab();
-    };
+    if (!document.getElementById('panel-vacations')){
+      var host = document.querySelector('.tracker-panel');
+      var panel = document.createElement('div');
+      panel.className = 'tracker-panel'; panel.id = 'panel-vacations';
+      panel.innerHTML =
+        '<div class="vac-toolbar"><div class="vac-title">\ud83c\udfd6 \u0412\u0432\u043e\u0434 \u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0438\u0439</div></div>'+
+        '<div class="vac-container">'+
+          '<div class="vac-sidebar" id="vacBanksList"></div>'+
+          '<div class="vac-workarea" id="vacWorkArea"><div class="vac-empty">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430 \u0441\u043b\u0435\u0432\u0430</div></div>'+
+        '</div>';
+      if (host && host.parentNode) host.parentNode.appendChild(panel);
+      else document.body.appendChild(panel);
+    }
+  }
+  function activate(){
+    ensureTab();
+    document.querySelectorAll('.tracker-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tab')==='vacations'); });
+    document.querySelectorAll('.tracker-panel').forEach(function(p){ p.classList.toggle('active', p.id==='panel-vacations'); });
+    renderBanks();
+  }
+  function renderBanks(){
+    var sb = document.getElementById('vacBanksList'); if(!sb) return;
+    var s = st();
+    var banks = Object.values(s.departments||{}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    var emps  = Object.values(s.employees||{}).filter(function(e){return !e.fired;});
+    sb.innerHTML = '';
+    banks.forEach(function(b){
+      var item=document.createElement('div'); item.className='vac-bank-item';
+      var title=document.createElement('div'); title.className='vac-bank-title';
+      var caret=document.createElement('span'); caret.className='vac-caret'; caret.textContent='\u25b8';
+      var label=document.createElement('span'); label.textContent=b.name;
+      title.appendChild(caret); title.appendChild(label);
+      var list=document.createElement('div'); list.className='vac-emp-list';
+      var mine=emps.filter(function(e){return e.department_id===b.id;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+      mine.forEach(function(e){
+        var row=document.createElement('div'); row.className='vac-emp-row'; row.textContent=e.name;
+        if(selEmp && selEmp.id===e.id) row.classList.add('active');
+        row.onclick=function(){ selEmp=e; renderBanks(); renderForm(); };
+        list.appendChild(row);
+      });
+      if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='\u043d\u0435\u0442 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432'; list.appendChild(em); }
+      title.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'\u25be':'\u25b8'; };
+      if(selEmp && mine.some(function(e){return e.id===selEmp.id;})){ item.classList.add('expanded'); caret.textContent='\u25be'; }
+      item.appendChild(title); item.appendChild(list); sb.appendChild(item);
+    });
+  }
+  function renderForm(){
+    var wa=document.getElementById('vacWorkArea'); if(!wa) return;
+    if(!selEmp){ wa.innerHTML='<div class="vac-empty">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430 \u0441\u043b\u0435\u0432\u0430</div>'; return; }
+    var types=ABS_TYPES.map(function(t){ return '<button type="button" class="vac-type-btn'+(selType===t[0]?' active':'')+'" data-vtype="'+t[0]+'">'+t[1]+'</button>'; }).join('');
+    wa.innerHTML=
+      '<div class="vac-form-head">'+selEmp.name+'</div>'+
+      '<div class="vac-types">'+types+'</div>'+
+      '<div class="vac-fields">'+
+        '<label class="vac-fld"><span>\u0421 \u0434\u0430\u0442\u044b</span><input type="date" id="vacFrom"></label>'+
+        '<label class="vac-fld"><span>\u041f\u043e \u0434\u0430\u0442\u0443</span><input type="date" id="vacTo"></label>'+
+      '</div>'+
+      '<label class="vac-fld vac-fld-wide"><span>\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</span><input type="text" id="vacComment" placeholder="\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e"></label>'+
+      '<div class="vac-actions"><button type="button" class="vac-save-btn" id="vacSaveBtn">\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button><span class="vac-msg" id="vacMsg"></span></div>';
+    wa.querySelectorAll('.vac-type-btn').forEach(function(btn){ btn.onclick=function(){ selType=btn.getAttribute('data-vtype'); renderForm(); }; });
+    wa.querySelector('#vacSaveBtn').onclick=save;
+  }
+  function csrf(){
+    var m=document.querySelector('meta[name="csrf-token"]'); if(m) return m.getAttribute('content');
+    var i=document.querySelector('input[name="csrf_token"]'); return i?i.value:'';
+  }
+  function save(){
+    var msg=document.getElementById('vacMsg');
+    var frm=document.getElementById('vacFrom').value, to=document.getElementById('vacTo').value, cm=document.getElementById('vacComment').value;
+    if(!selEmp) return;
+    if(!frm||!to){ if(msg){msg.textContent='\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0434\u0430\u0442\u044b'; msg.className='vac-msg err';} return; }
+    if(to<frm){ if(msg){msg.textContent='\u041f\u043e \u0434\u0430\u0442\u0443 \u0440\u0430\u043d\u044c\u0448\u0435 \u043d\u0430\u0447\u0430\u043b\u0430'; msg.className='vac-msg err';} return; }
+    var payload={employee_id:selEmp.id, vac_type:selType, date_from:frm, date_to:to, comment:cm};
+    fetch('/api/tracker/employee/vacation/add',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},body:JSON.stringify(payload)})
+      .then(function(r){return r.json().catch(function(){return {};});})
+      .then(function(res){
+        if(res && res.ok){
+          if(msg){msg.textContent='\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e \u2713'; msg.className='vac-msg ok';}
+          var f=document.getElementById('vacFrom'),t=document.getElementById('vacTo'),c=document.getElementById('vacComment');
+          if(f)f.value=''; if(t)t.value=''; if(c)c.value='';
+          if(typeof window.fetchState==='function') window.fetchState();
+        } else { if(msg){msg.textContent=(res&&res.error)||'\u041e\u0448\u0438\u0431\u043a\u0430'; msg.className='vac-msg err';} }
+      }).catch(function(){ if(msg){msg.textContent='\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0442\u0438'; msg.className='vac-msg err';} });
+  }
+  function boot(){ ensureTab(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  var _or=window.render; window.render=function(){ if(_or) _or(); if(selEmp) renderBanks(); };
 })();
-
-/* VACATIONS LOGIC */
-let vacSelectedEmp = null;
-let vacSelectedType = 'vacation';
-
-function renderVacations() {
-    const depts = Object.values(__trkState.departments).sort((a,b)=>a.name.localeCompare(b.name));
-    const emps = Object.values(__trkState.employees).filter(e=>!e.fired);
-    let html = '';
-    depts.forEach(d => {
-        const depEmps = emps.filter(e=>e.department_id === d.id).sort((a,b)=>a.name.localeCompare(b.name));
-        if (depEmps.length === 0) return;
-        html += `<div class="vac-dept">${d.name}</div>`;
-        depEmps.forEach(e => {
-            html += `<div class="vac-emp" onclick="selectVacEmp('${e.id}')" id="vac-emp-${e.id}">${e.name}</div>`;
-        });
-    });
-    document.getElementById('vacSidebar').innerHTML = html;
-}
-
-window.selectVacEmp = function(id) {
-    document.querySelectorAll('.vac-emp').forEach(el=>el.classList.remove('active'));
-    document.getElementById('vac-emp-'+id).classList.add('active');
-    vacSelectedEmp = __trkState.employees[id];
-    document.getElementById('vacMain').style.display = 'block';
-    document.getElementById('vacEmpName').innerText = vacSelectedEmp.name;
-    renderVacTypes();
-};
-
-function renderVacTypes() {
-    const types = {vacation: '🏖 Отпуск', sick_leave: '🤒 Больничный', business_trip: '✈️ Командировка', remote: '🏠 Удаленка', other: '📝 Другое'};
-    let html = '';
-    for (let k in types) {
-        html += `<button class="vac-type-btn ${k===vacSelectedType?'active':''}" onclick="vacSelectedType='${k}';renderVacTypes()">${types[k]}</button>`;
-    }
-    document.getElementById('vacTypes').innerHTML = html;
-}
-
-window.__vacSave = function() {
-    const dFrom = document.getElementById('vacDateFrom').value;
-    const dTo = document.getElementById('vacDateTo').value;
-    const comment = document.getElementById('vacComment').value;
-    if(!dFrom || !dTo) return alert('Укажите даты');
-    
-    fetch('/api/tracker/employee/vacation/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            employee_id: vacSelectedEmp.id,
-            reason: vacSelectedType,
-            date_from: dFrom,
-            date_to: dTo,
-            comment: comment
-        })
-    }).then(r=>r.json()).then(res=>{
-        if(res.ok) {
-            alert('Сохранено!');
-            document.getElementById('vacDateFrom').value = '';
-            document.getElementById('vacDateTo').value = '';
-            document.getElementById('vacComment').value = '';
-            // refresh data
-            fetchState();
-        } else {
-            alert(res.error || 'Ошибка');
-        }
-    });
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelector('.tracker-tab[data-tab="vacations"]').addEventListener('click', renderVacations);
-});

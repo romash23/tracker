@@ -9911,3 +9911,38 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .vac-dates { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
 .vac-dates input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; }
 #vacComment { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 4px; }
+
+
+/* ===== VACATIONS TAB (clean rebuild v2) ===== */
+#panel-vacations .vac-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+#panel-vacations .vac-title{font-size:1.15rem;font-weight:700;color:#1f2937;}
+#panel-vacations .vac-container{display:flex;gap:18px;align-items:flex-start;width:100%;}
+#panel-vacations .vac-sidebar{flex:0 0 300px;max-width:340px;display:flex;flex-direction:column;gap:6px;}
+#panel-vacations .vac-workarea{flex:1 1 auto;min-width:0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;}
+#panel-vacations .vac-bank-item{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff;}
+#panel-vacations .vac-bank-title{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;font-weight:600;color:#1f2937;user-select:none;}
+#panel-vacations .vac-bank-title:hover{background:#f3f4f6;}
+#panel-vacations .vac-caret{font-size:.8rem;color:#6b7280;}
+#panel-vacations .vac-emp-list{display:none;padding:4px 8px 8px 8px;flex-direction:column;gap:2px;}
+#panel-vacations .vac-bank-item.expanded .vac-emp-list{display:flex;}
+#panel-vacations .vac-emp-row{padding:7px 10px;border-radius:7px;cursor:pointer;color:#374151;font-size:.95rem;}
+#panel-vacations .vac-emp-row:hover{background:#eef2ff;}
+#panel-vacations .vac-emp-row.active{background:#6366f1;color:#fff;font-weight:600;}
+#panel-vacations .vac-emp-empty{padding:6px 10px;color:#9ca3af;font-size:.85rem;font-style:italic;}
+#panel-vacations .vac-empty{color:#9ca3af;font-style:italic;padding:20px 4px;}
+#panel-vacations .vac-form-head{font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:14px;}
+#panel-vacations .vac-types{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+#panel-vacations .vac-type-btn{padding:8px 14px;border:1px solid #d1d5db;border-radius:20px;background:#fff;cursor:pointer;font-size:.92rem;color:#374151;transition:all .15s;}
+#panel-vacations .vac-type-btn:hover{border-color:#6366f1;}
+#panel-vacations .vac-type-btn.active{background:#6366f1;border-color:#6366f1;color:#fff;font-weight:600;}
+#panel-vacations .vac-fields{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;}
+#panel-vacations .vac-fld{display:flex;flex-direction:column;gap:5px;font-size:.85rem;color:#6b7280;}
+#panel-vacations .vac-fld-wide{width:100%;}
+#panel-vacations .vac-fld input{padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:.95rem;color:#111827;}
+#panel-vacations .vac-fld-wide input{width:100%;box-sizing:border-box;}
+#panel-vacations .vac-actions{display:flex;align-items:center;gap:14px;margin-top:8px;}
+#panel-vacations .vac-save-btn{padding:9px 22px;border:none;border-radius:8px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:600;cursor:pointer;font-size:.95rem;}
+#panel-vacations .vac-save-btn:hover{filter:brightness(1.05);}
+#panel-vacations .vac-msg{font-size:.9rem;}
+#panel-vacations .vac-msg.ok{color:#15803d;}
+#panel-vacations .vac-msg.err{color:#b91c1c;}
