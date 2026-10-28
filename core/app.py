@@ -43,7 +43,7 @@ TASK_STATUS_LABELS = {
     'archived': 'Архив',
 }
 ABSENCE_TYPES = {
-    'vacation':      '🏖 Отпуск',
+    'vacation':      '🌞 Отпуск',
     'sick_leave':    '🤒 Больничный',
     'business_trip': '✈️ Командировка',
     'remote':        '🏠 Удаленка',
@@ -2488,7 +2488,7 @@ def create_app():
             if l['date'] > end_date:
                 continue
             logs_by_emp.setdefault(l['employee_id'], {}).setdefault(l['date'], []).append(l)
-        ABSENCE_ICON = {'vacation': '🏖', 'sick_leave': '🤒', 'business_trip': '✈️', 'remote': '🏠'}
+        ABSENCE_ICON = {'vacation': '🌞', 'sick_leave': '🤒', 'business_trip': '✈️', 'remote': '🏠'}
         STATUS_FILL_HEX = {'done': 'C8E6C9', 'in_progress': 'DCEDC8', 'planned': 'E0E0E0', 'blocked': 'FFCDD2'}
         wb = openpyxl.Workbook()
         ws = wb.active

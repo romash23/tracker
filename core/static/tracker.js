@@ -494,7 +494,7 @@ function statusClass(s) {
 function absenceIcon(t) {
     if (t === 'sick_leave') return '🤒';
     if (t === 'business_trip') return '✈️';
-    if (t === 'vacation') return '🏖';
+    if (t === 'vacation') return '🌞';
     if (t === 'remote') return '🏠';
     return '';
 }
@@ -504,7 +504,7 @@ function absenceLabel(t) {
     if (t === 'sick_leave') return '🤒 Больничный';
     if (t === 'business_trip') return '✈️ Командировка';
     if (t === 'remote') return '🏠 Удаленка';
-    return '🏖 Отпуск';
+    return '🌞 Отпуск';
 }
 function absenceClass(t) {
     if (t === 'sick_leave') return 'sick_leave';
@@ -892,7 +892,7 @@ function renderEmployees() {
         var sick = (e.vacations || []).filter(function(v) { return v.type === 'sick_leave'; }).length;
         var trip = (e.vacations || []).filter(function(v) { return v.type === 'business_trip'; }).length;
         var badges = '';
-        if (vac) badges += '<span class="badge badge-vac">🏖 ' + vac + '</span>';
+        if (vac) badges += '<span class="badge badge-vac">🌞 ' + vac + '</span>';
         if (sick) badges += '<span class="badge badge-sick">🤒 ' + sick + '</span>';
         if (trip) badges += '<span class="badge badge-trip">✈️ ' + trip + '</span>';
         var metaArr = [];
@@ -1935,7 +1935,7 @@ function renderCalendar() {
                 + day.vacation.map(function(vid) {
                     var e = state.employees.find(function(x) { return x.id === vid; });
                     return escapeHtml(maskName(e ? e.name : '?'));
-                }).join(', ') + '">🏖</span>';
+                }).join(', ') + '">🌞</span>';
         }
         var remBadge = '';
         if (day.remote && day.remote.length) {
@@ -3465,7 +3465,7 @@ function _summaryLegendHtml() {
         + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background:rgba(52,152,219,0.24);"></span>🔵 В работе</span>'
         + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background:rgba(149,165,166,0.24);"></span>📝 Запланировано</span>'
         + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background:rgba(231,76,60,0.24);"></span>🔴 Заблокировано</span>'
-        + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background: repeating-linear-gradient(45deg,rgba(52,152,219,0.15) 0,rgba(52,152,219,0.15) 4px,rgba(52,152,219,0.30) 4px,rgba(52,152,219,0.30) 8px);"></span>🏖 Отпуск</span>'
+        + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background: repeating-linear-gradient(45deg,rgba(52,152,219,0.15) 0,rgba(52,152,219,0.15) 4px,rgba(52,152,219,0.30) 4px,rgba(52,152,219,0.30) 8px);"></span>🌞 Отпуск</span>'
         + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background: repeating-linear-gradient(45deg,rgba(243,156,18,0.15) 0,rgba(243,156,18,0.15) 4px,rgba(243,156,18,0.30) 4px,rgba(243,156,18,0.30) 8px);"></span>🤒 Больничный</span>'
         + '<span class="grid-legend-item"><span class="grid-legend-swatch" style="background: repeating-linear-gradient(45deg,rgba(155,89,182,0.15) 0,rgba(155,89,182,0.15) 4px,rgba(155,89,182,0.30) 4px,rgba(155,89,182,0.30) 8px);"></span>✈️ Командировка</span>'
         + '</div>';
@@ -3475,7 +3475,7 @@ function _absenceBadgeForRow(r) {
     var cnt = { vacation: 0, sick_leave: 0, business_trip: 0, remote: 0 };
     Object.keys(days).forEach(function(k) { cnt[days[k]] = (cnt[days[k]] || 0) + 1; });
     var out = '';
-    if (cnt.vacation) out += ' <span class="emp-vac-badge">🏖 ' + cnt.vacation + '</span>';
+    if (cnt.vacation) out += ' <span class="emp-vac-badge">🌞 ' + cnt.vacation + '</span>';
     if (cnt.sick_leave) out += ' <span class="emp-sick-badge">🤒 ' + cnt.sick_leave + '</span>';
     if (cnt.business_trip) out += ' <span class="emp-trip-badge">✈️ ' + cnt.business_trip + '</span>';
     if (cnt.remote) out += ' <span class="emp-remote-badge">🏠 ' + cnt.remote + '</span>';
@@ -3494,7 +3494,7 @@ function _summaryExtrasHtml(d) {
         top += '</div>';
     }
     if (d.vacations && d.vacations.length) {
-        vac = '<div class="sum-extra-block"><div class="sum-extra-title">🏖 Отсутствия в периоде</div>';
+        vac = '<div class="sum-extra-block"><div class="sum-extra-title">🌞 Отсутствия в периоде</div>';
         d.vacations.forEach(function(v) {
             var vt = v.type || 'vacation';
             var lbl = v.type_label || absenceLabel(vt);
@@ -4488,7 +4488,7 @@ function renderStats(d) {
         + '<div class="sum-table-wrap scroll-block"><table class="sum-table grid-table"><thead><tr>'
         + '<th class="emp-col">Сотрудник</th><th>Отдел</th><th>Часов</th><th>Задач</th>'
         + '<th>Закрыто</th><th>В работе</th><th>Просроч.</th><th>Досрочно</th><th>Позже</th>'
-        + '<th>🏖/🤒/✈️</th></tr></thead><tbody>';
+        + '<th>🌞/🤒/✈️</th></tr></thead><tbody>';
     (d.by_employee || []).forEach(function(r) {
         var fired = r.employee_fired ? ' <span class="emp-fired" title="уволен ' + escapeHtml(r.employee_fired_date) + '">🚪</span>' : '';
         extras += '<tr>'
@@ -10623,7 +10623,7 @@ loadState().then(function() {
         var v = found.period;
         var vtype = v.type || 'vacation';
         var labels = {
-            vacation:      '🏖 Отпуск',
+            vacation:      '🌞 Отпуск',
             sick_leave:    '🤒 Больничный',
             business_trip: '✈️ Командировка',
             remote:        '🏠 Удаленка'
@@ -18160,14 +18160,14 @@ setTimeout(buildGanttTab, 1500);
   if (window.__trkVacTabV3) return;
   window.__trkVacTabV3 = true;
   var ABS_TYPES = [
-    ['vacation','🏖 Отпуск'],
+    ['vacation','🌞 Отпуск'],
     ['sick_leave','🤒 Больничный'],
     ['business_trip','✈️ Командировка'],
     ['remote','🏠 Удаленка'],
     ['other','📝 Другое']
   ];
   var EMOJI_MAP = {
-    'vacation': '🏖',
+    'vacation': '🌞',
     'sick_leave': '🤒',
     'business_trip': '✈️',
     'remote': '🏠',
@@ -18183,7 +18183,7 @@ setTimeout(buildGanttTab, 1500);
       var btn = document.createElement('button');
       btn.className = 'tracker-tab';
       btn.setAttribute('data-tab','vacations');
-      btn.innerHTML = '<span>🏖</span><span>Отсутствия</span>';
+      btn.innerHTML = '<span>🌞</span><span>Отсутствия</span>';
       if (anchor && anchor.parentNode===tabs) tabs.insertBefore(btn, anchor);
       else tabs.appendChild(btn);
       btn.addEventListener('click', function(e){ e.preventDefault(); activate(); });
@@ -18193,7 +18193,7 @@ setTimeout(buildGanttTab, 1500);
       var panel = document.createElement('div');
       panel.className = 'tracker-panel'; panel.id = 'panel-vacations';
       panel.innerHTML =
-        '<div class="vac-toolbar"><div class="vac-title">🏖 Ввод отсутствий</div></div>'+
+        '<div class="vac-toolbar"><div class="vac-title">🌞 Ввод отсутствий</div></div>'+
         '<div class="vac-container">'+
           '<div class="vac-sidebar" id="vacBanksList"></div>'+
           '<div class="vac-workarea" id="vacWorkArea"><div class="vac-empty">Выберите сотрудника слева</div></div>'+
@@ -18275,7 +18275,7 @@ setTimeout(buildGanttTab, 1500);
     } else {
       rawVacs.forEach(function(v){
         var tPair = ABS_TYPES.find(function(x){ return x[0]===v.type; });
-        var tLabel = tPair ? tPair[1] : ('🏖 ' + v.type);
+        var tLabel = tPair ? tPair[1] : ('🌞 ' + v.type);
         var isPast = v.to && v.to < todayStr;
         var cls = 'vac-list-item' + (isPast ? ' past' : '');
         html += '<div class="'+cls+'">'+
@@ -18301,7 +18301,7 @@ setTimeout(buildGanttTab, 1500);
     var findDayEmoji = function(ds){
       for(var i=0; i<rawVacs.length; i++){
         if(rawVacs[i].from <= ds && ds <= rawVacs[i].to){
-          return EMOJI_MAP[rawVacs[i].type] || '🏖';
+          return EMOJI_MAP[rawVacs[i].type] || '🌞';
         }
       }
       return '';
