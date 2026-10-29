@@ -18741,7 +18741,51 @@ setTimeout(buildGanttTab, 1500);
             renderGantt(); renderLoad();
         }; });
     }
-    function saveDraft(){ if (!stateDash.draft) { notify('Сначала выберите проверку', 'error'); return; } notify('Сохранение черновика дашборда будет подключено следующим проходом. Сейчас активны фильтры и нижний блок банков/нагрузки.', 'info'); }
+    function saveDraft(){
+        if (!stateDash.draft) { notify('Сначала выберите проверку', 'error'); return; }
+        var d = stateDash.draft;
+        if (!(d.name||'').trim()) { notify('У проверки нет названия — задайте его в карточке проверки', 'error'); return; }
+        if (!(d.department_ids||[]).length) { notify('Добавьте хотя бы один банк', 'error'); return; }
+        if (!d.lead_department || d.department_ids.indexOf(d.lead_department) < 0) { d.lead_department = d.department_ids[0]; }
+        // Этапы: сервер ждёт объект {ключ_этапа: дата_начала}. Шлём стартовые даты активных этапов.
+        var stageStarts = {};
+        dashNormalizeStages(d).forEach(function(s){ if (s.key && s.start) stageStarts[s.key] = s.start; });
+        // База — исходная задача (чтобы не потерять поля, которыми дашборд не управляет), сверху — черновик.
+        var orig = stateDash.task ? (st().tasks||[]).find(function(t){ return t.id === stateDash.task.id; }) : null;
+        var base = orig ? clone(orig) : {};
+        var payload = {
+            id: d.id || (base.id || ''),
+            name: (d.name||base.name||'').trim(),
+            icon: base.icon || '📋',
+            description: base.description || '',
+            status: base.status || 'active',
+            start_date: d.start_date || '',
+            deadline: d.deadline || '',
+            completed_at: base.completed_at || '',
+            folder: base.folder || '',
+            order_ref: base.order_ref || '',
+            tags: (base.tags||[]).slice(),
+            assignees: (base.assignees||base.assignee_ids||[]).slice(),
+            department_ids: (d.department_ids||[]).slice(),
+            task_kind: base.task_kind || 'audit',
+            load_coef: base.load_coef || 0,
+            lead_department: d.lead_department || '',
+            lead_employee: base.lead_employee || '',
+            is_urgent: !!base.is_urgent,
+            links: (base.links||[]).slice(),
+            orders: (base.orders||[]).slice(),
+            task_type: d.task_type || base.task_type || dirTaskType(stateDash.dir),
+            pocket: base.pocket || '',
+            department_shares: clone(d.department_shares || {}),
+            stages: stageStarts
+        };
+        var btn = byId('dashSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Сохранение…'; }
+        apiJson('/api/tracker/task/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+            .then(function(r){ if (!r || !r.success) throw new Error((r&&r.error) || 'Ошибка сохранения'); notify('✅ Черновик сохранён в проверку', 'success'); return (typeof trkRefreshAll==='function') ? trkRefreshAll() : null; })
+            .then(function(){ var nt = stateDash.task ? (st().tasks||[]).find(function(t){ return t.id === stateDash.task.id; }) : null; if (nt) loadDraft(nt); renderSelector(); renderGantt(); renderLoad(); })
+            .catch(function(err){ notify('❌ ' + ((err&&err.message)||'Ошибка'), 'error'); })
+            .then(function(){ var b2 = byId('dashSaveBtn'); if (b2) { b2.disabled = false; b2.textContent = 'Сохранить изменения'; } });
+    }
     function bindControls(){
         var btn = byId('tabDashboardsBtn'); if (btn && !btn.__dashBound) { btn.__dashBound = true; btn.addEventListener('click', function(){ window.switchTab('dashboards'); renderSelector(); syncControls(); renderGantt(); renderLoad(); }); }
         var sel = byId('dashTaskSelector'); if (sel && !sel.__dashBound) { sel.__dashBound = true; sel.addEventListener('change', function(){ var tid = this.value; if (!tid) { loadDraft(null); return; } var task = (st().tasks || []).find(function(x){ return x.id === tid; }); loadDraft(task || null); }); }
