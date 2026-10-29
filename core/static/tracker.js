@@ -18486,11 +18486,11 @@ setTimeout(buildGanttTab, 1500);
     if (window.__trkDashboardsV2) return;
     window.__trkDashboardsV2 = true;
 
-    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null}], activeLane:0, todayOffset:0 };
+    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,pinned:false,offset:0}], activeLane:0, todayOffset:0, globalOffset:0 };
     var MODE_MONTHS = { small:12, medium:6, large:3 };
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
     function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
-    function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null}); switchLane(stateDash.lanes.length-1); return true; }
+    function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null,pinned:false,offset:0}); switchLane(stateDash.lanes.length-1); return true; }
     function removeLane(i){ if(stateDash.lanes.length<=1) return false; stateDash.lanes.splice(i,1); if(stateDash.activeLane>=stateDash.lanes.length) stateDash.activeLane=stateDash.lanes.length-1; switchLane(stateDash.activeLane); return true; }
     var DASH_DIR_LABEL = { retail:'Розничное', corp:'Корпоративное' };
     var DASH_STAGE_KEY_DEFAULT = 'проверка_нжя';
@@ -18691,7 +18691,7 @@ setTimeout(buildGanttTab, 1500);
     function dashNormalizeStages(task){
         var raw = (task && Array.isArray(task.stages)) ? clone(task.stages) : [];
         var stages = raw.filter(function(s){ return s && s.start; });
-        stages.sort(function(a,b){ return String(a.start || '').localeCompare(String(b.start || '')); });
+        stages.sort(function(a,b){ return STAGE_ORDER.indexOf(a.key) - STAGE_ORDER.indexOf(b.key); });
         if (!stages.length) {
             var ds = (task && task.start_date) || todayISO();
             var de = (task && task.deadline) || addDaysISO(ds, 90);
@@ -18895,13 +18895,20 @@ setTimeout(buildGanttTab, 1500);
         else sel.value = '';
     }
 
-    function dashTimeBounds(){
+    function dashTimeBounds(laneIdx){
         var months = MODE_MONTHS[stateDash.mode] || 6;
         var totalDays = Math.round(months * 30.44);
-        var center = addDaysISO(todayISO(), stateDash.todayOffset || 0);
-        var half = Math.floor(totalDays / 2);
-        var startISO = addDaysISO(center, -half);
-        var endISO = addDaysISO(center, totalDays - half);
+        var today = todayISO();
+        var go = stateDash.globalOffset || 0;
+        if (laneIdx != null && stateDash.lanes[laneIdx] && stateDash.lanes[laneIdx].pinned) {
+            var off = stateDash.lanes[laneIdx].offset || 0;
+            var center = addDaysISO(today, off);
+        } else {
+            var center = addDaysISO(today, go);
+        }
+        var at20 = Math.floor(totalDays * 0.20);
+        var startISO = addDaysISO(center, -at20);
+        var endISO = addDaysISO(center, totalDays - at20);
         return { startISO: startISO, endISO: endISO, days: totalDays };
     }
 
@@ -19043,7 +19050,6 @@ setTimeout(buildGanttTab, 1500);
             if (dd === 0) return;
             var snap = drag.snap;
             if (drag.type === 'all') {
-                /* Apply delta from snapshot, not from current state */
                 stateDash.draft.stages = snap.map(function(s){ return { key:s.key, start:addDaysISO(s.start, dd), end:addDaysISO(s.end||s.start, dd), weight:s.weight }; });
                 stateDash.draft.start_date = addDaysISO(drag.baseStart, dd);
                 stateDash.draft.deadline = addDaysISO(drag.baseDeadline, dd);
@@ -19064,6 +19070,19 @@ setTimeout(buildGanttTab, 1500);
                 } else {
                     stg[i].start = addDaysISO(s.start, dd);
                     stg[i].end = addDaysISO(s.end, dd);
+                }
+                /* Enforce stage hierarchy: sort by STAGE_ORDER, no stage can be before its predecessor */
+                stg.sort(function(a,b){ return STAGE_ORDER.indexOf(a.key) - STAGE_ORDER.indexOf(b.key); });
+                /* Collision resolution: push overlapping stages right, compress if needed (min 1 day) */
+                for (var pi = 1; pi < stg.length; pi++) {
+                    var prev = stg[pi-1], cur = stg[pi];
+                    var prevEnd = prev.end || prev.start;
+                    if (cur.start <= prevEnd) {
+                        var overlap = addDaysISO(prevEnd, 1);
+                        var curLen = Math.max(1, Math.round((parse(cur.end||cur.start) - parse(cur.start)) / 86400000));
+                        cur.start = overlap;
+                        cur.end = addDaysISO(overlap, Math.max(1, curLen));
+                    }
                 }
                 stateDash.draft.stages = stg;
                 var mn = stg[0].start, mx = stg[0].end || stg[0].start;
@@ -19143,7 +19162,7 @@ setTimeout(buildGanttTab, 1500);
         renderLoad();
     }
 
-    function renderLaneBlock(lane, laneIdx, isActive, b){
+    function renderLaneBlock(lane, laneIdx, isActive, b, canClose, canPin, isPinned){
         var hasDraft = !!lane.draft;
         var d = lane.draft || {
             name: 'Проверка не выбрана (линия жизни)',
@@ -19182,23 +19201,42 @@ setTimeout(buildGanttTab, 1500);
                 var w = Math.max(1.5, x1 - x0);
                 var col = STAGE_COLORS[s.key] || '#48c9b0';
                 var isDefault = (s.key === DASH_STAGE_KEY_DEFAULT);
-                var tip = stageLabel(s.key) + ': ' + s.start + ' \u2192 ' + (s.end || s.start) + ' (\u0432\u0435\u0441 ' + fmtNum(s.weight) + ')';
+                var tip = stageLabel(s.key) + ': ' + s.start + ' → ' + (s.end || s.start) + ' (вес ' + fmtNum(s.weight) + ')';
                 return '<div class="dash-seg' + (isDefault ? ' dash-seg-lead' : '') + '" data-idx="' + idx + '" title="' + escapeHtml(tip) + '" style="left:' + x0 + '%;width:' + w + '%;background:' + escapeHtml(col) + '">'
-                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="\u0422\u044f\u043d\u0443\u0442\u044c \u043d\u0430\u0447\u0430\u043b\u043e"></span>'
-                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '\u2013' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
-                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="\u0422\u044f\u043d\u0443\u0442\u044c \u043a\u043e\u043d\u0435\u0446"></span>'
-                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" data-lane="' + laneIdx + '" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0430\u043f">\u00d7</button>')
+                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="Тянуть начало"></span>'
+                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '–' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
+                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="Тянуть конец"></span>'
+                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" data-lane="' + laneIdx + '" title="Удалить этап">×</button>')
                     + '</div>';
             }).join('');
         } else {
-            segs = '<div class="dash-tl-empty-bar">\u041f\u0443\u0441\u0442\u0430\u044f \u043b\u0438\u043d\u0438\u044f \u0436\u0438\u0437\u043d\u0438 (' + escapeHtml(rangeStart) + ' \u2192 ' + escapeHtml(rangeEnd) + '). \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443 \u0438\u043b\u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab+ \u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443\u00bb.</div>';
+            segs = '<div class="dash-tl-empty-bar">Пустая линия жизни (' + escapeHtml(rangeStart) + ' → ' + escapeHtml(rangeEnd) + '). Выберите проверку или нажмите «+ Создать проверку».</div>';
         }
         var trackId = isActive ? ' id="dashTlTrack"' : '';
-        return '<div class="dash-timeline">'
+
+        /* Lane header with pin + close buttons */
+        var headerHtml = '<div class="dash-lane-header">';
+        if (canPin) {
+            headerHtml += '<button class="dash-lane-pin' + (isPinned ? ' pinned' : '') + '" type="button" data-lane-pin="' + laneIdx + '" title="' + (isPinned ? 'Открепить ось' : 'Закрепить ось') + '">📌</button>';
+        }
+        if (canClose) {
+            headerHtml += '<button class="dash-lane-close" type="button" data-lane-close="' + laneIdx + '" title="Удалить ось">×</button>';
+        }
+        headerHtml += '</div>';
+
+        /* Lane controls (bank chips + stage chips) */
+        var controlsHtml = renderLaneControls(lane, laneIdx);
+
+        return '<div class="dash-lane-block' + (isActive ? ' active' : '') + '" data-lane-block="' + laneIdx + '">'
+            + headerHtml
+            + '<div class="dash-timeline">'
             + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
             + '<div class="dash-tl-track"' + trackId + ' data-lane-track="' + laneIdx + '">' + todayMarker + segs + '</div>'
+            + '</div>'
+            + controlsHtml
             + '</div>';
     }
+
 
     function renderLaneControls(lane, laneIdx){
         var hasDraft = !!lane.draft;
@@ -19208,48 +19246,58 @@ setTimeout(buildGanttTab, 1500);
         var curIds = d.department_ids || [];
 
         /* Bank chips: white -> blue (on), lead -> yellow */
-        var bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b, \u043f\u0440\u0430\u0432\u0430\u044f \u043a\u043d\u043e\u043f\u043a\u0430 \u2014 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c):</span>'
+        var bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">Банки в проверке (клик — вкл/выкл, ПКМ — руководитель):</span>'
             + allDeps.map(function(dep){
-                var on = curIds.indexOf(dep.id) >= 0;
-                var isLead = (d.lead_department === dep.id);
-                var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
-                return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" data-lane="' + laneIdx + '" title="' + escapeHtml(dep.name + (isLead ? ' (\u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c)' : '') + (on ? ' \u00b7 \u0434\u043e\u043b\u044f ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + (isLead ? ' \u2605' : '') + '</button>';
+                var depId = dep.id;
+                var on = curIds.indexOf(depId) >= 0;
+                var isLead = d.lead_department === depId;
+                var sh = (d.department_shares && d.department_shares[depId] != null) ? d.department_shares[depId] : 100;
+                return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-bank="' + escapeHtml(depId) + '" data-lane="' + laneIdx + '" title="' + escapeHtml(dep.name + (isLead ? ' ★ руководитель' : '') + (on ? ' · доля ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + (isLead ? ' ★' : '') + '</button>';
             }).join('')
             + '</div>';
 
         /* Stage chips: white -> stage color (on) */
         var existing = {};
         dashNormalizeStages(d).forEach(function(s){ existing[s.key] = true; });
-        var stageChips = '<div class="dash-stage-chips"><span class="dash-bank-chips-lbl">\u042d\u0442\u0430\u043f\u044b \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b):</span>'
+        var stageChips = '<div class="dash-stage-chips"><span class="dash-bank-chips-lbl">Этапы в проверке (клик — вкл/выкл):</span>'
             + STAGE_ORDER.map(function(k){
                 var on = !!existing[k];
                 var col = STAGE_COLORS[k] || '#48c9b0';
                 var isDefault = (k === DASH_STAGE_KEY_DEFAULT);
                 var style = on ? ('style="background:' + col + ';border-color:' + col + ';color:#fff"') : '';
-                return '<button class="dash-stage-chip' + (on ? ' on' : '') + (isDefault ? ' is-default' : '') + '" type="button" data-toggle-stage="' + escapeHtml(k) + '" data-lane="' + laneIdx + '" ' + style + ' title="' + escapeHtml(stageLabel(k) + (isDefault ? ' (\u0431\u0430\u0437\u043e\u0432\u044b\u0439, \u043d\u0435\u043b\u044c\u0437\u044f \u0432\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c)' : '') + ' \u00b7 \u0432\u0435\u0441 ' + stageWeight(k)) + '">' + escapeHtml(stageLabel(k)) + '</button>';
+                return '<button class="dash-stage-chip' + (on ? ' on' : '') + (isDefault ? ' is-default' : '') + '" type="button" data-toggle-stage="' + escapeHtml(k) + '" data-lane="' + laneIdx + '" ' + style + ' title="' + escapeHtml(stageLabel(k) + (isDefault ? ' (базовый, нельзя выключить)' : '') + ' · вес ' + stageWeight(k)) + '">' + escapeHtml(stageLabel(k)) + '</button>';
             }).join('')
             + '</div>';
 
         return bankChips + stageChips;
     }
 
-    function renderGantt(){
+function renderGantt(){
         var c = byId('dashGanttContainer');
         if (!c) return;
         var b = dashTimeBounds();
         stateDash._range = { start: b.startISO, end: b.endISO, days: b.days || 180 };
 
+        /* Global slider above all lanes */
+        var go = stateDash.globalOffset || 0;
+        var goLabel = go === 0 ? 'по умолчанию' : (go > 0 ? '+' + go + ' дн' : go + ' дн');
+        var sliderHtml = '<div class="dash-global-slider">'
+            + '<label class="dash-label">Сдвиг всех осей</label>'
+            + '<input type="range" id="dashGlobalSlider" min="-365" max="365" value="' + go + '" step="7" class="dash-today-slider">'
+            + '<span class="dash-today-label">' + goLabel + '</span>'
+            + '</div>';
+
         /* Lane tabs */
         var laneTabs = '<div class="dash-lanes">';
         stateDash.lanes.forEach(function(l, i){
-            var label = l.draft ? escapeHtml(l.draft.name || '\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a') : (l.task ? escapeHtml(l.task.name || '\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430') : '\u041e\u0441\u044c ' + (i+1));
+            var label = l.draft ? escapeHtml(l.draft.name || 'Черновик') : (l.task ? escapeHtml(l.task.name || 'Проверка') : 'Ось ' + (i+1));
             var active = (i === stateDash.activeLane);
             laneTabs += '<div class="dash-lane-tab' + (active ? ' active' : '') + '" data-lane="' + i + '">'
                 + '<span class="dash-lane-label">' + label + '</span>'
                 + '</div>';
         });
         if (stateDash.lanes.length < 5) {
-            laneTabs += '<button class="dash-lane-add" type="button" id="dashAddLaneBtn" title="\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043e\u0441\u044c">+ \u041e\u0441\u044c</button>';
+            laneTabs += '<button class="dash-lane-add" type="button" id="dashAddLaneBtn" title="Добавить ось">+ Ось</button>';
         }
         laneTabs += '</div>';
 
@@ -19258,133 +19306,108 @@ setTimeout(buildGanttTab, 1500);
             var isActive = (i === stateDash.activeLane);
             var d = l.draft;
             var canClose = stateDash.lanes.length > 1;
-            var metaHtml = '';
-            if (d) {
-                metaHtml = '<div class="dash-draft-meta">'
-                    + '<input type="text" class="form-control dash-draft-name" data-lane-name="' + i + '" value="' + escapeHtml(d.name || '') + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438">'
-                    + '<label class="dash-mini-lbl">\u041d\u0430\u0447\u0430\u043b\u043e</label><input type="date" class="form-control dash-draft-date" data-lane-start="' + i + '" value="' + escapeHtml(d.start_date || '') + '">'
-                    + '<label class="dash-mini-lbl">\u041a\u043e\u043d\u0435\u0446</label><input type="date" class="form-control dash-draft-date" data-lane-end="' + i + '" value="' + escapeHtml(d.deadline || '') + '">'
-                    + '</div>';
-            }
-            return '<div class="dash-lane-block' + (isActive ? ' active' : '') + '" data-lane-block="' + i + '">'
-                + '<div class="dash-lane-bar">'
-                + '<span class="dash-lane-badge">\u041e\u0441\u044c ' + (i+1) + '</span>'
-                + '<span class="dash-lane-title">' + (d ? escapeHtml(d.name || '\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a') : (l.task ? escapeHtml(l.task.name||'') : '\u043d\u0435\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438')) + '</span>'
-                + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + i + '" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043e\u0441\u044c">\u00d7</button>' : '')
-                + '</div>'
-                + metaHtml
-                + renderLaneBlock(l, i, isActive, b)
-                + renderLaneControls(l, i)
-                + '</div>';
+            var canPin = stateDash.lanes.length > 1;
+            var isPinned = !!l.pinned;
+            var lb = dashTimeBounds(i);
+            return renderLaneBlock(l, i, isActive, lb, canClose, canPin, isPinned);
         }).join('');
 
-        c.innerHTML = laneTabs + lanesHtml;
+        c.innerHTML = sliderHtml + laneTabs + lanesHtml;
 
-        /* Drag only on active lane track */
-        dashAttachDrag(c);
-
-        /* Lane tab switching */
+        /* Bind lane tab clicks */
         c.querySelectorAll('[data-lane]').forEach(function(tab){
-            if (!tab.classList.contains('dash-lane-tab')) return;
-            tab.addEventListener('click', function(){
-                switchLane(+this.getAttribute('data-lane'));
-                renderSelector(); syncControls(); renderGantt(); renderLoad();
-            });
-        });
-        c.querySelectorAll('[data-lane-close]').forEach(function(btn){
-            btn.addEventListener('click', function(e){
+            tab.addEventListener('pointerdown', function(e){
+                if (e.target.closest && e.target.closest('.dash-lane-close')) return;
+                if (e.target.closest && e.target.closest('.dash-lane-pin')) return;
                 e.stopPropagation();
-                if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); }
-            });
-        });
-        var addLaneBtn = byId('dashAddLaneBtn');
-        if (addLaneBtn) addLaneBtn.addEventListener('click', function(){
-            if (addLane()) { dashOpenCreateModal(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
-        });
-
-        /* Activate a lane block by clicking it (so its controls apply) */
-        c.querySelectorAll('[data-lane-block]').forEach(function(bl){
-            bl.addEventListener('pointerdown', function(e){
-                if (e.target.closest('[data-lane-close]')) return;
-                var li = +this.getAttribute('data-lane-block');
-                if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
+                var li = +this.getAttribute('data-lane');
+                switchLane(li);
+                renderGantt();
+                renderLoad();
             }, true);
         });
 
-        /* Meta inputs per lane */
-        c.querySelectorAll('[data-lane-name]').forEach(function(inp){
-            inp.addEventListener('change', function(){
-                var li = +this.getAttribute('data-lane-name'); var L = stateDash.lanes[li];
-                if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); }
-            });
-        });
-        c.querySelectorAll('[data-lane-start]').forEach(function(inp){
-            inp.addEventListener('change', function(){
-                var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li];
-                if (!L||!L.draft||!this.value) return;
-                L.draft.start_date=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg;
-                switchLane(li); renderGantt(); renderLoad();
-            });
-        });
-        c.querySelectorAll('[data-lane-end]').forEach(function(inp){
-            inp.addEventListener('change', function(){
-                var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li];
-                if (!L||!L.draft||!this.value) return;
-                L.draft.deadline=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg;
-                switchLane(li); renderGantt(); renderLoad();
+        /* Bind close buttons */
+        c.querySelectorAll('.dash-lane-close').forEach(function(btn){
+            btn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var li = +this.getAttribute('data-lane-close');
+                removeLane(li);
+                renderGantt();
+                renderLoad();
             });
         });
 
-        /* Bank chip: left click toggle on/off; right click set/unset lead */
-        c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
-            btn.addEventListener('click', function(){
-                var li=+this.getAttribute('data-lane'); switchLane(li);
-                if (!stateDash.draft) return;
-                var depId=this.getAttribute('data-toggle-bank');
-                var cur=(stateDash.draft.department_ids||[]).slice();
-                var k=cur.indexOf(depId);
-                if (k>=0){ cur.splice(k,1); if(stateDash.draft.lead_department===depId) stateDash.draft.lead_department=cur[0]||''; }
-                else { cur.push(depId); stateDash.draft.department_shares=stateDash.draft.department_shares||{}; if(stateDash.draft.department_shares[depId]==null)stateDash.draft.department_shares[depId]=100; if(!stateDash.draft.lead_department)stateDash.draft.lead_department=depId; }
-                stateDash.draft.department_ids=cur; syncLane(); renderGantt(); renderLoad();
+        /* Bind pin buttons */
+        c.querySelectorAll('.dash-lane-pin').forEach(function(btn){
+            btn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var li = +this.getAttribute('data-lane-pin');
+                var lane = stateDash.lanes[li];
+                if (!lane) return;
+                if (!lane.pinned) {
+                    lane.pinned = true;
+                    lane.offset = stateDash.globalOffset || 0;
+                } else {
+                    lane.pinned = false;
+                    lane.offset = 0;
+                }
+                renderGantt();
+                renderLoad();
             });
-            btn.addEventListener('contextmenu', function(e){
+        });
+
+        /* Bind add-lane button */
+        var addBtn = byId('dashAddLaneBtn');
+        if (addBtn) {
+            addBtn.addEventListener('click', function(e){
                 e.preventDefault();
-                var li=+this.getAttribute('data-lane'); switchLane(li);
-                if (!stateDash.draft) return;
-                var depId=this.getAttribute('data-toggle-bank');
-                var cur=(stateDash.draft.department_ids||[]);
-                if (cur.indexOf(depId)<0){ notify('\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0431\u0430\u043d\u043a \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443', 'info'); return; }
-                stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId;
-                syncLane(); renderGantt(); renderLoad();
+                if (addLane()) { renderGantt(); renderLoad(); }
             });
-        });
+        }
 
-        /* Stage chip: toggle add/remove (default stage can't be removed) */
-        c.querySelectorAll('[data-toggle-stage]').forEach(function(btn){
-            btn.addEventListener('click', function(){
-                var li=+this.getAttribute('data-lane'); switchLane(li);
+        /* Bind global slider */
+        var gs = byId('dashGlobalSlider');
+        if (gs) {
+            gs.addEventListener('input', function(){
+                stateDash.globalOffset = +this.value || 0;
+                renderGantt();
+                renderLoad();
+            });
+        }
+
+        /* Bind stage toggle chips */
+        c.querySelectorAll('[data-toggle-stage]').forEach(function(chip){
+            chip.addEventListener('click', function(e){
+                e.stopPropagation();
+                var li = +this.getAttribute('data-lane');
+                switchLane(li);
                 if (!stateDash.draft) return;
-                var key=this.getAttribute('data-toggle-stage');
-                if (key===DASH_STAGE_KEY_DEFAULT){ notify('\u042d\u0442\u0430\u043f \u00ab\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u041d\u0416\u042f\u00bb \u0431\u0430\u0437\u043e\u0432\u044b\u0439 \u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0430\u043a\u0442\u0438\u0432\u0435\u043d', 'info'); return; }
-                var stg=dashNormalizeStages(stateDash.draft);
-                var pos=stg.map(function(x){return x.key;}).indexOf(key);
-                if (pos>=0){ stg.splice(pos,1); }
-                else {
+                var key = this.getAttribute('data-toggle-stage');
+                if (key === DASH_STAGE_KEY_DEFAULT) { notify('Базовый этап нельзя выключить', 'info'); return; }
+                var stg = dashNormalizeStages(stateDash.draft);
+                var idx = stg.findIndex(function(s){ return s.key === key; });
+                if (idx >= 0) {
+                    stg.splice(idx, 1);
+                } else {
                     var ns, ne;
                     if (key === 'подготовка') {
-                        var ngStg = stg.filter(function(x){ return x.key === DASH_STAGE_KEY_DEFAULT; })[0];
+                        var ngStg = stg.find(function(s){ return s.key === DASH_STAGE_KEY_DEFAULT; });
                         var ngStart = ngStg ? (ngStg.start || stateDash.draft.start_date) : (stateDash.draft.start_date || todayISO());
                         ne = addDaysISO(ngStart, -1);
                         ns = addDaysISO(ne, -6);
                     } else {
-                        var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO();
-                        stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
-                        ns=addDaysISO(lastEnd,1); ne=addDaysISO(ns,13);
+                        var lastEnd = stateDash.draft.deadline || stateDash.draft.start_date || todayISO();
+                        stg.forEach(function(x){ if ((x.end||x.start) > lastEnd) lastEnd = x.end || x.start; });
+                        ns = addDaysISO(lastEnd, 1); ne = addDaysISO(ns, 13);
                     }
-                    stg.push({key:key,start:ns,end:ne,weight:stageWeight(key)});
-                    if (ne>stateDash.draft.deadline) stateDash.draft.deadline=ne;
+                    stg.push({ key: key, start: ns, end: ne, weight: stageWeight(key) });
+                    if (ne > stateDash.draft.deadline) stateDash.draft.deadline = ne;
                 }
-                stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad();
+                stateDash.draft.stages = stg;
+                syncLane();
+                renderGantt();
+                renderLoad();
             });
         });
 
@@ -19392,16 +19415,24 @@ setTimeout(buildGanttTab, 1500);
         c.querySelectorAll('[data-del]').forEach(function(btn){
             btn.addEventListener('click', function(e){
                 e.stopPropagation();
-                var li=+this.getAttribute('data-lane'); switchLane(li);
+                var li = +this.getAttribute('data-lane');
+                switchLane(li);
                 if (!stateDash.draft) return;
-                var idx=+this.getAttribute('data-del');
-                var stg=dashNormalizeStages(stateDash.draft);
-                if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); }
+                var idx = +this.getAttribute('data-del');
+                var stg = dashNormalizeStages(stateDash.draft);
+                if (stg[idx] && stg[idx].key !== DASH_STAGE_KEY_DEFAULT) {
+                    stg.splice(idx, 1);
+                    stateDash.draft.stages = stg;
+                    syncLane();
+                    renderGantt();
+                    renderLoad();
+                }
             });
         });
+        dashAttachDrag(c);
     }
 
-    function renderLoad(){
+function renderLoad(){
         var box = byId('dashLoadContainer');
         if (!box) return;
         var allDeps = st().departments || [];
@@ -19669,16 +19700,7 @@ setTimeout(buildGanttTab, 1500);
                 renderLoad();
             });
         }
-        var slider = byId('dashTodaySlider');
-        if (slider && !slider.__dashBound) {
-            slider.__dashBound = true;
-            slider.addEventListener('input', function(){
-                stateDash.todayOffset = +this.value || 0;
-                syncControls();
-                renderGantt();
-                renderLoad();
-            });
-        }
+
         var saveBtn = byId('dashSaveBtn');
         if (saveBtn && !saveBtn.__dashBound) {
             saveBtn.__dashBound = true;
