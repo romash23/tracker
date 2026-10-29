@@ -19370,9 +19370,17 @@ setTimeout(buildGanttTab, 1500);
                 var pos=stg.map(function(x){return x.key;}).indexOf(key);
                 if (pos>=0){ stg.splice(pos,1); }
                 else {
-                    var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO();
-                    stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
-                    var ns=addDaysISO(lastEnd,1), ne=addDaysISO(ns,13);
+                    var ns, ne;
+                    if (key === 'подготовка') {
+                        var ngStg = stg.filter(function(x){ return x.key === DASH_STAGE_KEY_DEFAULT; })[0];
+                        var ngStart = ngStg ? (ngStg.start || stateDash.draft.start_date) : (stateDash.draft.start_date || todayISO());
+                        ne = addDaysISO(ngStart, -1);
+                        ns = addDaysISO(ne, -6);
+                    } else {
+                        var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO();
+                        stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
+                        ns=addDaysISO(lastEnd,1); ne=addDaysISO(ns,13);
+                    }
                     stg.push({key:key,start:ns,end:ne,weight:stageWeight(key)});
                     if (ne>stateDash.draft.deadline) stateDash.draft.deadline=ne;
                 }

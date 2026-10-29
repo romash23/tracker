@@ -10021,7 +10021,7 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-limit-val{color:#dc2626!important}
 .dash-mini-chart{display:grid;grid-template-columns:repeat(auto-fit,minmax(28px,1fr));gap:6px;align-items:end;min-height:140px}
 .dash-mini-col{position:relative;padding-top:4px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;min-width:0}
-.dash-mini-bar{width:100%;max-width:28px;border-radius:10px 10px 6px 6px;background:linear-gradient(180deg,#60a5fa 0%,#2563eb 100%);min-height:8px}
+.dash-mini-bar{width:100%;max-width:none;border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,#60a5fa 0%,#2563eb 100%);min-height:8px}
 .dash-mini-col.warn .dash-mini-bar{background:linear-gradient(180deg,#fbbf24 0%,#f59e0b 100%)}
 .dash-mini-col.over .dash-mini-bar{background:linear-gradient(180deg,#fb7185 0%,#e11d48 100%)}
 .dash-mini-limit{position:absolute;left:0;right:0;border-top:2px dashed #dc2626;opacity:.95;pointer-events:none}
@@ -10128,12 +10128,7 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-mini-col { flex:1 1 0; min-width:0; height:136px; overflow:hidden; position:relative; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:6px; padding-top:4px; }
 
 /* ===== Dashboards topbar font +50% & create modal (patch) ===== */
-.dash-topbar { font-size: 1.5em; }
-.dash-topbar .dash-label { font-size: 1.5em; }
-.dash-topbar .btn-seg-btn { font-size: 1.5em; }
-.dash-topbar .form-control { font-size: 1.5em; }
-.dash-topbar #dashCreateTaskBtn { font-size: 1.5em; }
-.dash-topbar .dash-today-label { font-size: 1.5em; }
+
 
 /* create-check modal */
 .dash-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 9999; }
@@ -10149,3 +10144,19 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-modal-err { color: #ef4444; font-size: 13px; min-height: 16px; }
 .dash-modal-foot { padding: 14px 22px 20px; display: flex; justify-content: flex-end; gap: 10px; }
 .dash-modal-foot .btn { min-width: 96px; }
+
+/* ===== Dashboards font normalization (matches Планирование проверок) ===== */
+.dash-wrap { font-size: 0.95rem; }
+.dash-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+.dash-label { font-size: 0.9rem; font-weight: 700; color: #64748b; }
+.dash-summary-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+.dash-load-title { font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+.dash-load-sub { font-size: 0.9rem; color: #64748b; }
+.dash-bank-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+.dash-bank-inline { font-size: 0.95rem; }
+.dash-stage-chip { font-size: 0.9rem; }
+.dash-bank-actions .btn { font-size: 0.9rem; }
+.dash-mini-cap { font-size: 0.85rem; color: #64748b; }
+.dash-today-label { font-size: 0.9rem; color: #64748b; }
+.dash-lane-badge { font-size: 0.85rem; }
+.dash-placeholder { font-size: 0.95rem; color: #64748b; }
