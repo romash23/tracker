@@ -10172,3 +10172,16 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-lane-pin,.dash-lane-close{border:1px solid var(--trk-card-border);background:#fff;border-radius:10px;padding:6px 10px;cursor:pointer}
 .dash-lane-pin.active{background:#fef3c7;border-color:#f59e0b}
 .dash-lanes-foot{margin-top:10px}
+
+
+.dash-bank-row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.dash-lead-picker-btn{appearance:none;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:8px 12px;font-size:.9rem;font-weight:700;line-height:1;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s;flex:0 0 auto}
+.dash-lead-picker-btn:hover{background:#f8fafc;border-color:#94a3b8}
+.dash-lead-picker-btn:active{transform:translateY(1px)}
+.dash-lead-modal{max-width:360px;width:calc(100% - 24px)}
+.dash-lead-modal-body{display:flex;flex-direction:column;gap:8px;padding:4px 0 0}
+.dash-lead-option{appearance:none;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:10px;padding:10px 12px;font-size:.95rem;font-weight:600;text-align:left;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.dash-lead-option:hover{background:#eff6ff;border-color:#93c5fd}
+.dash-lead-option.active{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.dash-global-slider{cursor:grab}
+.dash-global-slider:active,.dash-global-slider.is-grabbing{cursor:grabbing}

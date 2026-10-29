@@ -18486,7 +18486,7 @@ setTimeout(buildGanttTab, 1500);
     if (window.__trkDashboardsV2) return;
     window.__trkDashboardsV2 = true;
 
-    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0 };
+    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0, leadPickerLane:null };
     var MODE_MONTHS = { small:12, medium:6, large:3 };
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
     function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
@@ -19277,14 +19277,15 @@ setTimeout(buildGanttTab, 1500);
         var curIds = d.department_ids || [];
 
         /* Bank chips: white -> blue (on), lead -> yellow */
-        var bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b, \u0434\u0432\u043e\u0439\u043d\u043e\u0439 \u043a\u043b\u0438\u043a \u2014 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c):</span>'
+        var bankChips = '<div class="dash-bank-row"><div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b):</span>'
             + allDeps.map(function(dep){
                 var on = curIds.indexOf(dep.id) >= 0;
                 var isLead = (d.lead_department === dep.id);
                 var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
                 return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" data-lane="' + laneIdx + '" title="' + escapeHtml(dep.name + (isLead ? ' (\u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c)' : '') + (on ? ' \u00b7 \u0434\u043e\u043b\u044f ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + (isLead ? ' \u2605' : '') + '</button>';
             }).join('')
-            + '</div>';
+            + '</div>'
+            + '<button class="dash-lead-picker-btn" type="button" data-open-lead-picker="' + laneIdx + '">\u0421\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044f</button></div>';
 
         /* Stage chips: white -> stage color (on) */
         var existing = {};
@@ -19313,21 +19314,68 @@ setTimeout(buildGanttTab, 1500);
             return renderLaneBlock(l, i, isActive, dashTimeBounds(laneOffset(l)), stateDash.lanes.length > 1, stateDash.lanes.length > 1, !!l.pinned);
         }).join('');
         var addBtn = stateDash.lanes.length < 5 ? '<div class="dash-lanes-foot"><button class="dash-lane-add" type="button" id="dashAddLaneBtn">+ Ось</button></div>' : '';
-        c.innerHTML = sliderHtml + lanesHtml + addBtn;
+        c.innerHTML = sliderHtml + lanesHtml + addBtn + renderLeadPicker();
         var addBtnEl = byId('dashAddLaneBtn');
         if (addBtnEl) addBtnEl.addEventListener('click', function(){ if (addLane()) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } });
         c.querySelectorAll('[data-lane-close]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } }); });
         c.querySelectorAll('[data-lane-pin]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var i=+this.getAttribute('data-lane-pin'); var lane=stateDash.lanes[i]; if(!lane) return; setLanePinned(i, !lane.pinned); renderGantt(); renderLoad(); }); });
         var gs = byId('dashGlobalSlider');
-        if (gs) gs.addEventListener('input', function(){ stateDash.globalOffset = dashClampGlobalOffset(+this.value || 0); renderGantt(); renderLoad(); syncControls(); });
+        if (gs) {
+            var updateSliderValueFromEvent = function(ev){
+                var rect = gs.getBoundingClientRect();
+                if (!rect.width) return;
+                var ratio = (ev.clientX - rect.left) / rect.width;
+                if (ratio < 0) ratio = 0;
+                if (ratio > 1) ratio = 1;
+                var min = Number(gs.min || 0);
+                var max = Number(gs.max || 0);
+                var next = Math.round(min + ratio * (max - min));
+                gs.value = String(next);
+                stateDash.globalOffset = dashClampGlobalOffset(next);
+                renderGantt(); renderLoad(); syncControls();
+            };
+            gs.addEventListener('input', function(){ stateDash.globalOffset = dashClampGlobalOffset(+this.value || 0); renderGantt(); renderLoad(); syncControls(); });
+            gs.addEventListener('pointerdown', function(ev){ gs.classList.add('is-grabbing'); updateSliderValueFromEvent(ev); try { gs.setPointerCapture(ev.pointerId); } catch(_) {} });
+            gs.addEventListener('pointermove', function(ev){ if ((ev.buttons & 1) !== 1) return; updateSliderValueFromEvent(ev); });
+            var releaseSlider = function(ev){ gs.classList.remove('is-grabbing'); try { if (ev && ev.pointerId != null) gs.releasePointerCapture(ev.pointerId); } catch(_) {} };
+            gs.addEventListener('pointerup', releaseSlider);
+            gs.addEventListener('pointercancel', releaseSlider);
+            gs.addEventListener('lostpointercapture', function(){ gs.classList.remove('is-grabbing'); });
+        }
         c.querySelectorAll('[data-lane-block]').forEach(function(el){ el.addEventListener('pointerdown', function(e){ if (e.target.closest('[data-lane-close]') || e.target.closest('[data-lane-pin]')) return; var li = +this.getAttribute('data-lane-block'); if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); } }, true); });
         c.querySelectorAll('[data-lane-name]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-name'); var L=stateDash.lanes[li]; if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); } }); });
         c.querySelectorAll('[data-lane-start]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.start_date=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
         c.querySelectorAll('[data-lane-end]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.deadline=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
         c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
             btn.addEventListener('click', function(){ var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]).slice(); var k=cur.indexOf(depId); if (k>=0){ cur.splice(k,1); if(stateDash.draft.lead_department===depId) stateDash.draft.lead_department=cur[0]||''; } else { cur.push(depId); stateDash.draft.department_shares=stateDash.draft.department_shares||{}; if(stateDash.draft.department_shares[depId]==null)stateDash.draft.department_shares[depId]=100; if(!stateDash.draft.lead_department)stateDash.draft.lead_department=depId; } stateDash.draft.department_ids=cur; syncLane(); renderGantt(); renderLoad(); });
-            btn.addEventListener('dblclick', function(e){ e.preventDefault(); e.stopPropagation(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]); if (cur.indexOf(depId)<0){ notify('Сначала включите банк в проверку', 'info'); return; } stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId; if(!stateDash.draft.lead_department) stateDash.draft.lead_department=cur[0]||''; syncLane(); renderGantt(); renderLoad(); });
         });
+        c.querySelectorAll('[data-open-lead-picker]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                var li = +this.getAttribute('data-open-lead-picker');
+                switchLane(li);
+                if (!stateDash.draft) return;
+                var cur = (stateDash.draft.department_ids || []).slice();
+                if (!cur.length) { notify('Добавьте хотя бы одного участника в проверку', 'error'); return; }
+                openLeadPicker(li);
+            });
+        });
+        c.querySelectorAll('[data-pick-lead]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                var li = +this.getAttribute('data-lane');
+                switchLane(li);
+                if (!stateDash.draft) return;
+                var depId = this.getAttribute('data-pick-lead') || '';
+                var cur = (stateDash.draft.department_ids || []);
+                if (cur.indexOf(depId) < 0) { notify('Добавьте хотя бы одного участника в проверку', 'error'); return; }
+                stateDash.draft.lead_department = depId;
+                closeLeadPicker();
+                syncLane(); renderGantt(); renderLoad();
+            });
+        });
+        var leadClose = byId('dashLeadPickerClose');
+        if (leadClose) leadClose.addEventListener('click', function(){ closeLeadPicker(); });
+        var leadBackdrop = byId('dashLeadPickerBackdrop');
+        if (leadBackdrop) leadBackdrop.addEventListener('click', function(e){ if (e.target === this) closeLeadPicker(); });
         c.querySelectorAll('[data-toggle-stage]').forEach(function(btn){
             btn.addEventListener('click', function(){
                 var li=+this.getAttribute('data-lane'); switchLane(li);
@@ -19350,6 +19398,38 @@ setTimeout(buildGanttTab, 1500);
         });
         c.querySelectorAll('[data-del]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var idx=+this.getAttribute('data-del'); var stg=dashNormalizeStages(stateDash.draft); if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); } }); });
         dashAttachDrag(c);
+    }
+
+
+    function renderLeadPicker(){
+        var laneIdx = stateDash.leadPickerLane;
+        if (laneIdx == null || laneIdx < 0) return '';
+        var lane = (stateDash.lanes || [])[laneIdx];
+        var draft = lane && lane.draft;
+        if (!draft) return '';
+        var ids = (draft.department_ids || []).slice();
+        if (!ids.length) return '';
+        var deps = st().departments || [];
+        var buttons = ids.map(function(depId){
+            var dep = deps.find ? deps.find(function(x){ return x.id === depId; }) : null;
+            var name = dep ? dep.name : depId;
+            var active = (draft.lead_department === depId);
+            return '<button class="dash-lead-option' + (active ? ' active' : '') + '" type="button" data-pick-lead="' + escapeHtml(depId) + '" data-lane="' + laneIdx + '">' + escapeHtml(name) + '</button>';
+        }).join('');
+        return '<div class="dash-modal-backdrop" id="dashLeadPickerBackdrop"><div class="dash-modal dash-lead-modal">'
+            + '<div class="dash-modal-head"><div class="dash-modal-title">Сменить руководителя</div><button class="dash-modal-close" type="button" id="dashLeadPickerClose">×</button></div>'
+            + '<div class="dash-lead-modal-body">' + buttons + '</div>'
+            + '</div></div>';
+    }
+
+    function openLeadPicker(laneIdx){
+        stateDash.leadPickerLane = laneIdx;
+        renderGantt();
+    }
+
+    function closeLeadPicker(){
+        stateDash.leadPickerLane = null;
+        renderGantt();
     }
 
     function renderLoad(){
