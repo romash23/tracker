@@ -18482,319 +18482,1095 @@ setTimeout(buildGanttTab, 1500);
    PATCH DASHBOARDS (Песочница планирования)
    ========================================================================= */
 (function(){
+    'use strict';
+    if (window.__trkDashboardsV2) return;
+    window.__trkDashboardsV2 = true;
+
     var stateDash = { task:null, mode:'week', dir:'retail', draft:null };
     var DASH_DIR_LABEL = { retail:'Розничное', corp:'Корпоративное' };
     var DASH_STAGE_KEY_DEFAULT = 'проверка_нжя';
+
+    var STAGE_ORDER = [
+        'подготовка','проверка_нжя','проверка_соглЦА','ос_проф',
+        'реализация_возражения','реализация_согласования','запас','оценка_тб'
+    ];
+    var STAGE_LABELS = {
+        'подготовка':'Подготовка',
+        'проверка_нжя':'Проверка НЖЯ',
+        'проверка_соглЦА':'Проверка согл. ЦА',
+        'ос_проф':'ОС проф.',
+        'реализация_возражения':'Реализация возражения',
+        'реализация_согласования':'Реализация согласования',
+        'запас':'Запас',
+        'оценка_тб':'Оценка ТБ'
+    };
+    var STAGE_WEIGHTS = {
+        'подготовка': 0.7,
+        'проверка_нжя': 1.0,
+        'проверка_соглЦА': 1.0,
+        'ос_проф': 0.0,
+        'реализация_возражения': 1.0,
+        'реализация_согласования': 0.5,
+        'запас': 0.5,
+        'оценка_тб': 0.0
+    };
+    var STAGE_COLORS = {
+        'подготовка':'#5dade2',
+        'проверка_нжя':'#48c9b0',
+        'проверка_соглЦА':'#58d68d',
+        'ос_проф':'#f4d03f',
+        'реализация_возражения':'#eb984e',
+        'реализация_согласования':'#e59866',
+        'запас':'#af7ac5',
+        'оценка_тб':'#ec7063'
+    };
+    var PLAN_TYPE_MAP = { retail:'розничная', corp:'корпоративная' };
+
     function st(){ return window.__trkState || { tasks:[], departments:[], employees:[] }; }
     function byId(id){ return document.getElementById(id); }
-    function fmtNum(v){ return (v===null || v===undefined || isNaN(v)) ? '—' : String(Math.round(v*100)/100).replace('.', ','); }
-    function ymd(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
-    function addDays(d,n){ var x = new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
-    function parse(s){ return _pd(s); }
-    function clone(x){ return JSON.parse(JSON.stringify(x)); }
-    function deptById(id){ return (st().departments||[]).find(function(d){ return d.id===id; }) || null; }
-    function stageLabel(key){ return (typeof TASK_STAGE_LABELS!=='undefined' && TASK_STAGE_LABELS[key]) || key; }
-    function dirTaskType(dir){ return (typeof PLAN_TYPE!=='undefined') ? PLAN_TYPE[dir] : (dir==='corp' ? 'корпоративная' : 'розничная'); }
-    function ensureDashboardsTab() {
-        var tabs = document.querySelector('.tracker-tabs'); if (!tabs) return;
+    function escapeHtml(s){
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+        });
+    }
+    function notify(msg, kind){
+        if (typeof window.__trackerNotify === 'function') { window.__trackerNotify(msg, kind); return; }
+        var t = document.getElementById('toast');
+        if (t) {
+            t.textContent = msg;
+            t.className = 'toast show ' + (kind || 'info');
+            setTimeout(function(){ t.classList.remove('show'); }, 2800);
+            return;
+        }
+        try { console.log('[dashboards]', kind || 'info', msg); } catch(e){}
+    }
+    function apiJson(url, options){
+        options = options || {};
+        options.headers = Object.assign({}, options.headers || {});
+        var csrf = window.REESTR_CSRF || '';
+        if (!csrf) {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) csrf = meta.getAttribute('content') || '';
+        }
+        if (csrf && options.method && options.method !== 'GET') {
+            options.headers['X-CSRF-Token'] = csrf;
+        }
+        if (!options.credentials) options.credentials = 'same-origin';
+        return fetch(url, options).then(function(r){ return r.json(); });
+    }
+    function fmtNum(v){
+        return (v === null || v === undefined || isNaN(v)) ? '—' : String(Math.round(Number(v)*100)/100).replace('.', ',');
+    }
+    function num(v){ var n = Number(v); return isFinite(n) ? n : 0; }
+    function ymd(d){
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function todayISO(){
+        var s = st().today;
+        if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        return ymd(new Date());
+    }
+    function parse(s){
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+        return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+    }
+    function addDays(d, n){
+        var x = new Date(d.getTime());
+        x.setDate(x.getDate() + n);
+        return x;
+    }
+    function addDaysISO(iso, delta){
+        var d = parse(iso) || new Date();
+        d.setDate(d.getDate() + delta);
+        return ymd(d);
+    }
+    function ovl(a, b, ps, pe){
+        return a && b && a <= pe && b >= ps;
+    }
+    function clone(x){ return JSON.parse(JSON.stringify(x || {})); }
+    function deptById(id){
+        return (st().departments || []).find(function(d){ return d.id === id; }) || null;
+    }
+    function stageLabel(key){ return STAGE_LABELS[key] || key; }
+    function stageWeight(key){ return (STAGE_WEIGHTS[key] !== undefined) ? STAGE_WEIGHTS[key] : 1.0; }
+    function dirTaskType(dir){ return PLAN_TYPE_MAP[dir] || (dir === 'corp' ? 'корпоративная' : 'розничная'); }
+
+    function normByDir(dep, dir){
+        if (!dep) return null;
+        var v = (dir === 'retail') ? dep.headcount_retail : dep.headcount_corp;
+        return (v === null || v === undefined || v === '') ? null : num(v);
+    }
+    function coefByDir(dep, dir){
+        if (!dep) return null;
+        var v = (dir === 'retail') ? dep.expert_coef_retail : dep.expert_coef_corp;
+        return (v === null || v === undefined || v === '') ? null : num(v);
+    }
+    function calcPossible(dep, dir){
+        var obj = (typeof dep === 'object' && dep) ? dep : deptById(dep);
+        if (!obj) return null;
+        var n = normByDir(obj, dir), c = coefByDir(obj, dir);
+        if (n === null || c === null) return null;
+        return Math.round(n * c * 100) / 100;
+    }
+    function calcAuditWeight(t, ps, pe){
+        var stages = (t && Array.isArray(t.stages)) ? t.stages.filter(function(s){ return s && s.start; }) : [];
+        if (!stages.length) {
+            var a0 = parse(t && t.start_date), b0 = parse((t && t.deadline) || (t && t.start_date));
+            return ovl(a0, b0, ps, pe) ? 1.0 : 0;
+        }
+        var w = 0;
+        stages.forEach(function(s){
+            var a = parse(s.start), b = parse(s.end || (t && t.deadline) || s.start);
+            if (ovl(a, b, ps, pe)) {
+                var sw = (s.weight !== undefined && s.weight !== null) ? Number(s.weight) : stageWeight(s.key);
+                if (sw > w) w = sw;
+            }
+        });
+        return w;
+    }
+    function calcTaskLeadCoef(t, bankId){
+        if (!t || (t.lead_department || '') !== bankId) return 1.0;
+        var tp = t.task_type || '';
+        if (tp === 'розничная') return 2.0;
+        if (tp === 'корпоративная') return 1.5;
+        return 1.0;
+    }
+    function calcTaskShareMult(t, bankId){
+        if (!t || !t.department_shares) return 1.0;
+        var v = t.department_shares[bankId];
+        if (v === undefined || v === null || v === '') return 1.0;
+        var n = Number(v);
+        return isFinite(n) && n > 0 ? (n / 100.0) : 1.0;
+    }
+
+    function ensureDashboardsTab(){
+        var tabs = document.querySelector('.tracker-tabs');
+        if (!tabs) return;
         if (!tabs.querySelector('[data-tab="dashboards"]')) {
             var anchor = tabs.querySelector('.tracker-tab[data-tab="stats"]');
             var btn = document.createElement('button');
-            btn.className = 'tracker-tab'; btn.setAttribute('data-tab', 'dashboards'); btn.id = 'tabDashboardsBtn';
+            btn.className = 'tracker-tab';
+            btn.setAttribute('data-tab', 'dashboards');
+            btn.id = 'tabDashboardsBtn';
             btn.innerHTML = '<span>📊</span><span>Дашборды</span>';
-            if (anchor && anchor.parentNode === tabs) tabs.insertBefore(btn, anchor); else tabs.appendChild(btn);
+            if (anchor && anchor.parentNode === tabs) tabs.insertBefore(btn, anchor);
+            else tabs.appendChild(btn);
         }
     }
+    function activateDashboardsTab(){
+        ensureDashboardsTab();
+        document.querySelectorAll('.tracker-tab').forEach(function(t){
+            t.classList.toggle('active', t.getAttribute('data-tab') === 'dashboards');
+        });
+        document.querySelectorAll('.tracker-panel').forEach(function(p){
+            p.classList.toggle('active', p.id === 'panel-dashboards');
+        });
+        try { localStorage.setItem('tracker_activeTab', 'dashboards'); } catch(e){}
+        renderSelector();
+        syncControls();
+        renderGantt();
+        renderLoad();
+    }
+
     function dashNormalizeStages(task){
-        var stages = clone(task.stages || []).filter(function(s){ return s && s.start; });
-        stages.sort(function(a,b){ return String(a.start||'').localeCompare(String(b.start||'')); });
+        var raw = (task && Array.isArray(task.stages)) ? clone(task.stages) : [];
+        var stages = raw.filter(function(s){ return s && s.start; });
+        stages.sort(function(a,b){ return String(a.start || '').localeCompare(String(b.start || '')); });
         if (!stages.length) {
-            var ds = task.start_date || todayISO(), de = task.deadline || ds;
-            stages = [{ key:DASH_STAGE_KEY_DEFAULT, start:ds, end:de, weight:1 }];
+            var ds = (task && task.start_date) || todayISO();
+            var de = (task && task.deadline) || addDaysISO(ds, 90);
+            if (de < ds) de = ds;
+            stages = [{ key: DASH_STAGE_KEY_DEFAULT, start: ds, end: de, weight: 1.0 }];
         }
-        for (var i=0; i<stages.length; i++) {
+        for (var i = 0; i < stages.length; i++) {
             var s = stages[i], next = stages[i+1];
-            if (!s.end) s.end = (next && next.start) ? addDaysISO(next.start, -1) : (task.deadline || s.start);
-            if (!s.weight) s.weight = 1;
+            if (!s.end || s.end < s.start) {
+                var cand = (next && next.start) ? addDaysISO(next.start, -1) : ((task && task.deadline) || s.start);
+                if (!cand || cand < s.start) cand = s.start;
+                s.end = cand;
+            }
+            if (s.weight === undefined || s.weight === null) s.weight = stageWeight(s.key);
         }
         return stages;
     }
+
     function dashBuildDraft(task){
         var draft = clone(task || {});
         draft.id = task && task.id ? task.id : '';
-        draft.name = draft.name || '';
+        draft.name = draft.name || 'Проверка';
+        draft.task_kind = draft.task_kind || 'audit';
         draft.task_type = draft.task_type || dirTaskType(stateDash.dir);
+        if (draft.task_type === 'корпоративная') stateDash.dir = 'corp';
+        else if (draft.task_type === 'розничная') stateDash.dir = 'retail';
         draft.start_date = draft.start_date || todayISO();
-        draft.deadline = draft.deadline || draft.start_date;
+        draft.deadline = draft.deadline || addDaysISO(draft.start_date, 90);
+        if (draft.deadline < draft.start_date) draft.deadline = draft.start_date;
         draft.department_ids = Array.isArray(draft.department_ids) ? draft.department_ids.slice() : [];
         draft.department_shares = clone(draft.department_shares || {});
+        draft.department_ids.forEach(function(depId){
+            if (draft.department_shares[depId] == null) draft.department_shares[depId] = 100;
+        });
         draft.stages = dashNormalizeStages(draft);
         draft.lead_department = draft.lead_department || (draft.department_ids[0] || '');
         return draft;
     }
-    function loadDraft(t) { stateDash.task = t || null; stateDash.draft = t ? dashBuildDraft(t) : null; syncControls(); renderSelector(); renderGantt(); renderLoad(); }
+
+    function dashNewDraft(){
+        var start = todayISO();
+        var end = addDaysISO(start, 90);
+        var allDeps = (st().departments || []);
+        var firstDepIds = allDeps.length ? [allDeps[0].id] : [];
+        var shares = {};
+        firstDepIds.forEach(function(id){ shares[id] = 100; });
+        var existingCount = (st().tasks || []).filter(function(t){ return (t.task_kind || 'audit') === 'audit'; }).length;
+        var draft = {
+            id: '',
+            name: 'Новая проверка ' + (existingCount + 1),
+            task_kind: 'audit',
+            task_type: dirTaskType(stateDash.dir),
+            start_date: start,
+            deadline: end,
+            department_ids: firstDepIds,
+            department_shares: shares,
+            lead_department: firstDepIds[0] || '',
+            stages: [{ key: DASH_STAGE_KEY_DEFAULT, start: start, end: end, weight: 1.0 }]
+        };
+        stateDash.task = null;
+        stateDash.draft = draft;
+        syncControls();
+        renderSelector();
+        renderGantt();
+        renderLoad();
+        notify('Создана новая колбаска проверки на 3 месяца (' + start + ' → ' + end + ')', 'info');
+    }
+
+    function loadDraft(t){
+        stateDash.task = t || null;
+        stateDash.draft = t ? dashBuildDraft(t) : null;
+        syncControls();
+        renderSelector();
+        renderGantt();
+        renderLoad();
+    }
+
     function syncControls(){
-        var sel = byId('dashTaskSelector'); if (sel) sel.value = stateDash.task ? stateDash.task.id : '';
-        var dirBox = byId('dashDirSwitch'); if (dirBox) dirBox.querySelectorAll('[data-dir]').forEach(function(btn){ btn.classList.toggle('active', btn.getAttribute('data-dir')===stateDash.dir); });
-        var modeBox = byId('dashModeSwitch'); if (modeBox) modeBox.querySelectorAll('[data-mode]').forEach(function(btn){ btn.classList.toggle('active', btn.getAttribute('data-mode')===stateDash.mode); });
+        var sel = byId('dashTaskSelector');
+        if (sel) {
+            if (stateDash.task && stateDash.task.id) sel.value = stateDash.task.id;
+            else if (stateDash.draft && !stateDash.draft.id) sel.value = '__new__';
+            else sel.value = '';
+        }
+        var dirBox = byId('dashDirSwitch');
+        if (dirBox) {
+            dirBox.querySelectorAll('[data-dir]').forEach(function(btn){
+                btn.classList.toggle('active', btn.getAttribute('data-dir') === stateDash.dir);
+            });
+        }
+        var modeBox = byId('dashModeSwitch');
+        if (modeBox) {
+            modeBox.querySelectorAll('[data-mode]').forEach(function(btn){
+                btn.classList.toggle('active', btn.getAttribute('data-mode') === stateDash.mode);
+            });
+        }
     }
-    function renderSelector() {
-        var sel = byId('dashTaskSelector'); if (!sel) return;
-        var opts = ['<option value="">-- Выберите проверку --</option>'];
-        (st().tasks || []).filter(function(t){ return (t.task_kind || 'audit') === 'audit'; }).forEach(function(t){
-            var meta = []; if (t.task_type) meta.push(t.task_type); if (Array.isArray(t.department_ids) && t.department_ids.length) meta.push('банков: ' + t.department_ids.length);
-            opts.push('<option value="'+escapeHtml(t.id)+'">'+escapeHtml(t.name)+(meta.length ? ' · ' + escapeHtml(meta.join(' · ')) : '')+'</option>');
+
+    function renderSelector(){
+        var sel = byId('dashTaskSelector');
+        if (!sel) return;
+        var allTasks = (st().tasks || []);
+        var auditTasks = allTasks.filter(function(t){ return (t.task_kind || 'audit') === 'audit'; });
+        var list = auditTasks.length ? auditTasks : allTasks;
+        var opts = ['<option value="">-- Выберите проверку (' + list.length + ') --</option>'];
+        if (stateDash.draft && !stateDash.draft.id) {
+            opts.push('<option value="__new__">✨ ' + escapeHtml(stateDash.draft.name || 'Новая проверка') + ' (черновик)</option>');
+        }
+        list.forEach(function(t){
+            var meta = [];
+            if (t.task_type) meta.push(t.task_type);
+            if (t.start_date || t.deadline) meta.push((t.start_date || '…') + '→' + (t.deadline || '…'));
+            if (Array.isArray(t.department_ids) && t.department_ids.length) meta.push('банков: ' + t.department_ids.length);
+            opts.push('<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + (meta.length ? ' · ' + escapeHtml(meta.join(' · ')) : '') + '</option>');
         });
-        sel.innerHTML = opts.join(''); sel.value = stateDash.task ? stateDash.task.id : '';
+        sel.innerHTML = opts.join('');
+        if (stateDash.task && stateDash.task.id) sel.value = stateDash.task.id;
+        else if (stateDash.draft && !stateDash.draft.id) sel.value = '__new__';
+        else sel.value = '';
     }
+
+    function dashTimeBounds(){
+        var startISO = todayISO();
+        var endISO = addDaysISO(startISO, 90);
+        if (stateDash.draft) {
+            var d = stateDash.draft;
+            var stages = dashNormalizeStages(d);
+            startISO = d.start_date || startISO;
+            endISO = d.deadline || endISO;
+            stages.forEach(function(s){
+                if (s.start && s.start < startISO) startISO = s.start;
+                var se = s.end || s.start;
+                if (se && se > endISO) endISO = se;
+            });
+        }
+        if (endISO < startISO) endISO = startISO;
+        return { startISO: startISO, endISO: endISO };
+    }
+
     function dashSlots(){
-        if (!stateDash.draft) return [];
-        var start = parse(stateDash.draft.start_date || todayISO()) || new Date(); start.setHours(0,0,0,0);
-        var end = parse(stateDash.draft.deadline || stateDash.draft.start_date || todayISO()) || new Date(start.getTime()); end.setHours(0,0,0,0);
+        var b = dashTimeBounds();
+        var start = parse(b.startISO) || new Date(); start.setHours(0,0,0,0);
+        var end = parse(b.endISO) || addDays(start, 90); end.setHours(0,0,0,0);
         if (end < start) { var tmp = start; start = end; end = tmp; }
         var slots = [];
         if (stateDash.mode === 'day') {
-            for (var d = new Date(start.getTime()); d <= end; d = addDays(d,1)) slots.push({ key: ymd(d), start:new Date(d.getTime()), end:new Date(d.getTime()), label:String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') });
+            var maxDays = 120, cnt = 0;
+            for (var d = new Date(start.getTime()); d <= end && cnt < maxDays; d = addDays(d, 1), cnt++) {
+                slots.push({
+                    key: ymd(d),
+                    start: new Date(d.getTime()),
+                    end: new Date(d.getTime()),
+                    label: String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0')
+                });
+            }
         } else {
-            var mon = new Date(start.getTime()), wd = (mon.getDay()+6)%7; mon.setDate(mon.getDate() - wd);
-            while (mon <= end) { var we = addDays(mon, 6); slots.push({ key: ymd(mon), start:new Date(mon.getTime()), end:we, label:String(mon.getDate()).padStart(2,'0') + '.' + String(mon.getMonth()+1).padStart(2,'0') }); mon = addDays(mon, 7); }
+            var mon = new Date(start.getTime());
+            var wd = (mon.getDay() + 6) % 7;
+            mon.setDate(mon.getDate() - wd);
+            var maxWeeks = 52, wcnt = 0;
+            while (mon <= end && wcnt < maxWeeks) {
+                var we = addDays(mon, 6);
+                slots.push({
+                    key: ymd(mon),
+                    start: new Date(mon.getTime()),
+                    end: we,
+                    label: String(mon.getDate()).padStart(2,'0') + '.' + String(mon.getMonth()+1).padStart(2,'0')
+                });
+                mon = addDays(mon, 7);
+                wcnt++;
+            }
         }
         return slots;
     }
+
     function dashLeadCoef(depId){
-        if (!stateDash.draft) return 1; if ((stateDash.draft.lead_department||'') !== depId) return 1;
-        var tp = stateDash.draft.task_type || dirTaskType(stateDash.dir); if (tp === 'розничная') return 2; if (tp === 'корпоративная') return 1.5; return 1;
+        if (!stateDash.draft) return 1.0;
+        if ((stateDash.draft.lead_department || '') !== depId) return 1.0;
+        var tp = stateDash.draft.task_type || dirTaskType(stateDash.dir);
+        if (tp === 'розничная') return 2.0;
+        if (tp === 'корпоративная') return 1.5;
+        return 1.0;
+    }
+    function dashShareMult(depId){
+        if (!stateDash.draft || !stateDash.draft.department_shares) return 1.0;
+        var v = stateDash.draft.department_shares[depId];
+        if (v === undefined || v === null || v === '') return 1.0;
+        var n = Number(v);
+        return isFinite(n) && n > 0 ? (n / 100.0) : 1.0;
     }
     function dashDraftStageLoad(slotStart, slotEnd, depId){
-        if (!stateDash.draft) return 0; if ((stateDash.draft.department_ids||[]).indexOf(depId) < 0) return 0;
-        var stages = dashNormalizeStages(stateDash.draft), maxW = 0;
-        stages.forEach(function(s){ if (!s.start) return; var a = parse(s.start), b = parse(s.end || stateDash.draft.deadline || s.start); if (_ovl(a,b,slotStart,slotEnd)) maxW = Math.max(maxW, Number(s.weight)||0); });
-        if (maxW <= 0) return 0; return maxW * dashLeadCoef(depId);
+        if (!stateDash.draft) return 0;
+        if ((stateDash.draft.department_ids || []).indexOf(depId) < 0) return 0;
+        var draftType = stateDash.draft.task_type || dirTaskType(stateDash.dir);
+        if (draftType !== dirTaskType(stateDash.dir)) return 0;
+        var stages = dashNormalizeStages(stateDash.draft);
+        var maxW = 0;
+        stages.forEach(function(s){
+            if (!s.start) return;
+            var a = parse(s.start), b = parse(s.end || stateDash.draft.deadline || s.start);
+            if (ovl(a, b, slotStart, slotEnd)) {
+                var sw = (s.weight !== undefined && s.weight !== null) ? Number(s.weight) : stageWeight(s.key);
+                if (sw > maxW) maxW = sw;
+            }
+        });
+        if (maxW <= 0) return 0;
+        return Math.round(maxW * dashLeadCoef(depId) * dashShareMult(depId) * 100) / 100;
     }
     function dashBaseLoad(depId, slot){
-        var all = st().tasks || [], prev = stateDash.task ? all.find(function(t){ return t.id === stateDash.task.id; }) : null, base = 0;
-        if (stateDash.mode === 'day') {
-            var dirType = dirTaskType(stateDash.dir);
-            all.forEach(function(t){
-                if (prev && t.id === prev.id) return; if ((t.department_ids||[]).indexOf(depId) < 0) return; if ((t.task_kind||'audit') !== 'audit') return; if ((t.task_type||'') !== dirType) return;
-                var dayStart = new Date(slot.start.getTime()); dayStart.setHours(0,0,0,0); var dayEnd = new Date(slot.end.getTime()); dayEnd.setHours(23,59,59,999);
-                var w = planAuditWeight(t, dayStart, dayEnd); if (w > 0) base += w * planLeadCoef(t, depId);
-            });
-        } else {
-            base = planBankDirLoad(depId, stateDash.dir, slot.start);
-            if (prev && prev.task_type === dirTaskType(stateDash.dir) && (prev.department_ids||[]).indexOf(depId) >= 0) {
-                var prevW = planAuditWeight(prev, slot.start, slot.end); if (prevW > 0) base -= prevW * planLeadCoef(prev, depId);
-            }
-        }
-        return Math.max(0, Math.round(base*100)/100);
+        var all = st().tasks || [];
+        var editId = (stateDash.draft && stateDash.draft.id) || (stateDash.task && stateDash.task.id) || '';
+        var dirType = dirTaskType(stateDash.dir);
+        var ps = new Date(slot.start.getTime()); ps.setHours(0,0,0,0);
+        var pe = new Date(slot.end.getTime()); pe.setHours(23,59,59,999);
+        var base = 0;
+        all.forEach(function(t){
+            if (editId && t.id === editId) return;
+            if ((t.department_ids || []).indexOf(depId) < 0) return;
+            if ((t.task_kind || 'audit') !== 'audit') return;
+            if ((t.task_type || '') !== dirType) return;
+            var w = calcAuditWeight(t, ps, pe);
+            if (w > 0) base += w * calcTaskLeadCoef(t, depId) * calcTaskShareMult(t, depId);
+        });
+        return Math.max(0, Math.round(base * 100) / 100);
     }
-    function dashSetStage(idx, startISO, endISO){
-        var st = dashNormalizeStages(stateDash.draft);
-        if (!st[idx]) return;
-        if (startISO) st[idx].start = startISO;
-        if (endISO) st[idx].end = endISO;
-        if (st[idx].end < st[idx].start) st[idx].end = st[idx].start;
-        var mn = st[idx].start, mx = st[idx].end;
-        st.forEach(function(s){ if (s.start < mn) mn = s.start; if ((s.end||s.start) > mx) mx = s.end||s.start; });
-        stateDash.draft.stages = st;
-        if (mn < stateDash.draft.start_date) stateDash.draft.start_date = mn;
-        if (mx > stateDash.draft.deadline) stateDash.draft.deadline = mx;
-    }
+
     function dashShiftAll(deltaDays){
-        var d = stateDash.draft, st = dashNormalizeStages(d);
-        st.forEach(function(s){ s.start = addDaysISO(s.start, deltaDays); s.end = addDaysISO(s.end||s.start, deltaDays); });
-        d.stages = st; d.start_date = addDaysISO(d.start_date, deltaDays); d.deadline = addDaysISO(d.deadline, deltaDays);
+        if (!stateDash.draft) return;
+        var d = stateDash.draft, stg = dashNormalizeStages(d);
+        stg.forEach(function(s){
+            s.start = addDaysISO(s.start, deltaDays);
+            s.end = addDaysISO(s.end || s.start, deltaDays);
+        });
+        d.stages = stg;
+        d.start_date = addDaysISO(d.start_date, deltaDays);
+        d.deadline = addDaysISO(d.deadline, deltaDays);
     }
-    function dashAttachDrag(c, stages){
-        var track = byId('dashTlTrack'); if (!track) return;
-        var rng = stateDash._range || {}; var days = rng.days || 1;
-        function pxToDays(px){ var w = track.getBoundingClientRect().width || 1; return Math.round((px / w) * days); }
+
+    function dashAttachDrag(c){
+        var track = byId('dashTlTrack');
+        if (!track || !stateDash.draft) return;
+        var rng = stateDash._range || {};
+        var days = rng.days || 1;
+        function pxToDays(px){
+            var w = track.getBoundingClientRect().width || 1;
+            return Math.round((px / w) * days);
+        }
         var drag = null;
         function onDown(e){
+            if (e.button !== undefined && e.button !== 0) return;
             var t = e.target;
+            if (t.closest && t.closest('.dash-seg-del')) return;
             var handle = t.closest ? t.closest('.dash-seg-h') : null;
             var seg = t.closest ? t.closest('.dash-seg') : null;
-            if (t.closest && t.closest('.dash-seg-del')) return;
-            if (handle){ drag = { type:'edge', idx:+handle.getAttribute('data-idx'), edge:handle.getAttribute('data-edge') }; }
-            else if (seg){ drag = { type:'seg', idx:+seg.getAttribute('data-idx') }; }
-            else { drag = { type:'all' }; }
+            if (handle) {
+                drag = { type:'edge', idx:+handle.getAttribute('data-idx'), edge:handle.getAttribute('data-edge') };
+            } else if (seg) {
+                drag = { type:'seg', idx:+seg.getAttribute('data-idx') };
+            } else {
+                drag = { type:'all' };
+            }
             drag.x0 = e.clientX;
-            drag.snap = dashNormalizeStages(stateDash.draft).map(function(s){ return { start:s.start, end:s.end }; });
-            drag.baseStart = stateDash.draft.start_date; drag.baseDeadline = stateDash.draft.deadline;
+            drag.snap = dashNormalizeStages(stateDash.draft).map(function(s){
+                return { key:s.key, start:s.start, end:s.end, weight:s.weight };
+            });
+            drag.baseStart = stateDash.draft.start_date;
+            drag.baseDeadline = stateDash.draft.deadline;
             e.preventDefault();
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
         }
         function onMove(e){
-            if (!drag) return;
+            if (!drag || !stateDash.draft) return;
             var dd = pxToDays(e.clientX - drag.x0);
-            if (!dd && drag.type!=='all') { return; }
             var snap = drag.snap;
-            if (drag.type === 'all'){
-                stateDash.draft.stages = snap.map(function(s){ return { start:s.start, end:s.end }; });
-                stateDash.draft.start_date = drag.baseStart; stateDash.draft.deadline = drag.baseDeadline;
+            if (drag.type === 'all') {
+                stateDash.draft.stages = snap.map(function(s){ return { key:s.key, start:s.start, end:s.end, weight:s.weight }; });
+                stateDash.draft.start_date = drag.baseStart;
+                stateDash.draft.deadline = drag.baseDeadline;
                 dashShiftAll(dd);
             } else {
-                var i = drag.idx, s = snap[i]; if (!s) return;
-                var st = dashNormalizeStages(stateDash.draft);
-                st[i].start = s.start; st[i].end = s.end;
-                if (drag.type === 'edge'){
-                    if (drag.edge === 'start'){ var ns = addDaysISO(s.start, dd); if (ns > st[i].end) ns = st[i].end; st[i].start = ns; }
-                    else { var ne = addDaysISO(s.end, dd); if (ne < st[i].start) ne = st[i].start; st[i].end = ne; }
+                var i = drag.idx, s = snap[i];
+                if (!s) return;
+                var stg = snap.map(function(x){ return { key:x.key, start:x.start, end:x.end, weight:x.weight }; });
+                if (drag.type === 'edge') {
+                    if (drag.edge === 'start') {
+                        var ns = addDaysISO(s.start, dd);
+                        if (ns > stg[i].end) ns = stg[i].end;
+                        stg[i].start = ns;
+                    } else {
+                        var ne = addDaysISO(s.end, dd);
+                        if (ne < stg[i].start) ne = stg[i].start;
+                        stg[i].end = ne;
+                    }
                 } else {
-                    st[i].start = addDaysISO(s.start, dd); st[i].end = addDaysISO(s.end, dd);
+                    stg[i].start = addDaysISO(s.start, dd);
+                    stg[i].end = addDaysISO(s.end, dd);
                 }
-                stateDash.draft.stages = st;
-                var mn = st[i].start, mx = st[i].end;
-                st.forEach(function(x){ if (x.start < mn) mn = x.start; if ((x.end||x.start) > mx) mx = x.end||x.start; });
-                if (mn < stateDash.draft.start_date) stateDash.draft.start_date = mn;
-                if (mx > stateDash.draft.deadline) stateDash.draft.deadline = mx;
+                stateDash.draft.stages = stg;
+                var mn = stg[0].start, mx = stg[0].end || stg[0].start;
+                stg.forEach(function(x){
+                    if (x.start < mn) mn = x.start;
+                    var xe = x.end || x.start;
+                    if (xe > mx) mx = xe;
+                });
+                stateDash.draft.start_date = mn;
+                stateDash.draft.deadline = mx;
             }
-            renderGantt(); renderLoad();
+            renderGantt();
+            renderLoad();
         }
-        function onUp(){ drag = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); }
+        function onUp(){
+            drag = null;
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        }
         track.addEventListener('pointerdown', onDown);
-        c.querySelectorAll('.dash-seg-del').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation();
-            var idx = +this.getAttribute('data-del'); var st = dashNormalizeStages(stateDash.draft);
-            if (st[idx] && st[idx].key !== DASH_STAGE_KEY_DEFAULT){ st.splice(idx,1); stateDash.draft.stages = st; renderGantt(); renderLoad(); }
-        }); });
+        c.querySelectorAll('.dash-seg-del').forEach(function(b){
+            b.addEventListener('click', function(ev){
+                ev.stopPropagation();
+                var idx = +this.getAttribute('data-del');
+                var stg = dashNormalizeStages(stateDash.draft);
+                if (stg[idx] && stg[idx].key !== DASH_STAGE_KEY_DEFAULT) {
+                    stg.splice(idx, 1);
+                    stateDash.draft.stages = stg;
+                    renderGantt();
+                    renderLoad();
+                }
+            });
+        });
     }
 
-    function renderGantt() {
-        var c = byId('dashGanttContainer'); if (!c) return;
-        if (!stateDash.draft) { c.innerHTML = '<div class="dash-empty">Выберите проверку или создайте новую, чтобы открыть песочницу планирования</div>'; return; }
-        var d = stateDash.draft, stages = dashNormalizeStages(d);
-        var bankNames = (d.department_ids||[]).map(function(id){ var dep = deptById(id); return dep ? dep.name : id; });
-        var minISO = d.start_date || todayISO(), maxISO = d.deadline || minISO;
-        stages.forEach(function(s){ if (s.start && s.start < minISO) minISO = s.start; if ((s.end||s.start) && (s.end||s.start) > maxISO) maxISO = s.end || s.start; });
-        var pad = stateDash.mode === 'day' ? 2 : 7;
-        var rangeStart = addDaysISO(minISO, -pad), rangeEnd = addDaysISO(maxISO, pad);
-        var totalDays = Math.max(1, Math.round((parse(rangeEnd)-parse(rangeStart))/86400000));
+    function openAddStageDialog(){
+        if (!stateDash.draft) { dashNewDraft(); }
+        var existing = {};
+        dashNormalizeStages(stateDash.draft).forEach(function(s){ existing[s.key] = true; });
+        var options = STAGE_ORDER.filter(function(k){ return k !== DASH_STAGE_KEY_DEFAULT && !existing[k]; });
+        if (!options.length) { notify('Все 7 дополнительных этапов уже добавлены', 'info'); return; }
+        var labels = options.map(function(k, i){ return (i+1) + '. ' + stageLabel(k) + ' (вес ' + stageWeight(k) + ')'; }).join('\n');
+        var ans = window.prompt('Добавить этап в колбаску:\n' + labels + '\n\nВведите номер этапа (1–' + options.length + '):', '1');
+        if (ans === null) return;
+        var idx = parseInt(ans, 10) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= options.length) { notify('Некорректный номер этапа', 'error'); return; }
+        var key = options[idx];
+        var stg = dashNormalizeStages(stateDash.draft);
+        var lastEnd = stateDash.draft.deadline || stateDash.draft.start_date || todayISO();
+        stg.forEach(function(s){ if ((s.end || s.start) > lastEnd) lastEnd = s.end || s.start; });
+        var newStart = addDaysISO(lastEnd, 1);
+        var newEnd = addDaysISO(newStart, 13);
+        stg.push({ key: key, start: newStart, end: newEnd, weight: stageWeight(key) });
+        stateDash.draft.stages = stg;
+        if (newEnd > stateDash.draft.deadline) stateDash.draft.deadline = newEnd;
+        renderGantt();
+        renderLoad();
+    }
+
+    function openAddBankDialog(){
+        if (!stateDash.draft) { dashNewDraft(); }
+        var cur = stateDash.draft.department_ids || [];
+        var avail = (st().departments || []).filter(function(dep){ return cur.indexOf(dep.id) < 0; });
+        if (!avail.length) { notify('Все банки уже участвуют в проверке', 'info'); return; }
+        var labels = avail.map(function(dep, i){ return (i+1) + '. ' + dep.name; }).join('\n');
+        var ans = window.prompt('Добавить банк в проверку:\n' + labels + '\n\nВведите номер банка (1–' + avail.length + '):', '1');
+        if (ans === null) return;
+        var idx = parseInt(ans, 10) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= avail.length) { notify('Некорректный номер банка', 'error'); return; }
+        var dep = avail[idx];
+        stateDash.draft.department_ids = cur.concat([dep.id]);
+        stateDash.draft.department_shares = stateDash.draft.department_shares || {};
+        if (stateDash.draft.department_shares[dep.id] == null) stateDash.draft.department_shares[dep.id] = 100;
+        if (!stateDash.draft.lead_department) stateDash.draft.lead_department = dep.id;
+        renderGantt();
+        renderLoad();
+    }
+
+    function renderGantt(){
+        var c = byId('dashGanttContainer');
+        if (!c) return;
+        var hasDraft = !!stateDash.draft;
+        var d = stateDash.draft || {
+            name: 'Проверка не выбрана (линия жизни)',
+            task_type: dirTaskType(stateDash.dir),
+            start_date: todayISO(),
+            deadline: addDaysISO(todayISO(), 90),
+            department_ids: [],
+            stages: []
+        };
+        var stages = hasDraft ? dashNormalizeStages(d) : [];
+        var minISO = d.start_date || todayISO();
+        var maxISO = d.deadline || addDaysISO(minISO, 90);
+        stages.forEach(function(s){
+            if (s.start && s.start < minISO) minISO = s.start;
+            var se = s.end || s.start;
+            if (se && se > maxISO) maxISO = se;
+        });
+        var pad = stateDash.mode === 'day' ? 3 : 7;
+        var rangeStart = addDaysISO(minISO, -pad);
+        var rangeEnd = addDaysISO(maxISO, pad);
+        var totalDays = Math.max(1, Math.round((parse(rangeEnd) - parse(rangeStart)) / 86400000));
         stateDash._range = { start: rangeStart, end: rangeEnd, days: totalDays };
-        function pctX(iso){ var dd = Math.round((parse(iso)-parse(rangeStart))/86400000); return Math.max(0, Math.min(100, (dd/totalDays)*100)); }
-        var ticks = [], step = stateDash.mode === 'day' ? 1 : 7;
-        for (var ti=0; ti<=totalDays; ti+=step){ var iso = addDaysISO(rangeStart, ti); ticks.push('<div class="dash-tl-tick" style="left:'+((ti/totalDays)*100)+'%"><span>'+escapeHtml(String(parse(iso).getDate()).padStart(2,'0')+'.'+String(parse(iso).getMonth()+1).padStart(2,'0'))+'</span></div>'); }
-        var segs = stages.map(function(s, idx){
-            var x0 = pctX(s.start), x1 = pctX(s.end || s.start), w = Math.max(1.2, x1 - x0);
-            var col = (TASK_STAGE_COLORS&&TASK_STAGE_COLORS[s.key]) || '#94a3b8';
-            var lead = s.key === DASH_STAGE_KEY_DEFAULT;
-            return '<div class="dash-seg'+(lead?' dash-seg-lead':'')+'" data-idx="'+idx+'" style="left:'+x0+'%;width:'+w+'%;background:'+escapeHtml(col)+'">'
-                + '<span class="dash-seg-h dash-seg-h-l" data-idx="'+idx+'" data-edge="start"></span>'
-                + '<span class="dash-seg-lab">'+escapeHtml(stageLabel(s.key))+'</span>'
-                + '<span class="dash-seg-h dash-seg-h-r" data-idx="'+idx+'" data-edge="end"></span>'
-                + (lead ? '' : '<button class="dash-seg-del" type="button" data-del="'+idx+'" title="Удалить этап">×</button>')
+
+        function pctX(iso){
+            var dd = Math.round((parse(iso) - parse(rangeStart)) / 86400000);
+            return Math.max(0, Math.min(100, (dd / totalDays) * 100));
+        }
+
+        var ticks = [];
+        var step = stateDash.mode === 'day' ? (totalDays > 45 ? 3 : 1) : 7;
+        for (var ti = 0; ti <= totalDays; ti += step) {
+            var iso = addDaysISO(rangeStart, ti);
+            var dt = parse(iso);
+            var lbl = String(dt.getDate()).padStart(2,'0') + '.' + String(dt.getMonth()+1).padStart(2,'0');
+            ticks.push('<div class="dash-tl-tick" style="left:' + ((ti / totalDays) * 100) + '%"><span>' + escapeHtml(lbl) + '</span></div>');
+        }
+
+        var segs = '';
+        if (hasDraft) {
+            segs = stages.map(function(s, idx){
+                var x0 = pctX(s.start);
+                var x1 = pctX(s.end || addDaysISO(s.start, 1));
+                var w = Math.max(2.2, x1 - x0);
+                var col = STAGE_COLORS[s.key] || '#48c9b0';
+                var isDefault = (s.key === DASH_STAGE_KEY_DEFAULT);
+                var tip = stageLabel(s.key) + ': ' + s.start + ' → ' + (s.end || s.start) + ' (вес ' + fmtNum(s.weight) + ')';
+                return '<div class="dash-seg' + (isDefault ? ' dash-seg-lead' : '') + '" data-idx="' + idx + '" title="' + escapeHtml(tip) + '" style="left:' + x0 + '%;width:' + w + '%;background:' + escapeHtml(col) + '">'
+                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="Тянуть начало этапа"></span>'
+                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '–' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
+                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="Тянуть конец этапа"></span>'
+                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" title="Удалить этап">×</button>')
+                    + '</div>';
+            }).join('');
+        } else {
+            segs = '<div class="dash-tl-empty-bar">Показана пустая временная шкала (' + escapeHtml(minISO) + ' → ' + escapeHtml(maxISO) + '). Выберите проверку сверху или нажмите «+ Создать проверку», чтобы разместить колбаску.</div>';
+        }
+
+        var bankChips = '';
+        if (hasDraft) {
+            var allDeps = st().departments || [];
+            var curIds = d.department_ids || [];
+            bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">Банки в проверке (клик — вкл/выкл):</span>'
+                + allDeps.map(function(dep){
+                    var on = curIds.indexOf(dep.id) >= 0;
+                    var isLead = (d.lead_department === dep.id);
+                    var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
+                    return '<button type="button" class="dash-bank-chip' + (on ? ' active' : '') + (isLead ? ' is-lead' : '') + '" data-toggle-bank="' + escapeHtml(dep.id) + '">'
+                        + escapeHtml(dep.name)
+                        + (on ? (' · ' + escapeHtml(String(sh)) + '%' + (isLead ? ' ★рук' : '')) : '')
+                        + '</button>';
+                }).join('')
+                + '</div>';
+        }
+
+        var titleHtml = hasDraft
+            ? '<div class="dash-title-edit-row">'
+                + '<input type="text" id="dashDraftNameInput" class="form-control dash-name-input" value="' + escapeHtml(d.name || '') + '" placeholder="Название проверки">'
+                + '<span class="dash-summary-dates">С <input type="date" id="dashDraftStartInput" value="' + escapeHtml(d.start_date || '') + '"> по <input type="date" id="dashDraftEndInput" value="' + escapeHtml(d.deadline || '') + '"></span>'
+              + '</div>'
+            : '<div class="dash-summary-title">Временная шкала планирования (3 месяца от сегодня)</div>';
+
+        c.innerHTML = ''
+            + '<div class="dash-summary">'
+                + '<div class="dash-summary-main">'
+                    + titleHtml
+                    + '<div class="dash-summary-meta">Направление: <b>' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + '</b> · Масштаб: <b>' + (stateDash.mode === 'day' ? 'Дни' : 'Недели') + '</b>'
+                    + (hasDraft ? (' · Этапов: <b>' + stages.length + '</b> (по умолчанию вся проверка = этап «Проверка НЖЯ»)') : '')
+                    + '</div>'
+                + '</div>'
+                + '<div class="dash-summary-side">'
+                    + '<button class="btn btn-secondary" type="button" id="dashAddStageBtn">+ Добавить этап</button>'
+                    + '<button class="btn btn-secondary" type="button" id="dashAddBankBtn">+ Добавить банк</button>'
+                + '</div>'
+            + '</div>'
+            + '<div class="dash-timeline" id="dashTimelineBox">'
+                + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
+                + '<div class="dash-tl-track" id="dashTlTrack">'
+                    + '<div class="dash-tl-line"></div>'
+                    + '<div class="dash-tl-bar" id="dashTlBar">' + segs + '</div>'
+                + '</div>'
+            + '</div>'
+            + '<div class="dash-tl-hint">💡 Тяни за края этапа — меняются его даты; тяни сам этап — сдвиг этапа; тяни серую полосу шкалы (или ПКМ по колбаске) — сдвиг всей проверки / добавление этапа.</div>'
+            + bankChips;
+
+        if (hasDraft) {
+            dashAttachDrag(c);
+            var tlBox = byId('dashTimelineBox');
+            if (tlBox) {
+                tlBox.addEventListener('contextmenu', function(ev){
+                    ev.preventDefault();
+                    openAddStageDialog();
+                });
+            }
+            var nameInp = byId('dashDraftNameInput');
+            if (nameInp) {
+                nameInp.addEventListener('input', function(){
+                    if (stateDash.draft) stateDash.draft.name = this.value;
+                });
+            }
+            var stInp = byId('dashDraftStartInput');
+            if (stInp) {
+                stInp.addEventListener('change', function(){
+                    if (!stateDash.draft || !this.value) return;
+                    stateDash.draft.start_date = this.value;
+                    var stg = dashNormalizeStages(stateDash.draft);
+                    if (stg.length) stg[0].start = this.value;
+                    stateDash.draft.stages = stg;
+                    renderGantt();
+                    renderLoad();
+                });
+            }
+            var endInp = byId('dashDraftEndInput');
+            if (endInp) {
+                endInp.addEventListener('change', function(){
+                    if (!stateDash.draft || !this.value) return;
+                    stateDash.draft.deadline = this.value;
+                    var stg = dashNormalizeStages(stateDash.draft);
+                    if (stg.length) stg[stg.length - 1].end = this.value;
+                    stateDash.draft.stages = stg;
+                    renderGantt();
+                    renderLoad();
+                });
+            }
+            c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
+                btn.addEventListener('click', function(){
+                    if (!stateDash.draft) return;
+                    var depId = this.getAttribute('data-toggle-bank');
+                    var cur = (stateDash.draft.department_ids || []).slice();
+                    var i = cur.indexOf(depId);
+                    if (i >= 0) {
+                        cur.splice(i, 1);
+                        if (stateDash.draft.lead_department === depId) {
+                            stateDash.draft.lead_department = cur[0] || '';
+                        }
+                    } else {
+                        cur.push(depId);
+                        stateDash.draft.department_shares = stateDash.draft.department_shares || {};
+                        if (stateDash.draft.department_shares[depId] == null) stateDash.draft.department_shares[depId] = 100;
+                        if (!stateDash.draft.lead_department) stateDash.draft.lead_department = depId;
+                    }
+                    stateDash.draft.department_ids = cur;
+                    renderGantt();
+                    renderLoad();
+                });
+            });
+        }
+        var addStageBtn = byId('dashAddStageBtn');
+        if (addStageBtn) addStageBtn.onclick = openAddStageDialog;
+        var addBankBtn = byId('dashAddBankBtn');
+        if (addBankBtn) addBankBtn.onclick = openAddBankDialog;
+    }
+
+    function renderLoad(){
+        var box = byId('dashLoadContainer');
+        if (!box) return;
+        var allDeps = st().departments || [];
+        if (!allDeps.length) {
+            box.innerHTML = '<div class="dash-empty">Справочник банков пуст — данные загружаются…</div>';
+            return;
+        }
+        var hasDraft = !!stateDash.draft;
+        var draftDepIds = hasDraft ? (stateDash.draft.department_ids || []).slice() : [];
+        var shownDeps = (hasDraft && draftDepIds.length)
+            ? allDeps.filter(function(d){ return draftDepIds.indexOf(d.id) >= 0; })
+            : allDeps;
+
+        var slots = dashSlots();
+
+        /* Таблица-гистограмма нагрузки по банкам во времени */
+        var thCells = slots.map(function(s){
+            return '<th class="dash-hm-th">' + escapeHtml(s.label) + '</th>';
+        }).join('');
+        var tableRows = shownDeps.map(function(dep){
+            var poss = calcPossible(dep, stateDash.dir);
+            var inDraft = draftDepIds.indexOf(dep.id) >= 0;
+            var isLead = hasDraft && stateDash.draft.lead_department === dep.id;
+            var tds = slots.map(function(slot){
+                var base = dashBaseLoad(dep.id, slot);
+                var dr = dashDraftStageLoad(slot.start, slot.end, dep.id);
+                var tot = Math.round((base + dr) * 100) / 100;
+                var over = (poss !== null && tot > poss);
+                var warn = (!over && poss !== null && tot > poss * 0.85);
+                var cls = 'dash-hm-td' + (over ? ' is-over' : (warn ? ' is-warn' : (tot > 0 ? ' is-ok' : '')));
+                var pct = poss ? Math.min(100, Math.round((tot / poss) * 100)) : (tot > 0 ? Math.min(100, Math.round(tot * 35)) : 0);
+                var tip = dep.name + ' (' + slot.label + '): нагрузка ' + fmtNum(tot)
+                    + (dr > 0 ? (' (база ' + fmtNum(base) + ' + черновик ' + fmtNum(dr) + ')') : '')
+                    + (poss !== null ? (' / лимит ' + fmtNum(poss)) : '');
+                return '<td class="' + cls + '" title="' + escapeHtml(tip) + '">'
+                    + '<div class="dash-hm-cellbar"><span style="width:' + pct + '%"></span></div>'
+                    + '<div class="dash-hm-val">' + (tot > 0 ? fmtNum(tot) : '0') + '</div>'
+                    + '</td>';
+            }).join('');
+            return '<tr class="' + (inDraft ? 'in-draft' : '') + '">'
+                + '<td class="dash-hm-bank">'
+                    + '<span class="dash-hm-bname">' + escapeHtml(dep.name) + '</span>'
+                    + (isLead ? ' <span class="dash-badge-lead">★ рук.</span>' : '')
+                + '</td>'
+                + '<td class="dash-hm-limit">' + fmtNum(poss) + '</td>'
+                + tds
+                + '</tr>';
+        }).join('');
+
+        var matrixHtml = '<div class="dash-hm-wrap"><table class="dash-hm-table">'
+            + '<thead><tr><th class="dash-hm-bank">Территориальный банк</th><th class="dash-hm-limit">Лимит (возможн.)</th>' + thCells + '</tr></thead>'
+            + '<tbody>' + tableRows + '</tbody>'
+            + '</table></div>';
+
+        var cards = shownDeps.map(function(dep){
+            var depId = dep.id;
+            var poss = calcPossible(dep, stateDash.dir);
+            var inDraft = draftDepIds.indexOf(depId) >= 0;
+            var share = (hasDraft && stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null)
+                ? stateDash.draft.department_shares[depId] : 100;
+            var lead = hasDraft && stateDash.draft.lead_department === depId;
+            var vals = slots.map(function(slot){
+                var base = dashBaseLoad(depId, slot);
+                var draft = dashDraftStageLoad(slot.start, slot.end, depId);
+                return { slot: slot, total: Math.round((base + draft)*100)/100, base: base, draft: draft };
+            });
+            var maxVal = vals.reduce(function(m, v){ return Math.max(m, v.total, (poss || 0) * 1.15, 1); }, 1);
+            var peakVal = vals.reduce(function(m, v){ return Math.max(m, v.total); }, 0);
+            var limPct = (poss !== null && poss > 0) ? Math.max(0, Math.min(100, 100 - (poss / maxVal) * 100)) : null;
+
+            var bars = vals.map(function(v){
+                var h = v.total > 0 ? Math.max(8, Math.round((v.total / maxVal) * 108)) : 3;
+                var cls = '';
+                if (poss !== null) {
+                    if (v.total > poss) cls = ' over';
+                    else if (v.total > poss * 0.85) cls = ' warn';
+                }
+                return '<div class="dash-mini-col' + cls + '">'
+                    + (limPct === null ? '' : '<div class="dash-mini-redzone" style="height:' + limPct + '%"></div><div class="dash-mini-limit" style="top:' + limPct + '%"></div>')
+                    + '<div class="dash-mini-bar" style="height:' + h + 'px" title="' + escapeHtml(v.slot.label + ': ' + fmtNum(v.total) + (poss !== null ? ' / возможно ' + fmtNum(poss) : '')) + '"></div>'
+                    + '<div class="dash-mini-cap">' + escapeHtml(v.slot.label) + '</div>'
+                    + '</div>';
+            }).join('');
+
+            var actionsHtml = '';
+            if (hasDraft) {
+                if (inDraft) {
+                    actionsHtml = '<div class="dash-bank-actions">'
+                        + '<button class="btn btn-secondary" type="button" data-act="share" data-dep="' + escapeHtml(depId) + '">Доля (' + escapeHtml(String(share)) + '%)</button>'
+                        + '<button class="btn btn-secondary" type="button" data-act="lead" data-dep="' + escapeHtml(depId) + '">' + (lead ? '★ Руководитель (снять)' : 'Назначить руководителем') + '</button>'
+                        + '<button class="btn btn-danger" type="button" data-act="remove" data-dep="' + escapeHtml(depId) + '">Удалить из проверки</button>'
+                        + '</div>';
+                } else {
+                    actionsHtml = '<div class="dash-bank-actions">'
+                        + '<button class="btn btn-secondary" type="button" data-act="add" data-dep="' + escapeHtml(depId) + '">+ Включить в проверку</button>'
+                        + '</div>';
+                }
+            }
+
+            return '<div class="dash-bank-card' + (inDraft ? ' is-active-bank' : '') + '">'
+                + '<div class="dash-bank-head">'
+                    + '<div>'
+                        + '<div class="dash-bank-name">' + escapeHtml(dep.name) + (lead ? ' <span class="dash-badge-lead">★ Руководитель (' + (stateDash.dir === 'retail' ? '×2' : '×1,5') + ')</span>' : '') + '</div>'
+                        + '<div class="dash-bank-meta">' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + (inDraft ? (' · в проверке · доля участия ' + escapeHtml(String(share)) + '%') : ' · не входит в выбранную проверку (показана фоновая линия жизни)') + '</div>'
+                    + '</div>'
+                    + actionsHtml
+                + '</div>'
+                + '<div class="dash-bank-stats">'
+                    + '<div class="dash-stat"><span>Пиковая / текущая нагрузка</span><b>' + fmtNum(peakVal) + '</b></div>'
+                    + '<div class="dash-stat"><span>Возможное число проверок (красный лимит)</span><b class="dash-limit-val">' + fmtNum(poss) + '</b></div>'
+                + '</div>'
+                + '<div class="dash-mini-chart">' + bars + '</div>'
                 + '</div>';
         }).join('');
-        c.innerHTML = ''
-            + '<div class="dash-summary"><div class="dash-summary-main"><div class="dash-summary-title">' + escapeHtml(d.name || 'Новая проверка') + '</div><div class="dash-summary-meta">' + escapeHtml(d.task_type || dirTaskType(stateDash.dir)) + ' · ' + escapeHtml(d.start_date || '—') + ' → ' + escapeHtml(d.deadline || '—') + '</div></div><div class="dash-summary-side"><button class="btn btn-secondary" type="button" id="dashAddStageBtn">+ Добавить этап</button><button class="btn btn-secondary" type="button" id="dashAddBankBtn">+ Добавить банк</button></div></div>'
-            + '<div class="dash-timeline"><div class="dash-tl-axis">' + ticks.join('') + '</div><div class="dash-tl-track" id="dashTlTrack"><div class="dash-tl-bar" id="dashTlBar">' + segs + '</div></div></div>'
-            + '<div class="dash-tl-hint">Тяни середину этапа — сдвиг этапа; края — изменение границ; серую подложку — вся проверка целиком.</div>'
-            + '<div class="dash-bank-inline"><b>Банки в проверке:</b> ' + (bankNames.length ? bankNames.map(escapeHtml).join(', ') : 'не выбраны') + '</div>';
-        dashAttachDrag(c, stages);
-        var addStageBtn = byId('dashAddStageBtn'); if (addStageBtn) addStageBtn.onclick = function(){
-            var existing = {}; dashNormalizeStages(stateDash.draft).forEach(function(s){ existing[s.key]=true; });
-            var options = (typeof TASK_STAGE_ORDER!=='undefined' ? TASK_STAGE_ORDER : []).filter(function(k){ return k !== DASH_STAGE_KEY_DEFAULT && !existing[k]; });
-            if (!options.length) { notify('Все этапы уже добавлены', 'info'); return; }
-            var labels = options.map(function(k, i){ return (i+1) + '. ' + stageLabel(k); }).join('\n');
-            var ans = window.prompt('Добавить этап:\n' + labels + '\n\nВведите номер этапа'); var idx = parseInt(ans, 10) - 1; if (isNaN(idx) || idx < 0 || idx >= options.length) return;
-            var key = options[idx]; stateDash.draft.stages = dashNormalizeStages(stateDash.draft); stateDash.draft.stages.push({ key:key, start: stateDash.draft.deadline || stateDash.draft.start_date || todayISO(), end: stateDash.draft.deadline || stateDash.draft.start_date || todayISO(), weight:1 }); stateDash.draft.stages = dashNormalizeStages(stateDash.draft); renderGantt(); renderLoad();
-        };
-        var addBankBtn = byId('dashAddBankBtn'); if (addBankBtn) addBankBtn.onclick = function(){
-            if (!stateDash.draft) return;
-            var cur = stateDash.draft.department_ids || [];
-            var avail = (st().departments||[]).filter(function(dep){ return cur.indexOf(dep.id) < 0; });
-            if (!avail.length) { notify('Все банки уже добавлены в проверку', 'info'); return; }
-            var labels = avail.map(function(dep, i){ return (i+1) + '. ' + dep.name; }).join('\n');
-            var ans = window.prompt('Добавить банк в проверку:\n' + labels + '\n\nВведите номер банка'); var idx = parseInt(ans, 10) - 1;
-            if (isNaN(idx) || idx < 0 || idx >= avail.length) return;
-            var dep = avail[idx]; stateDash.draft.department_ids = cur.concat([dep.id]);
-            stateDash.draft.department_shares = stateDash.draft.department_shares || {};
-            if (stateDash.draft.department_shares[dep.id] == null) stateDash.draft.department_shares[dep.id] = 100;
-            if (!stateDash.draft.lead_department) stateDash.draft.lead_department = dep.id;
-            renderGantt(); renderLoad();
-        };
+
+        box.innerHTML = ''
+            + '<div class="dash-load-head">'
+                + '<div>'
+                    + '<div class="dash-load-title">Нагрузка на ТБ (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'day' ? 'по дням' : 'по неделям') + ')</div>'
+                    + '<div class="dash-load-sub">Красная пунктирная линия и розовая зона сверху = предел возможного числа проверок (норматив × экспертный коэф.). Нагрузка банка-руководителя: розн ×2, корп ×1,5.</div>'
+                + '</div>'
+            + '</div>'
+            + matrixHtml
+            + '<div class="dash-bank-grid">' + cards + '</div>';
+
+        box.querySelectorAll('[data-act]').forEach(function(btn){
+            btn.onclick = function(){
+                var depId = this.getAttribute('data-dep');
+                var act = this.getAttribute('data-act');
+                if (!stateDash.draft) return;
+                if (act === 'add') {
+                    var cur = (stateDash.draft.department_ids || []).slice();
+                    if (cur.indexOf(depId) < 0) cur.push(depId);
+                    stateDash.draft.department_ids = cur;
+                    stateDash.draft.department_shares = stateDash.draft.department_shares || {};
+                    if (stateDash.draft.department_shares[depId] == null) stateDash.draft.department_shares[depId] = 100;
+                    if (!stateDash.draft.lead_department) stateDash.draft.lead_department = depId;
+                } else if (act === 'remove') {
+                    stateDash.draft.department_ids = (stateDash.draft.department_ids || []).filter(function(id){ return id !== depId; });
+                    if (stateDash.draft.lead_department === depId) {
+                        stateDash.draft.lead_department = stateDash.draft.department_ids[0] || '';
+                    }
+                } else if (act === 'lead') {
+                    stateDash.draft.lead_department = (stateDash.draft.lead_department === depId) ? '' : depId;
+                } else if (act === 'share') {
+                    var curSh = (stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null)
+                        ? stateDash.draft.department_shares[depId] : 100;
+                    var val = window.prompt('Доля участия банка в проверке (%):', String(curSh));
+                    if (val === null) return;
+                    var n = Number(String(val).replace(',', '.'));
+                    if (!isFinite(n) || n <= 0) { notify('Введите число больше 0', 'error'); return; }
+                    stateDash.draft.department_shares = stateDash.draft.department_shares || {};
+                    stateDash.draft.department_shares[depId] = Math.round(n * 100) / 100;
+                }
+                renderGantt();
+                renderLoad();
+            };
+        });
     }
-    function renderLoad(){
-        var box = byId('dashLoadContainer'); if (!box) return;
-        if (!stateDash.draft) { box.innerHTML = '<div class="dash-empty">Нижний блок банков и нагрузки появится после выбора проверки</div>'; return; }
-        var depIds = (stateDash.draft.department_ids || []).slice(); if (!depIds.length) { box.innerHTML = '<div class="dash-empty">У выбранной проверки пока нет банков-участников</div>'; return; }
-        var slots = dashSlots();
-        var cards = depIds.map(function(depId){
-            var dep = deptById(depId), poss = (typeof planPossible === 'function') ? planPossible(depId, stateDash.dir) : null;
-            var share = stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null ? stateDash.draft.department_shares[depId] : 100;
-            var lead = stateDash.draft.lead_department === depId;
-            var vals = slots.map(function(slot){ var base = dashBaseLoad(depId, slot), draft = dashDraftStageLoad(slot.start, slot.end, depId); return { slot:slot, total:Math.round((base + draft)*100)/100, base:base, draft:draft }; });
-            var maxVal = vals.reduce(function(m, v){ return Math.max(m, v.total, poss || 0, 1); }, 1);
-            var bars = vals.map(function(v){
-                var h = Math.max(8, Math.round((v.total / maxVal) * 96)), limPct = poss ? Math.max(0, Math.min(100, 100 - (poss / maxVal) * 100)) : null, cls = '';
-                if (poss !== null) { if (v.total > poss) cls = ' over'; else if (v.total > poss * 0.85) cls = ' warn'; }
-                return '<div class="dash-mini-col'+cls+'"><div class="dash-mini-limit"' + (limPct===null ? ' style="display:none"' : ' style="top:' + limPct + '%"') + '></div><div class="dash-mini-bar" style="height:' + h + 'px" title="' + escapeHtml(v.slot.label + ': ' + fmtNum(v.total) + (poss!==null ? ' / лимит ' + fmtNum(poss) : '')) + '"></div><div class="dash-mini-cap">' + escapeHtml(v.slot.label) + '</div></div>';
-            }).join('');
-            return '<div class="dash-bank-card"><div class="dash-bank-head"><div><div class="dash-bank-name">' + escapeHtml(dep ? dep.name : depId) + '</div><div class="dash-bank-meta">' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' · доля участия ' + escapeHtml(String(share)) + '%'+(lead ? ' · руководитель' : '') + '</div></div><div class="dash-bank-actions"><button class="btn btn-secondary" type="button" data-act="share" data-dep="' + escapeHtml(depId) + '">Доля</button><button class="btn btn-secondary" type="button" data-act="lead" data-dep="' + escapeHtml(depId) + '">' + (lead ? 'Снять руковод.' : 'Сделать руковод.') + '</button><button class="btn btn-danger" type="button" data-act="remove" data-dep="' + escapeHtml(depId) + '">Убрать</button></div></div><div class="dash-bank-stats"><div class="dash-stat"><span>Текущая нагрузка</span><b>' + fmtNum(vals.length ? vals[vals.length-1].total : 0) + '</b></div><div class="dash-stat"><span>Возможное число проверок</span><b class="dash-limit-val">' + fmtNum(poss) + '</b></div></div><div class="dash-mini-chart">' + bars + '</div></div>';
-        }).join('');
-        box.innerHTML = '<div class="dash-load-head"><div class="dash-load-title">Банки и текущая нагрузка</div><div class="dash-load-sub">Красная линия = возможное число проверок по нормативу. Показан черновик по выбранному направлению.</div></div><div class="dash-bank-grid">' + cards + '</div>';
-        box.querySelectorAll('[data-act]').forEach(function(btn){ btn.onclick = function(){
-            var depId = this.getAttribute('data-dep'), act = this.getAttribute('data-act'); if (!stateDash.draft) return;
-            if (act === 'remove') { stateDash.draft.department_ids = (stateDash.draft.department_ids||[]).filter(function(id){ return id !== depId; }); if (stateDash.draft.lead_department === depId) stateDash.draft.lead_department = stateDash.draft.department_ids[0] || ''; }
-            else if (act === 'lead') { stateDash.draft.lead_department = (stateDash.draft.lead_department === depId) ? '' : depId; }
-            else if (act === 'share') { var cur = (stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null) ? stateDash.draft.department_shares[depId] : 100; var val = window.prompt('Доля участия банка, %', String(cur)); if (val === null) return; var num = Number(String(val).replace(',', '.')); if (!isFinite(num) || num <= 0) { notify('Введите долю участия больше 0', 'error'); return; } stateDash.draft.department_shares = stateDash.draft.department_shares || {}; stateDash.draft.department_shares[depId] = Math.round(num * 100) / 100; }
-            renderGantt(); renderLoad();
-        }; });
-    }
+
     function saveDraft(){
-        if (!stateDash.draft) { notify('Сначала выберите проверку', 'error'); return; }
+        if (!stateDash.draft) { notify('Сначала выберите проверку или нажмите «+ Создать проверку»', 'error'); return; }
         var d = stateDash.draft;
-        if (!(d.name||'').trim()) { notify('У проверки нет названия — задайте его в карточке проверки', 'error'); return; }
-        if (!(d.department_ids||[]).length) { notify('Добавьте хотя бы один банк', 'error'); return; }
-        if (!d.lead_department || d.department_ids.indexOf(d.lead_department) < 0) { d.lead_department = d.department_ids[0]; }
-        // Этапы: сервер ждёт объект {ключ_этапа: дата_начала}. Шлём стартовые даты активных этапов.
+        var nameVal = (d.name || '').trim();
+        if (!nameVal) {
+            var asked = window.prompt('Введите название проверки:', 'Новая проверка');
+            if (!asked || !asked.trim()) { notify('Название проверки обязательно', 'error'); return; }
+            nameVal = asked.trim();
+            d.name = nameVal;
+        }
+        if (!(d.department_ids || []).length) {
+            notify('Добавьте хотя бы один банк-участник (кликните по банку под колбаской или «+ Добавить банк»)', 'error');
+            return;
+        }
+        if (!d.lead_department || d.department_ids.indexOf(d.lead_department) < 0) {
+            d.lead_department = d.department_ids[0];
+        }
+        var normStages = dashNormalizeStages(d);
         var stageStarts = {};
-        dashNormalizeStages(d).forEach(function(s){ if (s.key && s.start) stageStarts[s.key] = s.start; });
-        // База — исходная задача (чтобы не потерять поля, которыми дашборд не управляет), сверху — черновик.
-        var orig = stateDash.task ? (st().tasks||[]).find(function(t){ return t.id === stateDash.task.id; }) : null;
+        var prevDate = '';
+        normStages.forEach(function(s){
+            if (!s.key || !s.start) return;
+            var dt = s.start;
+            if (prevDate && dt <= prevDate) dt = addDaysISO(prevDate, 1);
+            stageStarts[s.key] = dt;
+            prevDate = dt;
+        });
+
+        var orig = stateDash.task ? (st().tasks || []).find(function(t){ return t.id === stateDash.task.id; }) : null;
         var base = orig ? clone(orig) : {};
         var payload = {
             id: d.id || (base.id || ''),
-            name: (d.name||base.name||'').trim(),
+            name: nameVal,
             icon: base.icon || '📋',
             description: base.description || '',
             status: base.status || 'active',
-            start_date: d.start_date || '',
-            deadline: d.deadline || '',
+            start_date: d.start_date || todayISO(),
+            deadline: d.deadline || addDaysISO(d.start_date || todayISO(), 90),
             completed_at: base.completed_at || '',
             folder: base.folder || '',
             order_ref: base.order_ref || '',
-            tags: (base.tags||[]).slice(),
-            assignees: (base.assignees||base.assignee_ids||[]).slice(),
-            department_ids: (d.department_ids||[]).slice(),
-            task_kind: base.task_kind || 'audit',
+            tags: (base.tags || []).slice(),
+            assignees: (base.assignees || base.assignee_ids || []).slice(),
+            department_ids: (d.department_ids || []).slice(),
+            task_kind: 'audit',
             load_coef: base.load_coef || 0,
             lead_department: d.lead_department || '',
             lead_employee: base.lead_employee || '',
             is_urgent: !!base.is_urgent,
-            links: (base.links||[]).slice(),
-            orders: (base.orders||[]).slice(),
+            links: (base.links || []).slice(),
+            orders: (base.orders || []).slice(),
             task_type: d.task_type || base.task_type || dirTaskType(stateDash.dir),
             pocket: base.pocket || '',
             department_shares: clone(d.department_shares || {}),
-            stages: stageStarts
+            stages: stageStarts,
+            force_duplicate: true
         };
-        var btn = byId('dashSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Сохранение…'; }
-        apiJson('/api/tracker/task/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-            .then(function(r){ if (!r || !r.success) throw new Error((r&&r.error) || 'Ошибка сохранения'); notify('✅ Черновик сохранён в проверку', 'success'); return (typeof trkRefreshAll==='function') ? trkRefreshAll() : null; })
-            .then(function(){ var nt = stateDash.task ? (st().tasks||[]).find(function(t){ return t.id === stateDash.task.id; }) : null; if (nt) loadDraft(nt); renderSelector(); renderGantt(); renderLoad(); })
-            .catch(function(err){ notify('❌ ' + ((err&&err.message)||'Ошибка'), 'error'); })
-            .then(function(){ var b2 = byId('dashSaveBtn'); if (b2) { b2.disabled = false; b2.textContent = 'Сохранить изменения'; } });
+        var btn = byId('dashSaveBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Сохранение…'; }
+        apiJson('/api/tracker/task/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r){
+            if (!r || !r.success) throw new Error((r && (r.message || r.error)) || 'Ошибка сохранения');
+            var savedId = r.id || payload.id;
+            notify('✅ Проверка сохранена в БД', 'success');
+            var refreshFn = window.__trkRefreshAll || window.__trkLoadState;
+            return (typeof refreshFn === 'function' ? Promise.resolve(refreshFn()) : Promise.resolve()).then(function(){
+                var nt = (st().tasks || []).find(function(t){ return t.id === savedId; });
+                if (nt) loadDraft(nt);
+                else { renderSelector(); renderGantt(); renderLoad(); }
+            });
+        })
+        .catch(function(err){
+            notify('❌ ' + ((err && err.message) || 'Ошибка сохранения'), 'error');
+        })
+        .then(function(){
+            var b2 = byId('dashSaveBtn');
+            if (b2) { b2.disabled = false; b2.textContent = 'Сохранить изменения'; }
+        });
     }
+
     function bindControls(){
-        var btn = byId('tabDashboardsBtn'); if (btn && !btn.__dashBound) { btn.__dashBound = true; btn.addEventListener('click', function(){ window.switchTab('dashboards'); renderSelector(); syncControls(); renderGantt(); renderLoad(); }); }
-        var sel = byId('dashTaskSelector'); if (sel && !sel.__dashBound) { sel.__dashBound = true; sel.addEventListener('change', function(){ var tid = this.value; if (!tid) { loadDraft(null); return; } var task = (st().tasks || []).find(function(x){ return x.id === tid; }); loadDraft(task || null); }); }
-        var createBtn = byId('dashCreateTaskBtn'); if (createBtn && !createBtn.__dashBound) { createBtn.__dashBound = true; createBtn.addEventListener('click', function(){ if (typeof window.openTaskModal === 'function') window.openTaskModal(null, 'audit'); else notify('Форма создания проверки недоступна', 'error'); }); }
-        var dirBox = byId('dashDirSwitch'); if (dirBox && !dirBox.__dashBound) { dirBox.__dashBound = true; dirBox.addEventListener('click', function(e){ var btn = e.target && e.target.closest ? e.target.closest('[data-dir]') : null; if (!btn) return; stateDash.dir = btn.getAttribute('data-dir') || 'retail'; if (stateDash.draft) stateDash.draft.task_type = dirTaskType(stateDash.dir); syncControls(); renderGantt(); renderLoad(); }); }
-        var modeBox = byId('dashModeSwitch'); if (modeBox && !modeBox.__dashBound) { modeBox.__dashBound = true; modeBox.addEventListener('click', function(e){ var btn = e.target && e.target.closest ? e.target.closest('[data-mode]') : null; if (!btn) return; stateDash.mode = btn.getAttribute('data-mode') || 'week'; syncControls(); renderLoad(); }); }
-        var saveBtn = byId('dashSaveBtn'); if (saveBtn && !saveBtn.__dashBound) { saveBtn.__dashBound = true; saveBtn.addEventListener('click', saveDraft); }
+        var btn = byId('tabDashboardsBtn');
+        if (btn && !btn.__dashBound) {
+            btn.__dashBound = true;
+            btn.addEventListener('click', function(e){
+                e.preventDefault();
+                activateDashboardsTab();
+            });
+        }
+        var sel = byId('dashTaskSelector');
+        if (sel && !sel.__dashBound) {
+            sel.__dashBound = true;
+            sel.addEventListener('focus', function(){ renderSelector(); });
+            sel.addEventListener('change', function(){
+                var tid = this.value;
+                if (!tid) { loadDraft(null); return; }
+                if (tid === '__new__') return;
+                var task = (st().tasks || []).find(function(x){ return x.id === tid; });
+                loadDraft(task || null);
+            });
+        }
+        var createBtn = byId('dashCreateTaskBtn');
+        if (createBtn && !createBtn.__dashBound) {
+            createBtn.__dashBound = true;
+            createBtn.addEventListener('click', function(e){
+                e.preventDefault();
+                dashNewDraft();
+            });
+        }
+        var dirBox = byId('dashDirSwitch');
+        if (dirBox && !dirBox.__dashBound) {
+            dirBox.__dashBound = true;
+            dirBox.addEventListener('click', function(e){
+                var b = e.target && e.target.closest ? e.target.closest('[data-dir]') : null;
+                if (!b) return;
+                stateDash.dir = b.getAttribute('data-dir') || 'retail';
+                if (stateDash.draft) stateDash.draft.task_type = dirTaskType(stateDash.dir);
+                syncControls();
+                renderGantt();
+                renderLoad();
+            });
+        }
+        var modeBox = byId('dashModeSwitch');
+        if (modeBox && !modeBox.__dashBound) {
+            modeBox.__dashBound = true;
+            modeBox.addEventListener('click', function(e){
+                var b = e.target && e.target.closest ? e.target.closest('[data-mode]') : null;
+                if (!b) return;
+                stateDash.mode = b.getAttribute('data-mode') || 'week';
+                syncControls();
+                renderGantt();
+                renderLoad();
+            });
+        }
+        var saveBtn = byId('dashSaveBtn');
+        if (saveBtn && !saveBtn.__dashBound) {
+            saveBtn.__dashBound = true;
+            saveBtn.addEventListener('click', function(e){
+                e.preventDefault();
+                saveDraft();
+            });
+        }
     }
-    function boot(){ ensureDashboardsTab(); bindControls(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
-    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-    var _dashRender = window.render; window.render = function(){ if (_dashRender) _dashRender(); bindControls(); renderSelector(); syncControls(); if (document.getElementById('panel-dashboards')) { renderGantt(); renderLoad(); } };
+
+    var _waitCount = 0;
+    function waitStateAndRefresh(){
+        var hasData = (st().tasks && st().tasks.length) || (st().departments && st().departments.length);
+        if (hasData) {
+            renderSelector();
+            syncControls();
+            renderGantt();
+            renderLoad();
+            return;
+        }
+        if (_waitCount++ < 35) {
+            setTimeout(waitStateAndRefresh, 300);
+        }
+    }
+
+    function boot(){
+        ensureDashboardsTab();
+        bindControls();
+        renderSelector();
+        syncControls();
+        renderGantt();
+        renderLoad();
+        waitStateAndRefresh();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+
+    document.addEventListener('click', function(e){
+        if (e.target && e.target.closest && e.target.closest('.tracker-tab[data-tab="dashboards"]')) {
+            setTimeout(function(){
+                bindControls();
+                renderSelector();
+                syncControls();
+                renderGantt();
+                renderLoad();
+            }, 40);
+        }
+    });
 })();

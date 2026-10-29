@@ -10044,3 +10044,42 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-seg-h-r{right:-2px;}
 .dash-seg-del{position:absolute;top:-8px;right:-8px;width:17px;height:17px;border-radius:50%;border:none;background:#ef4444;color:#fff;font-size:12px;line-height:1;cursor:pointer;z-index:4;padding:0;}
 .dash-tl-hint{font-size:11px;color:#94a3b8;margin:2px 0 8px;}
+
+/* ===== Dashboards segmented switch ===== */
+.btn-seg { display:inline-flex; border:1px solid #d0d7e2; border-radius:8px; overflow:hidden; background:#f1f5f9; }
+.btn-seg-btn { border:none; background:transparent; padding:6px 14px; font-size:13px; cursor:pointer; color:#475569; line-height:1.2; }
+.btn-seg-btn + .btn-seg-btn { border-left:1px solid #d0d7e2; }
+.btn-seg-btn.active { background:#2563eb; color:#fff; font-weight:600; }
+.btn-seg-btn:hover:not(.active) { background:#e2e8f0; }
+
+/* ===== Dashboards V2: timeline line, empty state, bank chips, load matrix & redzone ===== */
+.dash-tl-line { position:absolute; left:0; right:0; top:30px; height:3px; background:#cbd5e1; border-radius:2px; pointer-events:none; }
+.dash-tl-empty-bar { position:absolute; left:8px; right:8px; top:4px; height:32px; display:flex; align-items:center; justify-content:center; font-size:12px; color:#64748b; background:rgba(241,245,249,.88); border:1px dashed #94a3b8; border-radius:8px; padding:0 10px; text-align:center; pointer-events:none; }
+.dash-title-edit-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.dash-name-input { max-width:340px; font-weight:700; font-size:1rem; padding:6px 10px; }
+.dash-summary-dates { display:inline-flex; gap:6px; align-items:center; font-size:.88rem; color:var(--trk-meta,#64748b); }
+.dash-summary-dates input[type="date"] { padding:4px 8px; border:1px solid var(--trk-card-border,#cbd5e1); border-radius:8px; background:var(--trk-input-bg,#fff); color:var(--trk-text,#1e293b); font-size:.85rem; }
+.dash-bank-chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+.dash-bank-chips-lbl { font-size:.84rem; font-weight:600; color:var(--trk-meta,#64748b); margin-right:4px; }
+.dash-bank-chip { border:1px solid var(--trk-card-border,#cbd5e1); background:var(--trk-input-bg,#f8fafc); color:var(--trk-text,#334155); border-radius:999px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:all .15s; }
+.dash-bank-chip.active { background:#2563eb; color:#fff; border-color:#1d4ed8; font-weight:600; }
+.dash-bank-chip.is-lead { box-shadow:0 0 0 2px #f59e0b; }
+.dash-badge-lead { display:inline-block; background:#fef3c7; color:#b45309; border:1px solid #f59e0b; border-radius:999px; padding:1px 7px; font-size:.75rem; font-weight:700; vertical-align:middle; }
+.dash-mini-col { height:136px; overflow:hidden; }
+.dash-mini-redzone { position:absolute; left:0; right:0; top:0; background:rgba(239,68,68,.12); pointer-events:none; }
+.dash-mini-bar { position:relative; z-index:1; }
+.dash-mini-limit { z-index:2; }
+.dash-hm-wrap { overflow-x:auto; margin-bottom:16px; border:1px solid var(--trk-card-border,#e2e8f0); border-radius:12px; background:var(--trk-card-bg,#fff); }
+.dash-hm-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+.dash-hm-table th, .dash-hm-table td { border-bottom:1px solid var(--trk-card-border,#e2e8f0); border-right:1px solid var(--trk-card-border,#f1f5f9); padding:6px 8px; text-align:center; white-space:nowrap; }
+.dash-hm-table thead th { background:var(--trk-input-bg,#f8fafc); font-weight:700; color:var(--trk-meta,#475569); position:sticky; top:0; z-index:1; }
+.dash-hm-bank { text-align:left !important; font-weight:600; min-width:170px; position:sticky; left:0; background:var(--trk-card-bg,#fff); z-index:2; }
+.dash-hm-limit { font-weight:700; color:#dc2626; min-width:70px; }
+.dash-hm-td { position:relative; min-width:46px; padding:4px 6px !important; }
+.dash-hm-cellbar { height:5px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-bottom:3px; }
+.dash-hm-cellbar span { display:block; height:100%; background:#3b82f6; border-radius:3px; }
+.dash-hm-td.is-warn { background:rgba(245,158,11,.10); }
+.dash-hm-td.is-warn .dash-hm-cellbar span { background:#f59e0b; }
+.dash-hm-td.is-over { background:rgba(239,68,68,.16); font-weight:700; color:#b91c1c; }
+.dash-hm-td.is-over .dash-hm-cellbar span { background:#ef4444; }
+.dash-hm-val { font-size:.76rem; line-height:1.1; }
