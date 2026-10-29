@@ -10102,3 +10102,27 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-bank-row { display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap; }
 .dash-bank-actions-top { display:flex; gap:6px; }
 .btn-sm { padding:3px 8px; font-size:12px; }
+
+/* ===== Dashboards v3: lanes stacked, chip colors, single-column histograms ===== */
+.dash-lane-block { border:1px solid var(--trk-card-border,#e2e8f0); border-radius:14px; padding:12px 14px; margin-bottom:14px; background:var(--trk-card-bg,#fff); transition:box-shadow .15s,border-color .15s; }
+.dash-lane-block.active { border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.18); }
+.dash-lane-bar { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.dash-lane-badge { font-size:.72rem; font-weight:700; color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; }
+.dash-lane-title { font-size:.9rem; font-weight:600; color:var(--trk-text,#334155); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dash-lane-close { margin-left:auto; width:22px; height:22px; border-radius:6px; border:1px solid #fecaca; background:#fef2f2; color:#dc2626; cursor:pointer; font-size:14px; line-height:1; }
+.dash-lane-close:hover { background:#fee2e2; }
+
+/* Bank chips: white -> blue (on), lead -> yellow */
+.dash-bank-chip.on { background:#2563eb !important; color:#fff !important; border-color:#1d4ed8 !important; font-weight:600; }
+.dash-bank-chip.on.lead { background:#f59e0b !important; color:#1f2937 !important; border-color:#d97706 !important; }
+.dash-bank-chip.lead { box-shadow:0 0 0 2px #f59e0b; }
+
+/* Stage chips row */
+.dash-stage-chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+.dash-stage-chip { border:1px solid var(--trk-card-border,#cbd5e1); background:var(--trk-input-bg,#f8fafc); color:var(--trk-text,#334155); border-radius:999px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:all .15s; }
+.dash-stage-chip.is-default { font-weight:700; }
+
+/* Histograms: stacked one under another; bars span full width (range from mode slots) */
+.dash-bank-grid { display:flex !important; flex-direction:column; gap:14px; }
+.dash-mini-chart { display:flex; align-items:flex-end; gap:3px; width:100%; }
+.dash-mini-col { flex:1 1 0; min-width:0; height:136px; overflow:hidden; position:relative; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:6px; padding-top:4px; }

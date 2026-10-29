@@ -19059,11 +19059,9 @@ setTimeout(buildGanttTab, 1500);
         renderLoad();
     }
 
-    function renderGantt(){
-        var c = byId('dashGanttContainer');
-        if (!c) return;
-        var hasDraft = !!stateDash.draft;
-        var d = stateDash.draft || {
+    function renderLaneBlock(lane, laneIdx, isActive, b){
+        var hasDraft = !!lane.draft;
+        var d = lane.draft || {
             name: 'Проверка не выбрана (линия жизни)',
             task_type: dirTaskType(stateDash.dir),
             start_date: todayISO(),
@@ -19072,13 +19070,7 @@ setTimeout(buildGanttTab, 1500);
             stages: []
         };
         var stages = hasDraft ? dashNormalizeStages(d) : [];
-
-        /* Fixed time range from mode, not from task dates */
-        var b = dashTimeBounds();
-        var rangeStart = b.startISO;
-        var rangeEnd = b.endISO;
-        var totalDays = b.days || 180;
-        stateDash._range = { start: rangeStart, end: rangeEnd, days: totalDays };
+        var rangeStart = b.startISO, rangeEnd = b.endISO, totalDays = b.days || 180;
 
         function pctX(iso){
             var dd = Math.round((parse(iso) - parse(rangeStart)) / 86400000);
@@ -19095,10 +19087,7 @@ setTimeout(buildGanttTab, 1500);
             var lbl = String(dt.getDate()).padStart(2,'0') + '.' + String(dt.getMonth()+1).padStart(2,'0');
             ticks.push('<div class="dash-tl-tick" style="left:' + ((ti / totalDays) * 100) + '%"><span>' + escapeHtml(lbl) + '</span></div>');
         }
-
-        /* Today marker */
-        var todayPct = pctX(todayISO());
-        var todayMarker = '<div class="dash-tl-today" style="left:' + todayPct + '%" title="Сегодня"></div>';
+        var todayMarker = '<div class="dash-tl-today" style="left:' + pctX(todayISO()) + '%" title="Сегодня"></div>';
 
         /* Segments */
         var segs = '';
@@ -19109,146 +19098,215 @@ setTimeout(buildGanttTab, 1500);
                 var w = Math.max(1.5, x1 - x0);
                 var col = STAGE_COLORS[s.key] || '#48c9b0';
                 var isDefault = (s.key === DASH_STAGE_KEY_DEFAULT);
-                var tip = stageLabel(s.key) + ': ' + s.start + ' → ' + (s.end || s.start) + ' (вес ' + fmtNum(s.weight) + ')';
+                var tip = stageLabel(s.key) + ': ' + s.start + ' \u2192 ' + (s.end || s.start) + ' (\u0432\u0435\u0441 ' + fmtNum(s.weight) + ')';
                 return '<div class="dash-seg' + (isDefault ? ' dash-seg-lead' : '') + '" data-idx="' + idx + '" title="' + escapeHtml(tip) + '" style="left:' + x0 + '%;width:' + w + '%;background:' + escapeHtml(col) + '">'
-                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="Тянуть начало этапа"></span>'
-                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '–' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
-                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="Тянуть конец этапа"></span>'
-                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" title="Удалить этап">×</button>')
+                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="\u0422\u044f\u043d\u0443\u0442\u044c \u043d\u0430\u0447\u0430\u043b\u043e"></span>'
+                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '\u2013' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
+                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="\u0422\u044f\u043d\u0443\u0442\u044c \u043a\u043e\u043d\u0435\u0446"></span>'
+                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" data-lane="' + laneIdx + '" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0430\u043f">\u00d7</button>')
                     + '</div>';
             }).join('');
         } else {
-            segs = '<div class="dash-tl-empty-bar">Показана пустая временная шкала (' + escapeHtml(rangeStart) + ' → ' + escapeHtml(rangeEnd) + '). Выберите проверку сверху или нажмите «+ Создать проверку», чтобы разместить колбаску.</div>';
+            segs = '<div class="dash-tl-empty-bar">\u041f\u0443\u0441\u0442\u0430\u044f \u043b\u0438\u043d\u0438\u044f \u0436\u0438\u0437\u043d\u0438 (' + escapeHtml(rangeStart) + ' \u2192 ' + escapeHtml(rangeEnd) + '). \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443 \u0438\u043b\u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab+ \u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443\u00bb.</div>';
         }
+        var trackId = isActive ? ' id="dashTlTrack"' : '';
+        return '<div class="dash-timeline">'
+            + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
+            + '<div class="dash-tl-track"' + trackId + ' data-lane-track="' + laneIdx + '">' + todayMarker + segs + '</div>'
+            + '</div>';
+    }
 
-        /* Bank chips */
-        var bankChips = '';
-        if (hasDraft) {
-            var allDeps = st().departments || [];
-            var curIds = d.department_ids || [];
-            bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">Банки в проверке (клик — вкл/выкл):</span>'
-                + allDeps.map(function(dep){
-                    var on = curIds.indexOf(dep.id) >= 0;
-                    var isLead = (d.lead_department === dep.id);
-                    var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
-                    return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" title="' + escapeHtml(dep.name + (isLead ? ' (руководитель)' : '') + (on ? ' · доля ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + '</button>';
-                }).join('')
-                + '</div>';
-        }
+    function renderLaneControls(lane, laneIdx){
+        var hasDraft = !!lane.draft;
+        if (!hasDraft) return '';
+        var d = lane.draft;
+        var allDeps = st().departments || [];
+        var curIds = d.department_ids || [];
+
+        /* Bank chips: white -> blue (on), lead -> yellow */
+        var bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b, \u043f\u0440\u0430\u0432\u0430\u044f \u043a\u043d\u043e\u043f\u043a\u0430 \u2014 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c):</span>'
+            + allDeps.map(function(dep){
+                var on = curIds.indexOf(dep.id) >= 0;
+                var isLead = (d.lead_department === dep.id);
+                var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
+                return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" data-lane="' + laneIdx + '" title="' + escapeHtml(dep.name + (isLead ? ' (\u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c)' : '') + (on ? ' \u00b7 \u0434\u043e\u043b\u044f ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + (isLead ? ' \u2605' : '') + '</button>';
+            }).join('')
+            + '</div>';
+
+        /* Stage chips: white -> stage color (on) */
+        var existing = {};
+        dashNormalizeStages(d).forEach(function(s){ existing[s.key] = true; });
+        var stageChips = '<div class="dash-stage-chips"><span class="dash-bank-chips-lbl">\u042d\u0442\u0430\u043f\u044b \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b):</span>'
+            + STAGE_ORDER.map(function(k){
+                var on = !!existing[k];
+                var col = STAGE_COLORS[k] || '#48c9b0';
+                var isDefault = (k === DASH_STAGE_KEY_DEFAULT);
+                var style = on ? ('style="background:' + col + ';border-color:' + col + ';color:#fff"') : '';
+                return '<button class="dash-stage-chip' + (on ? ' on' : '') + (isDefault ? ' is-default' : '') + '" type="button" data-toggle-stage="' + escapeHtml(k) + '" data-lane="' + laneIdx + '" ' + style + ' title="' + escapeHtml(stageLabel(k) + (isDefault ? ' (\u0431\u0430\u0437\u043e\u0432\u044b\u0439, \u043d\u0435\u043b\u044c\u0437\u044f \u0432\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c)' : '') + ' \u00b7 \u0432\u0435\u0441 ' + stageWeight(k)) + '">' + escapeHtml(stageLabel(k)) + '</button>';
+            }).join('')
+            + '</div>';
+
+        return bankChips + stageChips;
+    }
+
+    function renderGantt(){
+        var c = byId('dashGanttContainer');
+        if (!c) return;
+        var b = dashTimeBounds();
+        stateDash._range = { start: b.startISO, end: b.endISO, days: b.days || 180 };
 
         /* Lane tabs */
         var laneTabs = '<div class="dash-lanes">';
         stateDash.lanes.forEach(function(l, i){
-            var label = l.draft ? escapeHtml(l.draft.name || 'Черновик') : (l.task ? escapeHtml(l.task.name || 'Проверка') : 'Ось ' + (i+1));
+            var label = l.draft ? escapeHtml(l.draft.name || '\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a') : (l.task ? escapeHtml(l.task.name || '\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430') : '\u041e\u0441\u044c ' + (i+1));
             var active = (i === stateDash.activeLane);
-            var canClose = stateDash.lanes.length > 1;
             laneTabs += '<div class="dash-lane-tab' + (active ? ' active' : '') + '" data-lane="' + i + '">'
                 + '<span class="dash-lane-label">' + label + '</span>'
-                + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + i + '" title="Удалить ось">×</button>' : '')
                 + '</div>';
         });
         if (stateDash.lanes.length < 5) {
-            laneTabs += '<button class="dash-lane-add" type="button" id="dashAddLaneBtn" title="Добавить ось">+ Ось</button>';
+            laneTabs += '<button class="dash-lane-add" type="button" id="dashAddLaneBtn" title="\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043e\u0441\u044c">+ \u041e\u0441\u044c</button>';
         }
         laneTabs += '</div>';
 
-        /* Draft meta inputs */
-        var metaHtml = '';
-        if (hasDraft) {
-            metaHtml = '<div class="dash-draft-meta">'
-                + '<input type="text" id="dashDraftNameInput" class="form-control dash-draft-name" value="' + escapeHtml(d.name || '') + '" placeholder="Название проверки">'
-                + '<label class="dash-mini-lbl">Начало</label><input type="date" id="dashDraftStartInput" class="form-control dash-draft-date" value="' + escapeHtml(d.start_date || '') + '">'
-                + '<label class="dash-mini-lbl">Конец</label><input type="date" id="dashDraftEndInput" class="form-control dash-draft-date" value="' + escapeHtml(d.deadline || '') + '">'
+        /* Stacked lane blocks */
+        var lanesHtml = stateDash.lanes.map(function(l, i){
+            var isActive = (i === stateDash.activeLane);
+            var d = l.draft;
+            var canClose = stateDash.lanes.length > 1;
+            var metaHtml = '';
+            if (d) {
+                metaHtml = '<div class="dash-draft-meta">'
+                    + '<input type="text" class="form-control dash-draft-name" data-lane-name="' + i + '" value="' + escapeHtml(d.name || '') + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438">'
+                    + '<label class="dash-mini-lbl">\u041d\u0430\u0447\u0430\u043b\u043e</label><input type="date" class="form-control dash-draft-date" data-lane-start="' + i + '" value="' + escapeHtml(d.start_date || '') + '">'
+                    + '<label class="dash-mini-lbl">\u041a\u043e\u043d\u0435\u0446</label><input type="date" class="form-control dash-draft-date" data-lane-end="' + i + '" value="' + escapeHtml(d.deadline || '') + '">'
+                    + '</div>';
+            }
+            return '<div class="dash-lane-block' + (isActive ? ' active' : '') + '" data-lane-block="' + i + '">'
+                + '<div class="dash-lane-bar">'
+                + '<span class="dash-lane-badge">\u041e\u0441\u044c ' + (i+1) + '</span>'
+                + '<span class="dash-lane-title">' + (d ? escapeHtml(d.name || '\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a') : (l.task ? escapeHtml(l.task.name||'') : '\u043d\u0435\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438')) + '</span>'
+                + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + i + '" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043e\u0441\u044c">\u00d7</button>' : '')
+                + '</div>'
+                + metaHtml
+                + renderLaneBlock(l, i, isActive, b)
+                + renderLaneControls(l, i)
                 + '</div>';
-        }
+        }).join('');
 
-        var html = laneTabs
-            + metaHtml
-            + '<div class="dash-timeline">'
-            + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
-            + '<div class="dash-tl-track" id="dashTlTrack">' + todayMarker + segs + '</div>'
-            + '</div>'
-            + '<div class="dash-bank-row">'
-            + bankChips
-            + '<div class="dash-bank-actions-top">'
-            + '<button class="btn btn-secondary btn-sm" type="button" id="dashAddStageBtn">+ Добавить этап</button>'
-            + '<button class="btn btn-secondary btn-sm" type="button" id="dashAddBankBtn">+ Добавить банк</button>'
-            + '</div>'
-            + '</div>';
-        c.innerHTML = html;
+        c.innerHTML = laneTabs + lanesHtml;
 
-        /* Bind events */
+        /* Drag only on active lane track */
         dashAttachDrag(c);
-        var nameInp = byId('dashDraftNameInput');
-        if (nameInp) nameInp.addEventListener('change', function(){ if (stateDash.draft) { stateDash.draft.name = this.value; syncLane(); renderSelector(); } });
-        var startInp = byId('dashDraftStartInput');
-        if (startInp) {
-            startInp.addEventListener('change', function(){
-                if (!stateDash.draft || !this.value) return;
-                stateDash.draft.start_date = this.value;
-                var stg = dashNormalizeStages(stateDash.draft);
-                if (stg.length) stg[0].start = this.value;
-                stateDash.draft.stages = stg;
-                syncLane();
-                renderGantt(); renderLoad();
-            });
-        }
-        var endInp = byId('dashDraftEndInput');
-        if (endInp) {
-            endInp.addEventListener('change', function(){
-                if (!stateDash.draft || !this.value) return;
-                stateDash.draft.deadline = this.value;
-                var stg = dashNormalizeStages(stateDash.draft);
-                if (stg.length) stg[stg.length - 1].end = this.value;
-                stateDash.draft.stages = stg;
-                syncLane();
-                renderGantt(); renderLoad();
-            });
-        }
-        c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
-            btn.addEventListener('click', function(){
-                if (!stateDash.draft) return;
-                var depId = this.getAttribute('data-toggle-bank');
-                var cur = (stateDash.draft.department_ids || []).slice();
-                var i = cur.indexOf(depId);
-                if (i >= 0) {
-                    cur.splice(i, 1);
-                    if (stateDash.draft.lead_department === depId) stateDash.draft.lead_department = cur[0] || '';
-                } else {
-                    cur.push(depId);
-                    stateDash.draft.department_shares = stateDash.draft.department_shares || {};
-                    if (stateDash.draft.department_shares[depId] == null) stateDash.draft.department_shares[depId] = 100;
-                    if (!stateDash.draft.lead_department) stateDash.draft.lead_department = depId;
-                }
-                stateDash.draft.department_ids = cur;
-                syncLane();
-                renderGantt(); renderLoad();
-            });
-        });
-        /* Lane tabs */
+
+        /* Lane tab switching */
         c.querySelectorAll('[data-lane]').forEach(function(tab){
-            tab.addEventListener('click', function(e){
-                if (e.target.closest && e.target.closest('[data-lane-close]')) return;
-                var li = +this.getAttribute('data-lane');
-                switchLane(li);
+            if (!tab.classList.contains('dash-lane-tab')) return;
+            tab.addEventListener('click', function(){
+                switchLane(+this.getAttribute('data-lane'));
                 renderSelector(); syncControls(); renderGantt(); renderLoad();
             });
         });
         c.querySelectorAll('[data-lane-close]').forEach(function(btn){
             btn.addEventListener('click', function(e){
                 e.stopPropagation();
-                var li = +this.getAttribute('data-lane-close');
-                if (removeLane(li)) { renderSelector(); syncControls(); renderGantt(); renderLoad(); }
+                if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); }
             });
         });
         var addLaneBtn = byId('dashAddLaneBtn');
         if (addLaneBtn) addLaneBtn.addEventListener('click', function(){
             if (addLane()) { dashNewDraft(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
         });
-        var addStageBtn = byId('dashAddStageBtn');
-        if (addStageBtn) addStageBtn.onclick = openAddStageDialog;
-        var addBankBtn = byId('dashAddBankBtn');
-        if (addBankBtn) addBankBtn.onclick = openAddBankDialog;
+
+        /* Activate a lane block by clicking it (so its controls apply) */
+        c.querySelectorAll('[data-lane-block]').forEach(function(bl){
+            bl.addEventListener('pointerdown', function(e){
+                if (e.target.closest('[data-lane-close]')) return;
+                var li = +this.getAttribute('data-lane-block');
+                if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
+            }, true);
+        });
+
+        /* Meta inputs per lane */
+        c.querySelectorAll('[data-lane-name]').forEach(function(inp){
+            inp.addEventListener('change', function(){
+                var li = +this.getAttribute('data-lane-name'); var L = stateDash.lanes[li];
+                if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); }
+            });
+        });
+        c.querySelectorAll('[data-lane-start]').forEach(function(inp){
+            inp.addEventListener('change', function(){
+                var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li];
+                if (!L||!L.draft||!this.value) return;
+                L.draft.start_date=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg;
+                switchLane(li); renderGantt(); renderLoad();
+            });
+        });
+        c.querySelectorAll('[data-lane-end]').forEach(function(inp){
+            inp.addEventListener('change', function(){
+                var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li];
+                if (!L||!L.draft||!this.value) return;
+                L.draft.deadline=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg;
+                switchLane(li); renderGantt(); renderLoad();
+            });
+        });
+
+        /* Bank chip: left click toggle on/off; right click set/unset lead */
+        c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                var li=+this.getAttribute('data-lane'); switchLane(li);
+                if (!stateDash.draft) return;
+                var depId=this.getAttribute('data-toggle-bank');
+                var cur=(stateDash.draft.department_ids||[]).slice();
+                var k=cur.indexOf(depId);
+                if (k>=0){ cur.splice(k,1); if(stateDash.draft.lead_department===depId) stateDash.draft.lead_department=cur[0]||''; }
+                else { cur.push(depId); stateDash.draft.department_shares=stateDash.draft.department_shares||{}; if(stateDash.draft.department_shares[depId]==null)stateDash.draft.department_shares[depId]=100; if(!stateDash.draft.lead_department)stateDash.draft.lead_department=depId; }
+                stateDash.draft.department_ids=cur; syncLane(); renderGantt(); renderLoad();
+            });
+            btn.addEventListener('contextmenu', function(e){
+                e.preventDefault();
+                var li=+this.getAttribute('data-lane'); switchLane(li);
+                if (!stateDash.draft) return;
+                var depId=this.getAttribute('data-toggle-bank');
+                var cur=(stateDash.draft.department_ids||[]);
+                if (cur.indexOf(depId)<0){ notify('\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0431\u0430\u043d\u043a \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443', 'info'); return; }
+                stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId;
+                syncLane(); renderGantt(); renderLoad();
+            });
+        });
+
+        /* Stage chip: toggle add/remove (default stage can't be removed) */
+        c.querySelectorAll('[data-toggle-stage]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                var li=+this.getAttribute('data-lane'); switchLane(li);
+                if (!stateDash.draft) return;
+                var key=this.getAttribute('data-toggle-stage');
+                if (key===DASH_STAGE_KEY_DEFAULT){ notify('\u042d\u0442\u0430\u043f \u00ab\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u041d\u0416\u042f\u00bb \u0431\u0430\u0437\u043e\u0432\u044b\u0439 \u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0430\u043a\u0442\u0438\u0432\u0435\u043d', 'info'); return; }
+                var stg=dashNormalizeStages(stateDash.draft);
+                var pos=stg.map(function(x){return x.key;}).indexOf(key);
+                if (pos>=0){ stg.splice(pos,1); }
+                else {
+                    var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO();
+                    stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
+                    var ns=addDaysISO(lastEnd,1), ne=addDaysISO(ns,13);
+                    stg.push({key:key,start:ns,end:ne,weight:stageWeight(key)});
+                    if (ne>stateDash.draft.deadline) stateDash.draft.deadline=ne;
+                }
+                stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad();
+            });
+        });
+
+        /* Delete-stage button on segment */
+        c.querySelectorAll('[data-del]').forEach(function(btn){
+            btn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var li=+this.getAttribute('data-lane'); switchLane(li);
+                if (!stateDash.draft) return;
+                var idx=+this.getAttribute('data-del');
+                var stg=dashNormalizeStages(stateDash.draft);
+                if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); }
+            });
+        });
     }
 
     function renderLoad(){
@@ -19267,44 +19325,7 @@ setTimeout(buildGanttTab, 1500);
 
         var slots = dashSlots();
 
-        /* Таблица-гистограмма нагрузки по банкам во времени */
-        var thCells = slots.map(function(s){
-            return '<th class="dash-hm-th">' + escapeHtml(s.label) + '</th>';
-        }).join('');
-        var tableRows = shownDeps.map(function(dep){
-            var poss = calcPossible(dep, stateDash.dir);
-            var inDraft = draftDepIds.indexOf(dep.id) >= 0;
-            var isLead = hasDraft && stateDash.draft.lead_department === dep.id;
-            var tds = slots.map(function(slot){
-                var base = dashBaseLoad(dep.id, slot);
-                var dr = dashDraftStageLoad(slot.start, slot.end, dep.id);
-                var tot = Math.round((base + dr) * 100) / 100;
-                var over = (poss !== null && tot > poss);
-                var warn = (!over && poss !== null && tot > poss * 0.85);
-                var cls = 'dash-hm-td' + (over ? ' is-over' : (warn ? ' is-warn' : (tot > 0 ? ' is-ok' : '')));
-                var pct = poss ? Math.min(100, Math.round((tot / poss) * 100)) : (tot > 0 ? Math.min(100, Math.round(tot * 35)) : 0);
-                var tip = dep.name + ' (' + slot.label + '): нагрузка ' + fmtNum(tot)
-                    + (dr > 0 ? (' (база ' + fmtNum(base) + ' + черновик ' + fmtNum(dr) + ')') : '')
-                    + (poss !== null ? (' / лимит ' + fmtNum(poss)) : '');
-                return '<td class="' + cls + '" title="' + escapeHtml(tip) + '">'
-                    + '<div class="dash-hm-cellbar"><span style="width:' + pct + '%"></span></div>'
-                    + '<div class="dash-hm-val">' + (tot > 0 ? fmtNum(tot) : '0') + '</div>'
-                    + '</td>';
-            }).join('');
-            return '<tr class="' + (inDraft ? 'in-draft' : '') + '">'
-                + '<td class="dash-hm-bank">'
-                    + '<span class="dash-hm-bname">' + escapeHtml(dep.name) + '</span>'
-                    + (isLead ? ' <span class="dash-badge-lead">★ рук.</span>' : '')
-                + '</td>'
-                + '<td class="dash-hm-limit">' + fmtNum(poss) + '</td>'
-                + tds
-                + '</tr>';
-        }).join('');
-
-        var matrixHtml = '<div class="dash-hm-wrap"><table class="dash-hm-table">'
-            + '<thead><tr><th class="dash-hm-bank">Территориальный банк</th><th class="dash-hm-limit">Лимит (возможн.)</th>' + thCells + '</tr></thead>'
-            + '<tbody>' + tableRows + '</tbody>'
-            + '</table></div>';
+        /* (Сводная таблица убрана — дублировала гистограммы) */
 
         var cards = shownDeps.map(function(dep){
             var depId = dep.id;
@@ -19374,7 +19395,6 @@ setTimeout(buildGanttTab, 1500);
                     + '<div class="dash-load-sub">Красная пунктирная линия и розовая зона сверху = предел возможного числа проверок (норматив × экспертный коэф.). Нагрузка банка-руководителя: розн ×2, корп ×1,5.</div>'
                 + '</div>'
             + '</div>'
-            + matrixHtml
             + '<div class="dash-bank-grid">' + cards + '</div>';
 
         box.querySelectorAll('[data-act]').forEach(function(btn){
@@ -19423,7 +19443,7 @@ setTimeout(buildGanttTab, 1500);
             d.name = nameVal;
         }
         if (!(d.department_ids || []).length) {
-            notify('Добавьте хотя бы один банк-участник (кликните по банку под колбаской или «+ Добавить банк»)', 'error');
+            notify('Добавьте хотя бы один банк-участник (кликните по банку в плашке «Банки в проверке»)', 'error');
             return;
         }
         if (!d.lead_department || d.department_ids.indexOf(d.lead_department) < 0) {
