@@ -18491,6 +18491,7 @@ setTimeout(buildGanttTab, 1500);
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
     function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
     function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null,offset:stateDash.globalOffset||0,pinned:false}); switchLane(stateDash.lanes.length-1); return true; }
+    function findEmptyLane(){ for (var i=0;i<stateDash.lanes.length;i++){ var l=stateDash.lanes[i]; if (l && !l.task && !l.draft) return i; } return -1; }
     function removeLane(i){ if(stateDash.lanes.length<=1) return false; stateDash.lanes.splice(i,1); if(stateDash.activeLane>=stateDash.lanes.length) stateDash.activeLane=stateDash.lanes.length-1; switchLane(stateDash.activeLane); return true; }
     function laneOffset(lane){ lane=lane||stateDash.lanes[stateDash.activeLane]||{}; return lane && lane.pinned ? (lane.offset||0) : (stateDash.globalOffset||0); }
     function setLanePinned(i, pinned){ var lane=stateDash.lanes[i]; if(!lane) return; lane.pinned=!!pinned; if(lane.pinned) lane.offset=stateDash.globalOffset||0; }
@@ -18745,6 +18746,12 @@ setTimeout(buildGanttTab, 1500);
 
     function dashCreateDraft(opts){
         opts = opts || {};
+        var emptyIdx = findEmptyLane();
+        if (emptyIdx >= 0) {
+            switchLane(emptyIdx);
+        } else if (stateDash.lanes.length < 5) {
+            addLane();
+        }
         var start = todayISO();
         var end = addDaysISO(start, 90);
         var allDeps = (st().departments || []);
@@ -18870,7 +18877,16 @@ setTimeout(buildGanttTab, 1500);
             });
         }
         var slider = byId('dashGlobalSlider');
-        if (slider) slider.value = stateDash.globalOffset || 0;
+        if (slider) {
+            var cfg = dashGlobalSliderConfig();
+            slider.min = cfg.min;
+            slider.max = cfg.max;
+            slider.step = 1;
+            var v = stateDash.globalOffset || 0;
+            if (v < cfg.min) v = cfg.min;
+            if (v > cfg.max) v = cfg.max;
+            slider.value = v;
+        }
     }
 
     function renderSelector(){
@@ -18895,6 +18911,20 @@ setTimeout(buildGanttTab, 1500);
         if (stateDash.task && stateDash.task.id) sel.value = stateDash.task.id;
         else if (stateDash.draft && !stateDash.draft.id) sel.value = '__new__';
         else sel.value = '';
+    }
+
+    function dashGlobalSliderConfig(){
+        if (stateDash.mode === 'small') return { min:-180, max:360 };
+        if (stateDash.mode === 'large') return { min:-45, max:90 };
+        return { min:-90, max:180 };
+    }
+
+    function dashClampGlobalOffset(v){
+        var cfg = dashGlobalSliderConfig();
+        v = Number(v) || 0;
+        if (v < cfg.min) v = cfg.min;
+        if (v > cfg.max) v = cfg.max;
+        return Math.round(v);
     }
 
     function dashTimeBounds(offsetDays){
@@ -19250,7 +19280,9 @@ setTimeout(buildGanttTab, 1500);
     function renderGantt(){
         var c = byId('dashGanttContainer');
         if (!c) return;
-        var sliderHtml = '<div class="dash-global-slider-wrap"><input type="range" id="dashGlobalSlider" class="dash-global-slider" min="-365" max="365" step="7" value="' + (stateDash.globalOffset || 0) + '"></div>';
+        stateDash.globalOffset = dashClampGlobalOffset(stateDash.globalOffset || 0);
+        var sliderCfg = dashGlobalSliderConfig();
+        var sliderHtml = '<div class="dash-global-slider-wrap"><input type="range" id="dashGlobalSlider" class="dash-global-slider" min="' + sliderCfg.min + '" max="' + sliderCfg.max + '" step="1" value="' + (stateDash.globalOffset || 0) + '"></div>';
         var lanesHtml = stateDash.lanes.map(function(l, i){
             var isActive = (i === stateDash.activeLane);
             return renderLaneBlock(l, i, isActive, dashTimeBounds(laneOffset(l)), stateDash.lanes.length > 1, stateDash.lanes.length > 1, !!l.pinned);
@@ -19262,7 +19294,7 @@ setTimeout(buildGanttTab, 1500);
         c.querySelectorAll('[data-lane-close]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } }); });
         c.querySelectorAll('[data-lane-pin]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var i=+this.getAttribute('data-lane-pin'); var lane=stateDash.lanes[i]; if(!lane) return; setLanePinned(i, !lane.pinned); renderGantt(); renderLoad(); }); });
         var gs = byId('dashGlobalSlider');
-        if (gs) gs.addEventListener('input', function(){ stateDash.globalOffset = +this.value || 0; renderGantt(); renderLoad(); });
+        if (gs) gs.addEventListener('input', function(){ stateDash.globalOffset = dashClampGlobalOffset(+this.value || 0); renderGantt(); renderLoad(); syncControls(); });
         c.querySelectorAll('[data-lane-block]').forEach(function(el){ el.addEventListener('pointerdown', function(e){ if (e.target.closest('[data-lane-close]') || e.target.closest('[data-lane-pin]')) return; var li = +this.getAttribute('data-lane-block'); if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); } }, true); });
         c.querySelectorAll('[data-lane-name]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-name'); var L=stateDash.lanes[li]; if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); } }); });
         c.querySelectorAll('[data-lane-start]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.start_date=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
@@ -19558,6 +19590,7 @@ setTimeout(buildGanttTab, 1500);
                 var b = e.target && e.target.closest ? e.target.closest('[data-mode]') : null;
                 if (!b) return;
                 stateDash.mode = b.getAttribute('data-mode') || 'medium';
+                stateDash.globalOffset = dashClampGlobalOffset(stateDash.globalOffset || 0);
                 syncControls();
                 renderGantt();
                 renderLoad();
