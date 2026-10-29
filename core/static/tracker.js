@@ -18486,12 +18486,14 @@ setTimeout(buildGanttTab, 1500);
     if (window.__trkDashboardsV2) return;
     window.__trkDashboardsV2 = true;
 
-    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null}], activeLane:0, todayOffset:0 };
+    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0 };
     var MODE_MONTHS = { small:12, medium:6, large:3 };
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
     function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
-    function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null}); switchLane(stateDash.lanes.length-1); return true; }
+    function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null,offset:stateDash.globalOffset||0,pinned:false}); switchLane(stateDash.lanes.length-1); return true; }
     function removeLane(i){ if(stateDash.lanes.length<=1) return false; stateDash.lanes.splice(i,1); if(stateDash.activeLane>=stateDash.lanes.length) stateDash.activeLane=stateDash.lanes.length-1; switchLane(stateDash.activeLane); return true; }
+    function laneOffset(lane){ lane=lane||stateDash.lanes[stateDash.activeLane]||{}; return lane && lane.pinned ? (lane.offset||0) : (stateDash.globalOffset||0); }
+    function setLanePinned(i, pinned){ var lane=stateDash.lanes[i]; if(!lane) return; lane.pinned=!!pinned; if(lane.pinned) lane.offset=stateDash.globalOffset||0; }
     var DASH_DIR_LABEL = { retail:'Розничное', corp:'Корпоративное' };
     var DASH_STAGE_KEY_DEFAULT = 'проверка_нжя';
 
@@ -18690,8 +18692,10 @@ setTimeout(buildGanttTab, 1500);
 
     function dashNormalizeStages(task){
         var raw = (task && Array.isArray(task.stages)) ? clone(task.stages) : [];
-        var stages = raw.filter(function(s){ return s && s.start; });
-        stages.sort(function(a,b){ return String(a.start || '').localeCompare(String(b.start || '')); });
+        var stages = raw.filter(function(s){ return s && s.start; }).map(function(s){
+            return { key:s.key, start:s.start, end:s.end || s.start, weight:(s.weight===undefined||s.weight===null)?stageWeight(s.key):s.weight };
+        });
+        stages.sort(function(a,b){ return STAGE_ORDER.indexOf(a.key) - STAGE_ORDER.indexOf(b.key); });
         if (!stages.length) {
             var ds = (task && task.start_date) || todayISO();
             var de = (task && task.deadline) || addDaysISO(ds, 90);
@@ -18699,13 +18703,18 @@ setTimeout(buildGanttTab, 1500);
             stages = [{ key: DASH_STAGE_KEY_DEFAULT, start: ds, end: de, weight: 1.0 }];
         }
         for (var i = 0; i < stages.length; i++) {
-            var s = stages[i], next = stages[i+1];
-            if (!s.end || s.end < s.start) {
-                var cand = (next && next.start) ? addDaysISO(next.start, -1) : ((task && task.deadline) || s.start);
-                if (!cand || cand < s.start) cand = s.start;
-                s.end = cand;
-            }
+            var s = stages[i];
+            if (!s.end || s.end < s.start) s.end = s.start;
             if (s.weight === undefined || s.weight === null) s.weight = stageWeight(s.key);
+        }
+        for (var k = 1; k < stages.length; k++) {
+            var prev = stages[k-1], cur = stages[k];
+            var prevEnd = parse(prev.end || prev.start), curStart = parse(cur.start), curEnd = parse(cur.end || cur.start);
+            if (prevEnd && curStart && curEnd && curStart <= prevEnd) {
+                var len = Math.max(1, Math.round((curEnd - curStart) / 86400000));
+                cur.start = addDaysISO(prev.end || prev.start, 1);
+                cur.end = addDaysISO(cur.start, len);
+            }
         }
         return stages;
     }
@@ -18860,15 +18869,8 @@ setTimeout(buildGanttTab, 1500);
                 btn.classList.toggle('active', btn.getAttribute('data-mode') === stateDash.mode);
             });
         }
-        var slider = byId('dashTodaySlider');
-        if (slider) {
-            slider.value = stateDash.todayOffset || 0;
-        }
-        var lbl = byId('dashTodayLabel');
-        if (lbl) {
-            var off = stateDash.todayOffset || 0;
-            lbl.textContent = off === 0 ? 'по центру' : (off > 0 ? '+' + off + ' дн' : off + ' дн');
-        }
+        var slider = byId('dashGlobalSlider');
+        if (slider) slider.value = stateDash.globalOffset || 0;
     }
 
     function renderSelector(){
@@ -18895,13 +18897,13 @@ setTimeout(buildGanttTab, 1500);
         else sel.value = '';
     }
 
-    function dashTimeBounds(){
+    function dashTimeBounds(offsetDays){
         var months = MODE_MONTHS[stateDash.mode] || 6;
         var totalDays = Math.round(months * 30.44);
-        var center = addDaysISO(todayISO(), stateDash.todayOffset || 0);
-        var half = Math.floor(totalDays / 2);
-        var startISO = addDaysISO(center, -half);
-        var endISO = addDaysISO(center, totalDays - half);
+        var center = addDaysISO(todayISO(), offsetDays || 0);
+        var at20 = Math.floor(totalDays * 0.20);
+        var startISO = addDaysISO(center, -at20);
+        var endISO = addDaysISO(center, totalDays - at20);
         return { startISO: startISO, endISO: endISO, days: totalDays };
     }
 
@@ -19065,15 +19067,18 @@ setTimeout(buildGanttTab, 1500);
                     stg[i].start = addDaysISO(s.start, dd);
                     stg[i].end = addDaysISO(s.end, dd);
                 }
+                stg.sort(function(a,b){ return STAGE_ORDER.indexOf(a.key) - STAGE_ORDER.indexOf(b.key); });
+                for (var k = 1; k < stg.length; k++) {
+                    var prev = stg[k-1], cur = stg[k];
+                    if (cur.start <= prev.end) {
+                        var curLen = Math.max(1, Math.round((parse(cur.end||cur.start) - parse(cur.start)) / 86400000));
+                        cur.start = addDaysISO(prev.end, 1);
+                        cur.end = addDaysISO(cur.start, curLen);
+                    }
+                }
                 stateDash.draft.stages = stg;
-                var mn = stg[0].start, mx = stg[0].end || stg[0].start;
-                stg.forEach(function(x){
-                    if (x.start < mn) mn = x.start;
-                    var xe = x.end || x.start;
-                    if (xe > mx) mx = xe;
-                });
-                stateDash.draft.start_date = mn;
-                stateDash.draft.deadline = mx;
+                stateDash.draft.start_date = stg[0].start;
+                stateDash.draft.deadline = stg[stg.length-1].end;
             }
             syncLane();
             renderGantt();
@@ -19143,7 +19148,7 @@ setTimeout(buildGanttTab, 1500);
         renderLoad();
     }
 
-    function renderLaneBlock(lane, laneIdx, isActive, b){
+    function renderLaneBlock(lane, laneIdx, isActive, b, canClose, canPin, isPinned){
         var hasDraft = !!lane.draft;
         var d = lane.draft || {
             name: 'Проверка не выбрана (линия жизни)',
@@ -19154,6 +19159,7 @@ setTimeout(buildGanttTab, 1500);
             stages: []
         };
         var stages = hasDraft ? dashNormalizeStages(d) : [];
+        b = b || dashTimeBounds(laneOffset(lane));
         var rangeStart = b.startISO, rangeEnd = b.endISO, totalDays = b.days || 180;
 
         function pctX(iso){
@@ -19161,7 +19167,6 @@ setTimeout(buildGanttTab, 1500);
             return Math.max(-5, Math.min(105, (dd / totalDays) * 100));
         }
 
-        /* Ticks */
         var ticks = [];
         var useDays = (stateDash.mode === 'large');
         var step = useDays ? (totalDays > 60 ? 3 : 1) : 7;
@@ -19172,8 +19177,13 @@ setTimeout(buildGanttTab, 1500);
             ticks.push('<div class="dash-tl-tick" style="left:' + ((ti / totalDays) * 100) + '%"><span>' + escapeHtml(lbl) + '</span></div>');
         }
         var todayMarker = '<div class="dash-tl-today" style="left:' + pctX(todayISO()) + '%" title="Сегодня"></div>';
+        var header = '<div class="dash-lane-header">'
+            + '<div class="dash-lane-title">Ось ' + (laneIdx+1) + (hasDraft ? ' · ' + escapeHtml(d.name || 'Проверка') : '') + '</div>'
+            + '<div class="dash-lane-header-actions">'
+            + (canPin ? '<button class="dash-lane-pin' + (isPinned ? ' active' : '') + '" type="button" data-lane-pin="' + laneIdx + '" title="' + (isPinned ? 'Открепить ось' : 'Закрепить ось') + '">📌</button>' : '')
+            + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + laneIdx + '" title="Удалить ось">×</button>' : '')
+            + '</div></div>';
 
-        /* Segments */
         var segs = '';
         if (hasDraft) {
             segs = stages.map(function(s, idx){
@@ -19182,21 +19192,25 @@ setTimeout(buildGanttTab, 1500);
                 var w = Math.max(1.5, x1 - x0);
                 var col = STAGE_COLORS[s.key] || '#48c9b0';
                 var isDefault = (s.key === DASH_STAGE_KEY_DEFAULT);
-                var tip = stageLabel(s.key) + ': ' + s.start + ' \u2192 ' + (s.end || s.start) + ' (\u0432\u0435\u0441 ' + fmtNum(s.weight) + ')';
+                var tip = stageLabel(s.key) + ': ' + s.start + ' → ' + (s.end || s.start) + ' (вес ' + fmtNum(s.weight) + ')';
                 return '<div class="dash-seg' + (isDefault ? ' dash-seg-lead' : '') + '" data-idx="' + idx + '" title="' + escapeHtml(tip) + '" style="left:' + x0 + '%;width:' + w + '%;background:' + escapeHtml(col) + '">'
-                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="\u0422\u044f\u043d\u0443\u0442\u044c \u043d\u0430\u0447\u0430\u043b\u043e"></span>'
-                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '\u2013' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
-                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="\u0422\u044f\u043d\u0443\u0442\u044c \u043a\u043e\u043d\u0435\u0446"></span>'
-                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" data-lane="' + laneIdx + '" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0430\u043f">\u00d7</button>')
+                    + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="Тянуть начало"></span>'
+                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '–' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
+                    + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="Тянуть конец"></span>'
+                    + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" data-lane="' + laneIdx + '" title="Удалить этап">×</button>')
                     + '</div>';
             }).join('');
         } else {
-            segs = '<div class="dash-tl-empty-bar">\u041f\u0443\u0441\u0442\u0430\u044f \u043b\u0438\u043d\u0438\u044f \u0436\u0438\u0437\u043d\u0438 (' + escapeHtml(rangeStart) + ' \u2192 ' + escapeHtml(rangeEnd) + '). \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443 \u0438\u043b\u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab+ \u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443\u00bb.</div>';
+            segs = '<div class="dash-tl-empty-bar">Пустая линия жизни (' + escapeHtml(rangeStart) + ' → ' + escapeHtml(rangeEnd) + '). Выберите проверку или нажмите «+ Создать проверку».</div>';
         }
         var trackId = isActive ? ' id="dashTlTrack"' : '';
-        return '<div class="dash-timeline">'
+        return '<div class="dash-lane-block" data-lane-block="' + laneIdx + '">'
+            + header
+            + '<div class="dash-timeline">'
             + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
             + '<div class="dash-tl-track"' + trackId + ' data-lane-track="' + laneIdx + '">' + todayMarker + segs + '</div>'
+            + '</div>'
+            + renderLaneControls(lane, laneIdx)
             + '</div>';
     }
 
@@ -19236,169 +19250,49 @@ setTimeout(buildGanttTab, 1500);
     function renderGantt(){
         var c = byId('dashGanttContainer');
         if (!c) return;
-        var b = dashTimeBounds();
-        stateDash._range = { start: b.startISO, end: b.endISO, days: b.days || 180 };
-
-        /* Lane tabs */
-        var laneTabs = '<div class="dash-lanes">';
-        stateDash.lanes.forEach(function(l, i){
-            var label = l.draft ? escapeHtml(l.draft.name || '\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a') : (l.task ? escapeHtml(l.task.name || '\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430') : '\u041e\u0441\u044c ' + (i+1));
-            var active = (i === stateDash.activeLane);
-            laneTabs += '<div class="dash-lane-tab' + (active ? ' active' : '') + '" data-lane="' + i + '">'
-                + '<span class="dash-lane-label">' + label + '</span>'
-                + '</div>';
-        });
-        if (stateDash.lanes.length < 5) {
-            laneTabs += '<button class="dash-lane-add" type="button" id="dashAddLaneBtn" title="\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043e\u0441\u044c">+ \u041e\u0441\u044c</button>';
-        }
-        laneTabs += '</div>';
-
-        /* Stacked lane blocks */
+        var sliderHtml = '<div class="dash-global-slider-wrap"><input type="range" id="dashGlobalSlider" class="dash-global-slider" min="-365" max="365" step="7" value="' + (stateDash.globalOffset || 0) + '"></div>';
         var lanesHtml = stateDash.lanes.map(function(l, i){
             var isActive = (i === stateDash.activeLane);
-            var d = l.draft;
-            var canClose = stateDash.lanes.length > 1;
-            var metaHtml = '';
-            if (d) {
-                metaHtml = '<div class="dash-draft-meta">'
-                    + '<input type="text" class="form-control dash-draft-name" data-lane-name="' + i + '" value="' + escapeHtml(d.name || '') + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438">'
-                    + '<label class="dash-mini-lbl">\u041d\u0430\u0447\u0430\u043b\u043e</label><input type="date" class="form-control dash-draft-date" data-lane-start="' + i + '" value="' + escapeHtml(d.start_date || '') + '">'
-                    + '<label class="dash-mini-lbl">\u041a\u043e\u043d\u0435\u0446</label><input type="date" class="form-control dash-draft-date" data-lane-end="' + i + '" value="' + escapeHtml(d.deadline || '') + '">'
-                    + '</div>';
-            }
-            return '<div class="dash-lane-block' + (isActive ? ' active' : '') + '" data-lane-block="' + i + '">'
-                + '<div class="dash-lane-bar">'
-                + '<span class="dash-lane-badge">\u041e\u0441\u044c ' + (i+1) + '</span>'
-                + '<span class="dash-lane-title">' + (d ? escapeHtml(d.name || '\u0427\u0435\u0440\u043d\u043e\u0432\u0438\u043a') : (l.task ? escapeHtml(l.task.name||'') : '\u043d\u0435\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438')) + '</span>'
-                + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + i + '" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043e\u0441\u044c">\u00d7</button>' : '')
-                + '</div>'
-                + metaHtml
-                + renderLaneBlock(l, i, isActive, b)
-                + renderLaneControls(l, i)
-                + '</div>';
+            return renderLaneBlock(l, i, isActive, dashTimeBounds(laneOffset(l)), stateDash.lanes.length > 1, stateDash.lanes.length > 1, !!l.pinned);
         }).join('');
-
-        c.innerHTML = laneTabs + lanesHtml;
-
-        /* Drag only on active lane track */
-        dashAttachDrag(c);
-
-        /* Lane tab switching */
-        c.querySelectorAll('[data-lane]').forEach(function(tab){
-            if (!tab.classList.contains('dash-lane-tab')) return;
-            tab.addEventListener('click', function(){
-                switchLane(+this.getAttribute('data-lane'));
-                renderSelector(); syncControls(); renderGantt(); renderLoad();
-            });
-        });
-        c.querySelectorAll('[data-lane-close]').forEach(function(btn){
-            btn.addEventListener('click', function(e){
-                e.stopPropagation();
-                if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); }
-            });
-        });
-        var addLaneBtn = byId('dashAddLaneBtn');
-        if (addLaneBtn) addLaneBtn.addEventListener('click', function(){
-            if (addLane()) { dashOpenCreateModal(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
-        });
-
-        /* Activate a lane block by clicking it (so its controls apply) */
-        c.querySelectorAll('[data-lane-block]').forEach(function(bl){
-            bl.addEventListener('pointerdown', function(e){
-                if (e.target.closest('[data-lane-close]')) return;
-                var li = +this.getAttribute('data-lane-block');
-                if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
-            }, true);
-        });
-
-        /* Meta inputs per lane */
-        c.querySelectorAll('[data-lane-name]').forEach(function(inp){
-            inp.addEventListener('change', function(){
-                var li = +this.getAttribute('data-lane-name'); var L = stateDash.lanes[li];
-                if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); }
-            });
-        });
-        c.querySelectorAll('[data-lane-start]').forEach(function(inp){
-            inp.addEventListener('change', function(){
-                var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li];
-                if (!L||!L.draft||!this.value) return;
-                L.draft.start_date=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg;
-                switchLane(li); renderGantt(); renderLoad();
-            });
-        });
-        c.querySelectorAll('[data-lane-end]').forEach(function(inp){
-            inp.addEventListener('change', function(){
-                var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li];
-                if (!L||!L.draft||!this.value) return;
-                L.draft.deadline=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg;
-                switchLane(li); renderGantt(); renderLoad();
-            });
-        });
-
-        /* Bank chip: left click toggle on/off; right click set/unset lead */
+        var addBtn = stateDash.lanes.length < 5 ? '<div class="dash-lanes-foot"><button class="dash-lane-add" type="button" id="dashAddLaneBtn">+ Ось</button></div>' : '';
+        c.innerHTML = sliderHtml + lanesHtml + addBtn;
+        var addBtnEl = byId('dashAddLaneBtn');
+        if (addBtnEl) addBtnEl.addEventListener('click', function(){ if (addLane()) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } });
+        c.querySelectorAll('[data-lane-close]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } }); });
+        c.querySelectorAll('[data-lane-pin]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var i=+this.getAttribute('data-lane-pin'); var lane=stateDash.lanes[i]; if(!lane) return; setLanePinned(i, !lane.pinned); renderGantt(); renderLoad(); }); });
+        var gs = byId('dashGlobalSlider');
+        if (gs) gs.addEventListener('input', function(){ stateDash.globalOffset = +this.value || 0; renderGantt(); renderLoad(); });
+        c.querySelectorAll('[data-lane-block]').forEach(function(el){ el.addEventListener('pointerdown', function(e){ if (e.target.closest('[data-lane-close]') || e.target.closest('[data-lane-pin]')) return; var li = +this.getAttribute('data-lane-block'); if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); } }, true); });
+        c.querySelectorAll('[data-lane-name]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-name'); var L=stateDash.lanes[li]; if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); } }); });
+        c.querySelectorAll('[data-lane-start]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.start_date=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
+        c.querySelectorAll('[data-lane-end]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.deadline=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
         c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
-            btn.addEventListener('click', function(){
-                var li=+this.getAttribute('data-lane'); switchLane(li);
-                if (!stateDash.draft) return;
-                var depId=this.getAttribute('data-toggle-bank');
-                var cur=(stateDash.draft.department_ids||[]).slice();
-                var k=cur.indexOf(depId);
-                if (k>=0){ cur.splice(k,1); if(stateDash.draft.lead_department===depId) stateDash.draft.lead_department=cur[0]||''; }
-                else { cur.push(depId); stateDash.draft.department_shares=stateDash.draft.department_shares||{}; if(stateDash.draft.department_shares[depId]==null)stateDash.draft.department_shares[depId]=100; if(!stateDash.draft.lead_department)stateDash.draft.lead_department=depId; }
-                stateDash.draft.department_ids=cur; syncLane(); renderGantt(); renderLoad();
-            });
-            btn.addEventListener('contextmenu', function(e){
-                e.preventDefault();
-                var li=+this.getAttribute('data-lane'); switchLane(li);
-                if (!stateDash.draft) return;
-                var depId=this.getAttribute('data-toggle-bank');
-                var cur=(stateDash.draft.department_ids||[]);
-                if (cur.indexOf(depId)<0){ notify('\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0431\u0430\u043d\u043a \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443', 'info'); return; }
-                stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId;
-                syncLane(); renderGantt(); renderLoad();
-            });
+            btn.addEventListener('click', function(){ var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]).slice(); var k=cur.indexOf(depId); if (k>=0){ cur.splice(k,1); if(stateDash.draft.lead_department===depId) stateDash.draft.lead_department=cur[0]||''; } else { cur.push(depId); stateDash.draft.department_shares=stateDash.draft.department_shares||{}; if(stateDash.draft.department_shares[depId]==null)stateDash.draft.department_shares[depId]=100; if(!stateDash.draft.lead_department)stateDash.draft.lead_department=depId; } stateDash.draft.department_ids=cur; syncLane(); renderGantt(); renderLoad(); });
+            btn.addEventListener('contextmenu', function(e){ e.preventDefault(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]); if (cur.indexOf(depId)<0){ notify('Сначала включите банк в проверку', 'info'); return; } stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId; syncLane(); renderGantt(); renderLoad(); });
         });
-
-        /* Stage chip: toggle add/remove (default stage can't be removed) */
         c.querySelectorAll('[data-toggle-stage]').forEach(function(btn){
             btn.addEventListener('click', function(){
                 var li=+this.getAttribute('data-lane'); switchLane(li);
                 if (!stateDash.draft) return;
                 var key=this.getAttribute('data-toggle-stage');
-                if (key===DASH_STAGE_KEY_DEFAULT){ notify('\u042d\u0442\u0430\u043f \u00ab\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u041d\u0416\u042f\u00bb \u0431\u0430\u0437\u043e\u0432\u044b\u0439 \u0438 \u0432\u0441\u0435\u0433\u0434\u0430 \u0430\u043a\u0442\u0438\u0432\u0435\u043d', 'info'); return; }
-                var stg=dashNormalizeStages(stateDash.draft);
-                var pos=stg.map(function(x){return x.key;}).indexOf(key);
+                if (key===DASH_STAGE_KEY_DEFAULT){ notify('Этап «Проверка НЖЯ» базовый и всегда активен', 'info'); return; }
+                var stg=dashNormalizeStages(stateDash.draft), pos=stg.map(function(x){return x.key;}).indexOf(key);
                 if (pos>=0){ stg.splice(pos,1); }
                 else {
+                    var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO(); stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
                     var ns, ne;
-                    if (key === 'подготовка') {
-                        var ngStg = stg.filter(function(x){ return x.key === DASH_STAGE_KEY_DEFAULT; })[0];
-                        var ngStart = ngStg ? (ngStg.start || stateDash.draft.start_date) : (stateDash.draft.start_date || todayISO());
-                        ne = addDaysISO(ngStart, -1);
-                        ns = addDaysISO(ne, -6);
-                    } else {
-                        var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO();
-                        stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
-                        ns=addDaysISO(lastEnd,1); ne=addDaysISO(ns,13);
-                    }
-                    stg.push({key:key,start:ns,end:ne,weight:stageWeight(key)});
-                    if (ne>stateDash.draft.deadline) stateDash.draft.deadline=ne;
+                    if (key === 'подготовка') { var ngStg = stg.filter(function(x){ return x.key === DASH_STAGE_KEY_DEFAULT; })[0]; var ngStart = ngStg ? (ngStg.start || stateDash.draft.start_date) : (stateDash.draft.start_date || todayISO()); ne = addDaysISO(ngStart, -1); ns = addDaysISO(ne, -6); }
+                    else { ns=addDaysISO(lastEnd,1); ne=addDaysISO(ns,13); }
+                    stg.push({key:key,start:ns,end:ne,weight:stageWeight(key)}); if (ne>stateDash.draft.deadline) stateDash.draft.deadline=ne;
                 }
+                stg.sort(function(a,b){ return STAGE_ORDER.indexOf(a.key) - STAGE_ORDER.indexOf(b.key); });
+                for (var k = 1; k < stg.length; k++) { var prev = stg[k-1], cur = stg[k]; if (cur.start <= prev.end) { var curLen = Math.max(1, Math.round((parse(cur.end||cur.start) - parse(cur.start)) / 86400000)); cur.start = addDaysISO(prev.end, 1); cur.end = addDaysISO(cur.start, curLen); } }
                 stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad();
             });
         });
-
-        /* Delete-stage button on segment */
-        c.querySelectorAll('[data-del]').forEach(function(btn){
-            btn.addEventListener('click', function(e){
-                e.stopPropagation();
-                var li=+this.getAttribute('data-lane'); switchLane(li);
-                if (!stateDash.draft) return;
-                var idx=+this.getAttribute('data-del');
-                var stg=dashNormalizeStages(stateDash.draft);
-                if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); }
-            });
-        });
+        c.querySelectorAll('[data-del]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var idx=+this.getAttribute('data-del'); var stg=dashNormalizeStages(stateDash.draft); if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); } }); });
+        dashAttachDrag(c);
     }
 
     function renderLoad(){

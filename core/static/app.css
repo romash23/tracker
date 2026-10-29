@@ -10160,3 +10160,12 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-today-label { font-size: 0.9rem; color: #64748b; }
 .dash-lane-badge { font-size: 0.85rem; }
 .dash-placeholder { font-size: 0.95rem; color: #64748b; }
+
+.dash-global-slider-wrap{margin:0 0 12px 0;padding:6px 2px}
+.dash-global-slider{width:100%;display:block}
+.dash-lane-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.dash-lane-title{font-size:1.05rem;font-weight:700;color:#0f172a}
+.dash-lane-header-actions{display:flex;align-items:center;gap:8px}
+.dash-lane-pin,.dash-lane-close{border:1px solid var(--trk-card-border);background:#fff;border-radius:10px;padding:6px 10px;cursor:pointer}
+.dash-lane-pin.active{background:#fef3c7;border-color:#f59e0b}
+.dash-lanes-foot{margin-top:10px}
