@@ -10126,3 +10126,26 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-bank-grid { display:flex !important; flex-direction:column; gap:14px; }
 .dash-mini-chart { display:flex; align-items:flex-end; gap:3px; width:100%; }
 .dash-mini-col { flex:1 1 0; min-width:0; height:136px; overflow:hidden; position:relative; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:6px; padding-top:4px; }
+
+/* ===== Dashboards topbar font +50% & create modal (patch) ===== */
+.dash-topbar { font-size: 1.5em; }
+.dash-topbar .dash-label { font-size: 1.5em; }
+.dash-topbar .btn-seg-btn { font-size: 1.5em; }
+.dash-topbar .form-control { font-size: 1.5em; }
+.dash-topbar #dashCreateTaskBtn { font-size: 1.5em; }
+.dash-topbar .dash-today-label { font-size: 1.5em; }
+
+/* create-check modal */
+.dash-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+.dash-modal { background: #fff; width: 420px; max-width: calc(100vw - 32px); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.28); overflow: hidden; animation: dashModalIn .14s ease-out; }
+@keyframes dashModalIn { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.dash-modal-head { font-size: 20px; font-weight: 700; padding: 18px 22px; border-bottom: 1px solid #eef2f7; color: #0f172a; }
+.dash-modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 6px; }
+.dash-modal-label { font-size: 14px; font-weight: 600; color: #334155; margin-top: 10px; }
+.dash-modal-label:first-child { margin-top: 0; }
+.dash-modal .dash-req { color: #ef4444; }
+.dash-modal .form-control { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 15px; }
+.dash-modal .dash-modal-seg { display: inline-flex; gap: 0; }
+.dash-modal-err { color: #ef4444; font-size: 13px; min-height: 16px; }
+.dash-modal-foot { padding: 14px 22px 20px; display: flex; justify-content: flex-end; gap: 10px; }
+.dash-modal-foot .btn { min-width: 96px; }

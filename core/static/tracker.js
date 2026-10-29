@@ -18486,7 +18486,7 @@ setTimeout(buildGanttTab, 1500);
     if (window.__trkDashboardsV2) return;
     window.__trkDashboardsV2 = true;
 
-    var stateDash = { task:null, mode:'medium', dir:'retail', draft:null, lanes:[{task:null,draft:null}], activeLane:0, todayOffset:0 };
+    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null}], activeLane:0, todayOffset:0 };
     var MODE_MONTHS = { small:12, medium:6, large:3 };
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
     function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
@@ -18599,6 +18599,17 @@ setTimeout(buildGanttTab, 1500);
     function stageLabel(key){ return STAGE_LABELS[key] || key; }
     function stageWeight(key){ return (STAGE_WEIGHTS[key] !== undefined) ? STAGE_WEIGHTS[key] : 1.0; }
     function dirTaskType(dir){ return PLAN_TYPE_MAP[dir] || (dir === 'corp' ? 'корпоративная' : 'розничная'); }
+    function dashTaskDir(t){
+        var tt = (t && t.task_type ? String(t.task_type) : '').toLowerCase();
+        if (tt.indexOf('корп') !== -1) return 'corp';
+        if (tt.indexOf('розн') !== -1) return 'retail';
+        return '';
+    }
+    function dashDirMatch(t){
+        if (stateDash.dir === 'all') return true;
+        var d = dashTaskDir(t);
+        return d === '' || d === stateDash.dir;
+    }
 
     function normByDir(dep, dir){
         if (!dep) return null;
@@ -18704,9 +18715,12 @@ setTimeout(buildGanttTab, 1500);
         draft.id = task && task.id ? task.id : '';
         draft.name = draft.name || 'Проверка';
         draft.task_kind = draft.task_kind || 'audit';
-        draft.task_type = draft.task_type || dirTaskType(stateDash.dir);
-        if (draft.task_type === 'корпоративная') stateDash.dir = 'corp';
-        else if (draft.task_type === 'розничная') stateDash.dir = 'retail';
+        draft.task_type = draft.task_type || (stateDash.dir !== 'all' ? dirTaskType(stateDash.dir) : 'розничная');
+        // Не переключаем фильтр, если выбрано «Все» — просто показываем проверку как есть
+        if (stateDash.dir !== 'all') {
+            if (draft.task_type === 'корпоративная') stateDash.dir = 'corp';
+            else if (draft.task_type === 'розничная') stateDash.dir = 'retail';
+        }
         draft.start_date = draft.start_date || todayISO();
         draft.deadline = draft.deadline || addDaysISO(draft.start_date, 90);
         if (draft.deadline < draft.start_date) draft.deadline = draft.start_date;
@@ -18720,19 +18734,21 @@ setTimeout(buildGanttTab, 1500);
         return draft;
     }
 
-    function dashNewDraft(){
+    function dashCreateDraft(opts){
+        opts = opts || {};
         var start = todayISO();
         var end = addDaysISO(start, 90);
         var allDeps = (st().departments || []);
         var firstDepIds = allDeps.length ? [allDeps[0].id] : [];
         var shares = {};
         firstDepIds.forEach(function(id){ shares[id] = 100; });
-        var existingCount = (st().tasks || []).filter(function(t){ return (t.task_kind || 'audit') === 'audit'; }).length;
+        var dir = opts.dir === 'corp' ? 'corp' : 'retail';
         var draft = {
             id: '',
-            name: 'Новая проверка ' + (existingCount + 1),
+            name: opts.name,
             task_kind: 'audit',
-            task_type: dirTaskType(stateDash.dir),
+            task_type: dirTaskType(dir),
+            pocket: opts.pocket || '',
             start_date: start,
             deadline: end,
             department_ids: firstDepIds,
@@ -18740,13 +18756,80 @@ setTimeout(buildGanttTab, 1500);
             lead_department: firstDepIds[0] || '',
             stages: [{ key: DASH_STAGE_KEY_DEFAULT, start: start, end: end, weight: 1.0 }]
         };
+        // Чтобы созданная колбаска не отфильтровалась — выставляем направление фильтра под неё
+        if (stateDash.dir !== 'all' && stateDash.dir !== dir) stateDash.dir = 'all';
         stateDash.task = null;
         stateDash.draft = draft;
         syncControls();
         renderSelector();
         renderGantt();
         renderLoad();
-        notify('Создана новая колбаска проверки на 3 месяца (' + start + ' → ' + end + ')', 'info');
+        notify('Создана проверка «' + draft.name + '» (' + DASH_DIR_LABEL[dir] + ', 3 мес: ' + start + ' → ' + end + ')', 'info');
+    }
+
+    function dashCloseCreateModal(){
+        var ov = byId('dashCreateModal');
+        if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+        document.removeEventListener('keydown', dashCreateModalEsc);
+    }
+    function dashCreateModalEsc(e){ if (e.key === 'Escape') dashCloseCreateModal(); }
+
+    function dashOpenCreateModal(){
+        dashCloseCreateModal();
+        var existingCount = (st().tasks || []).filter(function(t){ return (t.task_kind || 'audit') === 'audit'; }).length;
+        var defName = 'Новая проверка ' + (existingCount + 1);
+        var defDir = stateDash.dir === 'corp' ? 'corp' : 'retail';
+        // Список существующих карманов
+        var seen = {}, pockets = [];
+        (st().tasks || []).forEach(function(t){ var pk=(t.pocket||'').trim(); if(pk && !seen[pk]){ seen[pk]=1; pockets.push(pk);} });
+        pockets.sort();
+        var pocketOpts = ['<option value="">— Без кармана —</option>'];
+        pockets.forEach(function(pk){ pocketOpts.push('<option value="'+escapeHtml(pk)+'">'+escapeHtml(pk)+'</option>'); });
+
+        var ov = document.createElement('div');
+        ov.id = 'dashCreateModal';
+        ov.className = 'dash-modal-overlay';
+        ov.innerHTML = ''
+            + '<div class="dash-modal" role="dialog" aria-modal="true">'
+            +   '<div class="dash-modal-head">Новая проверка</div>'
+            +   '<div class="dash-modal-body">'
+            +     '<label class="dash-modal-label">Название проверки <span class="dash-req">*</span></label>'
+            +     '<input type="text" id="dashCmName" class="form-control" value="'+escapeHtml(defName)+'" placeholder="Например: Проверка Байкальского банка">'
+            +     '<div class="dash-modal-err" id="dashCmNameErr"></div>'
+            +     '<label class="dash-modal-label">Направление <span class="dash-req">*</span></label>'
+            +     '<div class="btn-seg dash-modal-seg" id="dashCmDir">'
+            +       '<button class="btn-seg-btn'+(defDir==='corp'?' active':'')+'" type="button" data-dir="corp">Корп</button>'
+            +       '<button class="btn-seg-btn'+(defDir==='retail'?' active':'')+'" type="button" data-dir="retail">Розн</button>'
+            +     '</div>'
+            +     '<label class="dash-modal-label">Карман</label>'
+            +     '<select id="dashCmPocket" class="form-control">'+pocketOpts.join('')+'</select>'
+            +   '</div>'
+            +   '<div class="dash-modal-foot">'
+            +     '<button class="btn btn-secondary" type="button" id="dashCmCancel">Отмена</button>'
+            +     '<button class="btn" type="button" id="dashCmOk">Создать</button>'
+            +   '</div>'
+            + '</div>';
+        document.body.appendChild(ov);
+
+        var dirSel = defDir;
+        var seg = byId('dashCmDir');
+        seg.addEventListener('click', function(e){
+            var b = e.target && e.target.closest ? e.target.closest('[data-dir]') : null;
+            if (!b) return;
+            dirSel = b.getAttribute('data-dir');
+            seg.querySelectorAll('[data-dir]').forEach(function(x){ x.classList.toggle('active', x===b); });
+        });
+        ov.addEventListener('mousedown', function(e){ if (e.target === ov) dashCloseCreateModal(); });
+        byId('dashCmCancel').addEventListener('click', dashCloseCreateModal);
+        document.addEventListener('keydown', dashCreateModalEsc);
+        byId('dashCmOk').addEventListener('click', function(){
+            var nm = (byId('dashCmName').value || '').trim();
+            if (!nm) { byId('dashCmNameErr').textContent = 'Укажите название проверки'; byId('dashCmName').focus(); return; }
+            var pk = byId('dashCmPocket').value || '';
+            dashCloseCreateModal();
+            dashCreateDraft({ name: nm, dir: dirSel, pocket: pk });
+        });
+        setTimeout(function(){ var el=byId('dashCmName'); if(el){ el.focus(); el.select(); } }, 30);
     }
 
     function loadDraft(t){
@@ -18793,7 +18876,8 @@ setTimeout(buildGanttTab, 1500);
         if (!sel) return;
         var allTasks = (st().tasks || []);
         var auditTasks = allTasks.filter(function(t){ return (t.task_kind || 'audit') === 'audit'; });
-        var list = auditTasks.length ? auditTasks : allTasks;
+        var base = auditTasks.length ? auditTasks : allTasks;
+        var list = base.filter(function(t){ return dashDirMatch(t); });
         var opts = ['<option value="">-- Выберите проверку (' + list.length + ') --</option>'];
         if (stateDash.draft && !stateDash.draft.id) {
             opts.push('<option value="__new__">✨ ' + escapeHtml(stateDash.draft.name || 'Новая проверка') + ' (черновик)</option>');
@@ -19017,7 +19101,7 @@ setTimeout(buildGanttTab, 1500);
     }
 
     function openAddStageDialog(){
-        if (!stateDash.draft) { dashNewDraft(); }
+        if (!stateDash.draft) { dashOpenCreateModal(); return; }
         var existing = {};
         dashNormalizeStages(stateDash.draft).forEach(function(s){ existing[s.key] = true; });
         var options = STAGE_ORDER.filter(function(k){ return k !== DASH_STAGE_KEY_DEFAULT && !existing[k]; });
@@ -19041,7 +19125,7 @@ setTimeout(buildGanttTab, 1500);
     }
 
     function openAddBankDialog(){
-        if (!stateDash.draft) { dashNewDraft(); }
+        if (!stateDash.draft) { dashOpenCreateModal(); return; }
         var cur = stateDash.draft.department_ids || [];
         var avail = (st().departments || []).filter(function(dep){ return cur.indexOf(dep.id) < 0; });
         if (!avail.length) { notify('Все банки уже участвуют в проверке', 'info'); return; }
@@ -19215,7 +19299,7 @@ setTimeout(buildGanttTab, 1500);
         });
         var addLaneBtn = byId('dashAddLaneBtn');
         if (addLaneBtn) addLaneBtn.addEventListener('click', function(){
-            if (addLane()) { dashNewDraft(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
+            if (addLane()) { dashOpenCreateModal(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
         });
 
         /* Activate a lane block by clicking it (so its controls apply) */
@@ -19483,8 +19567,8 @@ setTimeout(buildGanttTab, 1500);
             is_urgent: !!base.is_urgent,
             links: (base.links || []).slice(),
             orders: (base.orders || []).slice(),
-            task_type: d.task_type || base.task_type || dirTaskType(stateDash.dir),
-            pocket: base.pocket || '',
+            task_type: d.task_type || base.task_type || (stateDash.dir !== 'all' ? dirTaskType(stateDash.dir) : 'розничная'),
+            pocket: (d.pocket !== undefined && d.pocket !== null && d.pocket !== '') ? d.pocket : (base.pocket || ''),
             department_shares: clone(d.department_shares || {}),
             stages: stageStarts,
             force_duplicate: true
@@ -19542,7 +19626,7 @@ setTimeout(buildGanttTab, 1500);
             createBtn.__dashBound = true;
             createBtn.addEventListener('click', function(e){
                 e.preventDefault();
-                dashNewDraft();
+                dashOpenCreateModal();
             });
         }
         var dirBox = byId('dashDirSwitch');
@@ -19551,9 +19635,16 @@ setTimeout(buildGanttTab, 1500);
             dirBox.addEventListener('click', function(e){
                 var b = e.target && e.target.closest ? e.target.closest('[data-dir]') : null;
                 if (!b) return;
-                stateDash.dir = b.getAttribute('data-dir') || 'retail';
-                if (stateDash.draft) stateDash.draft.task_type = dirTaskType(stateDash.dir);
+                stateDash.dir = b.getAttribute('data-dir') || 'all';
+                // Сброс выбранной проверки, если её направление не совпадает с фильтром
+                if (stateDash.task && !dashDirMatch(stateDash.task)) {
+                    stateDash.task = null; stateDash.draft = null;
+                    var l = stateDash.lanes[stateDash.activeLane]; if (l) { l.task = null; l.draft = null; }
+                }
+                // task_type драфта подстраиваем только для конкретного направления
+                if (stateDash.draft && stateDash.dir !== 'all') stateDash.draft.task_type = dirTaskType(stateDash.dir);
                 syncControls();
+                renderSelector();
                 renderGantt();
                 renderLoad();
             });
