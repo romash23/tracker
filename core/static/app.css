@@ -10021,6 +10021,9 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-limit-val{color:#dc2626!important}
 .dash-mini-chart{display:grid;grid-template-columns:repeat(auto-fit,minmax(28px,1fr));gap:6px;align-items:end;min-height:140px}
 .dash-mini-col{position:relative;padding-top:4px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;min-width:0}
+
+.dash-mini-col.is-today::after{content:'';position:absolute;left:0;top:0;bottom:0;width:1px;background:#ef4444;opacity:.95;pointer-events:none}
+
 .dash-mini-bar{width:100%;max-width:none;border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,#60a5fa 0%,#2563eb 100%);min-height:8px}
 .dash-mini-col.warn .dash-mini-bar{background:linear-gradient(180deg,#fbbf24 0%,#f59e0b 100%)}
 .dash-mini-col.over .dash-mini-bar{background:linear-gradient(180deg,#fb7185 0%,#e11d48 100%)}

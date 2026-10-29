@@ -18937,8 +18937,8 @@ setTimeout(buildGanttTab, 1500);
         return { startISO: startISO, endISO: endISO, days: totalDays };
     }
 
-    function dashSlots(){
-        var b = dashTimeBounds();
+    function dashSlots(offsetDays){
+        var b = dashTimeBounds(offsetDays);
         var start = parse(b.startISO) || new Date(); start.setHours(0,0,0,0);
         var end = parse(b.endISO) || addDays(start, 180); end.setHours(0,0,0,0);
         if (end < start) { var tmp = start; start = end; end = tmp; }
@@ -18965,6 +18965,27 @@ setTimeout(buildGanttTab, 1500);
         }
         return slots;
     }
+    function dashLoadOffsets(){
+        var out = [];
+        var seen = {};
+        var lanes = Array.isArray(stateDash.lanes) ? stateDash.lanes : [];
+        lanes.forEach(function(l){
+            var off = laneOffset(l);
+            var key = String(off);
+            if (!seen[key]) { seen[key] = 1; out.push(off); }
+        });
+        if (!out.length) out.push(dashClampGlobalOffset(stateDash.globalOffset || 0));
+        return out.sort(function(a,b){ return a - b; });
+    }
+    function dashDraftsForLoad(){
+        var rows = [];
+        var lanes = Array.isArray(stateDash.lanes) ? stateDash.lanes : [];
+        lanes.forEach(function(l){
+            if (l && l.draft) rows.push(l.draft);
+        });
+        if (!rows.length && stateDash.draft) rows.push(stateDash.draft);
+        return rows;
+    }
 
     function dashLeadCoef(depId){
         if (!stateDash.draft) return 1.0;
@@ -18982,22 +19003,26 @@ setTimeout(buildGanttTab, 1500);
         return isFinite(n) && n > 0 ? (n / 100.0) : 1.0;
     }
     function dashDraftStageLoad(slotStart, slotEnd, depId){
-        if (!stateDash.draft) return 0;
-        if ((stateDash.draft.department_ids || []).indexOf(depId) < 0) return 0;
-        var draftType = stateDash.draft.task_type || dirTaskType(stateDash.dir);
-        if (draftType !== dirTaskType(stateDash.dir)) return 0;
-        var stages = dashNormalizeStages(stateDash.draft);
-        var maxW = 0;
-        stages.forEach(function(s){
-            if (!s.start) return;
-            var a = parse(s.start), b = parse(s.end || stateDash.draft.deadline || s.start);
-            if (ovl(a, b, slotStart, slotEnd)) {
-                var sw = (s.weight !== undefined && s.weight !== null) ? Number(s.weight) : stageWeight(s.key);
-                if (sw > maxW) maxW = sw;
-            }
+        var drafts = dashDraftsForLoad();
+        if (!drafts.length) return 0;
+        var total = 0;
+        drafts.forEach(function(draft){
+            if (!draft || (draft.department_ids || []).indexOf(depId) < 0) return;
+            var draftDir = dashTaskDir(draft) || ((draft.task_type || '').indexOf('корп') !== -1 ? 'corp' : 'retail');
+            if (stateDash.dir !== 'all' && draftDir && draftDir !== stateDash.dir) return;
+            var stages = dashNormalizeStages(draft);
+            var maxW = 0;
+            stages.forEach(function(s){
+                if (!s.start) return;
+                var a = parse(s.start), b = parse(s.end || draft.deadline || s.start);
+                if (ovl(a, b, slotStart, slotEnd)) {
+                    var sw = (s.weight !== undefined && s.weight !== null) ? Number(s.weight) : stageWeight(s.key);
+                    if (sw > maxW) maxW = sw;
+                }
+            });
+            if (maxW > 0) total += Math.round(maxW * calcTaskLeadCoef(draft, depId) * calcTaskShareMult(draft, depId) * 100) / 100;
         });
-        if (maxW <= 0) return 0;
-        return Math.round(maxW * dashLeadCoef(depId) * dashShareMult(depId) * 100) / 100;
+        return Math.round(total * 100) / 100;
     }
     function dashBaseLoad(depId, slot){
         var all = st().tasks || [];
@@ -19335,72 +19360,72 @@ setTimeout(buildGanttTab, 1500);
             box.innerHTML = '<div class="dash-empty">Справочник банков пуст — данные загружаются…</div>';
             return;
         }
-        var hasDraft = !!stateDash.draft;
-        var draftDepIds = hasDraft ? (stateDash.draft.department_ids || []).slice() : [];
-        var shownDeps = (hasDraft && draftDepIds.length)
-            ? allDeps.filter(function(d){ return draftDepIds.indexOf(d.id) >= 0; })
-            : allDeps;
-
-        var slots = dashSlots();
-
-        /* (Сводная таблица убрана — дублировала гистограммы) */
+        var drafts = dashDraftsForLoad();
+        var depMap = {};
+        drafts.forEach(function(d){ ((d && d.department_ids) || []).forEach(function(id){ depMap[id] = 1; }); });
+        var shownDeps = Object.keys(depMap).length ? allDeps.filter(function(d){ return depMap[d.id]; }) : allDeps;
+        var offsets = dashLoadOffsets();
+        var slotGroups = offsets.map(function(off){ return { offset: off, slots: dashSlots(off) }; });
 
         var cards = shownDeps.map(function(dep){
             var depId = dep.id;
-            var poss = calcPossible(dep, stateDash.dir);
-            var inDraft = draftDepIds.indexOf(depId) >= 0;
-            var share = (hasDraft && stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null)
-                ? stateDash.draft.department_shares[depId] : 100;
-            var lead = hasDraft && stateDash.draft.lead_department === depId;
-            var vals = slots.map(function(slot){
-                var base = dashBaseLoad(depId, slot);
-                var draft = dashDraftStageLoad(slot.start, slot.end, depId);
-                return { slot: slot, total: Math.round((base + draft)*100)/100, base: base, draft: draft };
+            var calcDir = (stateDash.dir === 'corp' || stateDash.dir === 'retail') ? stateDash.dir : 'retail';
+            var poss = calcPossible(dep, calcDir);
+            var inDraft = !!depMap[depId];
+            var share = null;
+            var lead = false;
+            drafts.forEach(function(d){
+                if (!d || (d.department_ids || []).indexOf(depId) < 0) return;
+                if (share === null && d.department_shares && d.department_shares[depId] != null) share = d.department_shares[depId];
+                if (d.lead_department === depId) lead = true;
+            });
+            var vals = [];
+            slotGroups.forEach(function(group){
+                group.slots.forEach(function(slot){
+                    var base = dashBaseLoad(depId, slot);
+                    var draft = dashDraftStageLoad(slot.start, slot.end, depId);
+                    vals.push({ slot: slot, total: Math.round((base + draft) * 100) / 100, base: base, draft: draft });
+                });
             });
             var maxVal = vals.reduce(function(m, v){ return Math.max(m, v.total, (poss || 0) * 1.15, 1); }, 1);
             var peakVal = vals.reduce(function(m, v){ return Math.max(m, v.total); }, 0);
-            var limPct = (poss !== null && poss > 0) ? Math.max(0, Math.min(100, 100 - (poss / maxVal) * 100)) : null;
-
+            var today = todayISO();
             var bars = vals.map(function(v){
                 var h = v.total > 0 ? Math.max(8, Math.round((v.total / maxVal) * 108)) : 3;
                 var cls = '';
                 if (poss !== null) {
                     if (v.total > poss) cls = ' over';
-                    else if (v.total > poss * 0.85) cls = ' warn';
+                    else if (v.total >= poss * 0.8) cls = ' warn';
                 }
-                return '<div class="dash-mini-col' + cls + '">'
-                    + (limPct === null ? '' : '<div class="dash-mini-redzone" style="height:' + limPct + '%"></div><div class="dash-mini-limit" style="top:' + limPct + '%"></div>')
-                    + '<div class="dash-mini-bar" style="height:' + h + 'px" title="' + escapeHtml(v.slot.label + ': ' + fmtNum(v.total) + (poss !== null ? ' / возможно ' + fmtNum(poss) : '')) + '"></div>'
-                    + '<div class="dash-mini-cap">' + escapeHtml(v.slot.label) + '</div>'
+                var isToday = today >= ymd(v.slot.start) && today <= ymd(v.slot.end);
+                var title = escapeHtml((v.slot.label || '') + ': нагрузка ' + fmtNum(v.total)
+                    + (v.base ? ' · база ' + fmtNum(v.base) : '')
+                    + (v.draft ? ' · черновик +' + fmtNum(v.draft) : '')
+                    + (poss !== null ? ' · лимит ' + fmtNum(poss) : ''));
+                return '<div class="dash-mini-col' + cls + (isToday ? ' is-today' : '') + '" title="' + title + '">'
+                    + '<div class="dash-mini-bar" style="height:' + h + 'px"></div>'
                     + '</div>';
             }).join('');
 
-            var actionsHtml = '';
-            if (hasDraft) {
-                if (inDraft) {
-                    actionsHtml = '<div class="dash-bank-actions">'
-                        + '<button class="btn btn-secondary" type="button" data-act="share" data-dep="' + escapeHtml(depId) + '">Доля (' + escapeHtml(String(share)) + '%)</button>'
-                        + '<button class="btn btn-secondary" type="button" data-act="lead" data-dep="' + escapeHtml(depId) + '">' + (lead ? '★ Руководитель (снять)' : 'Назначить руководителем') + '</button>'
-                        + '<button class="btn btn-danger" type="button" data-act="remove" data-dep="' + escapeHtml(depId) + '">Удалить из проверки</button>'
-                        + '</div>';
-                } else {
-                    actionsHtml = '<div class="dash-bank-actions">'
-                        + '<button class="btn btn-secondary" type="button" data-act="add" data-dep="' + escapeHtml(depId) + '">+ Включить в проверку</button>'
-                        + '</div>';
-                }
-            }
-
-            return '<div class="dash-bank-card' + (inDraft ? ' is-active-bank' : '') + '">'
+            return '<div class="dash-bank-card' + (inDraft ? ' active' : '') + '">'
                 + '<div class="dash-bank-head">'
-                    + '<div>'
-                        + '<div class="dash-bank-name">' + escapeHtml(dep.name) + (lead ? ' <span class="dash-badge-lead">★ Руководитель (' + (stateDash.dir === 'retail' ? '×2' : '×1,5') + ')</span>' : '') + '</div>'
-                        + '<div class="dash-bank-meta">' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + (inDraft ? (' · в проверке · доля участия ' + escapeHtml(String(share)) + '%') : ' · не входит в выбранную проверку (показана фоновая линия жизни)') + '</div>'
-                    + '</div>'
-                    + actionsHtml
+                + '<div>'
+                + '<div class="dash-bank-name">' + escapeHtml(dep.name || dep.id) + '</div>'
+                + '<div class="dash-bank-meta">'
+                + (lead ? '<span class="dash-badge lead">Руководитель</span>' : '')
+                + (inDraft ? '<span class="dash-badge">Участвует</span>' : '<span class="dash-badge ghost">Не участвует</span>')
+                + (share !== null ? '<span class="dash-badge ghost">Доля ' + fmtNum(share) + '%</span>' : '')
+                + '</div>'
+                + '</div>'
+                + '<div class="dash-bank-actions">'
+                + '<button class="btn btn-mini ' + (inDraft ? 'btn-secondary' : 'btn-primary') + '" type="button" data-dep="' + depId + '" data-act="' + (inDraft ? 'remove' : 'add') + '">' + (inDraft ? 'Убрать' : 'Добавить') + '</button>'
+                + (inDraft ? '<button class="btn btn-mini btn-secondary" type="button" data-dep="' + depId + '" data-act="lead">' + (lead ? 'Снять руководство' : 'Сделать руководителем') + '</button>' : '')
+                + (inDraft ? '<button class="btn btn-mini btn-secondary" type="button" data-dep="' + depId + '" data-act="share">Доля</button>' : '')
+                + '</div>'
                 + '</div>'
                 + '<div class="dash-bank-stats">'
-                    + '<div class="dash-stat"><span>Пиковая / текущая нагрузка</span><b>' + fmtNum(peakVal) + '</b></div>'
-                    + '<div class="dash-stat"><span>Возможное число проверок (красный лимит)</span><b class="dash-limit-val">' + fmtNum(poss) + '</b></div>'
+                + '<div class="dash-stat"><span>Пик</span><b>' + fmtNum(peakVal) + '</b></div>'
+                + '<div class="dash-stat"><span>Возможное число проверок (красный лимит)</span><b class="dash-limit-val">' + fmtNum(poss) + '</b></div>'
                 + '</div>'
                 + '<div class="dash-mini-chart">' + bars + '</div>'
                 + '</div>';
@@ -19409,8 +19434,8 @@ setTimeout(buildGanttTab, 1500);
         box.innerHTML = ''
             + '<div class="dash-load-head">'
                 + '<div>'
-                    + '<div class="dash-load-title">Нагрузка на ТБ (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'day' ? 'по дням' : 'по неделям') + ')</div>'
-                    + '<div class="dash-load-sub">Красная пунктирная линия и розовая зона сверху = предел возможного числа проверок (норматив × экспертный коэф.). Нагрузка банка-руководителя: розн ×2, корп ×1,5.</div>'
+                    + '<div class="dash-load-title">Нагрузка на ТБ (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'large' ? 'по дням' : 'по неделям') + ')</div>'
+                    + '<div class="dash-load-sub">Гистограммы синхронизированы с общим ползунком и всеми открытыми черновиками. Тонкая вертикальная линия показывает текущий день.</div>'
                 + '</div>'
             + '</div>'
             + '<div class="dash-bank-grid">' + cards + '</div>';
@@ -19435,9 +19460,9 @@ setTimeout(buildGanttTab, 1500);
                 } else if (act === 'lead') {
                     stateDash.draft.lead_department = (stateDash.draft.lead_department === depId) ? '' : depId;
                 } else if (act === 'share') {
-                    var curSh = (stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null)
+                    var curVal = (stateDash.draft.department_shares && stateDash.draft.department_shares[depId] != null)
                         ? stateDash.draft.department_shares[depId] : 100;
-                    var val = window.prompt('Доля участия банка в проверке (%):', String(curSh));
+                    var val = window.prompt('Доля участия банка, %', String(curVal));
                     if (val === null) return;
                     var n = Number(String(val).replace(',', '.'));
                     if (!isFinite(n) || n <= 0) { notify('Введите число больше 0', 'error'); return; }
