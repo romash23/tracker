@@ -18588,17 +18588,109 @@ setTimeout(buildGanttTab, 1500);
         }
         return Math.max(0, Math.round(base*100)/100);
     }
+    function dashSetStage(idx, startISO, endISO){
+        var st = dashNormalizeStages(stateDash.draft);
+        if (!st[idx]) return;
+        if (startISO) st[idx].start = startISO;
+        if (endISO) st[idx].end = endISO;
+        if (st[idx].end < st[idx].start) st[idx].end = st[idx].start;
+        var mn = st[idx].start, mx = st[idx].end;
+        st.forEach(function(s){ if (s.start < mn) mn = s.start; if ((s.end||s.start) > mx) mx = s.end||s.start; });
+        stateDash.draft.stages = st;
+        if (mn < stateDash.draft.start_date) stateDash.draft.start_date = mn;
+        if (mx > stateDash.draft.deadline) stateDash.draft.deadline = mx;
+    }
+    function dashShiftAll(deltaDays){
+        var d = stateDash.draft, st = dashNormalizeStages(d);
+        st.forEach(function(s){ s.start = addDaysISO(s.start, deltaDays); s.end = addDaysISO(s.end||s.start, deltaDays); });
+        d.stages = st; d.start_date = addDaysISO(d.start_date, deltaDays); d.deadline = addDaysISO(d.deadline, deltaDays);
+    }
+    function dashAttachDrag(c, stages){
+        var track = byId('dashTlTrack'); if (!track) return;
+        var rng = stateDash._range || {}; var days = rng.days || 1;
+        function pxToDays(px){ var w = track.getBoundingClientRect().width || 1; return Math.round((px / w) * days); }
+        var drag = null;
+        function onDown(e){
+            var t = e.target;
+            var handle = t.closest ? t.closest('.dash-seg-h') : null;
+            var seg = t.closest ? t.closest('.dash-seg') : null;
+            if (t.closest && t.closest('.dash-seg-del')) return;
+            if (handle){ drag = { type:'edge', idx:+handle.getAttribute('data-idx'), edge:handle.getAttribute('data-edge') }; }
+            else if (seg){ drag = { type:'seg', idx:+seg.getAttribute('data-idx') }; }
+            else { drag = { type:'all' }; }
+            drag.x0 = e.clientX;
+            drag.snap = dashNormalizeStages(stateDash.draft).map(function(s){ return { start:s.start, end:s.end }; });
+            drag.baseStart = stateDash.draft.start_date; drag.baseDeadline = stateDash.draft.deadline;
+            e.preventDefault();
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        }
+        function onMove(e){
+            if (!drag) return;
+            var dd = pxToDays(e.clientX - drag.x0);
+            if (!dd && drag.type!=='all') { return; }
+            var snap = drag.snap;
+            if (drag.type === 'all'){
+                stateDash.draft.stages = snap.map(function(s){ return { start:s.start, end:s.end }; });
+                stateDash.draft.start_date = drag.baseStart; stateDash.draft.deadline = drag.baseDeadline;
+                dashShiftAll(dd);
+            } else {
+                var i = drag.idx, s = snap[i]; if (!s) return;
+                var st = dashNormalizeStages(stateDash.draft);
+                st[i].start = s.start; st[i].end = s.end;
+                if (drag.type === 'edge'){
+                    if (drag.edge === 'start'){ var ns = addDaysISO(s.start, dd); if (ns > st[i].end) ns = st[i].end; st[i].start = ns; }
+                    else { var ne = addDaysISO(s.end, dd); if (ne < st[i].start) ne = st[i].start; st[i].end = ne; }
+                } else {
+                    st[i].start = addDaysISO(s.start, dd); st[i].end = addDaysISO(s.end, dd);
+                }
+                stateDash.draft.stages = st;
+                var mn = st[i].start, mx = st[i].end;
+                st.forEach(function(x){ if (x.start < mn) mn = x.start; if ((x.end||x.start) > mx) mx = x.end||x.start; });
+                if (mn < stateDash.draft.start_date) stateDash.draft.start_date = mn;
+                if (mx > stateDash.draft.deadline) stateDash.draft.deadline = mx;
+            }
+            renderGantt(); renderLoad();
+        }
+        function onUp(){ drag = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); }
+        track.addEventListener('pointerdown', onDown);
+        c.querySelectorAll('.dash-seg-del').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation();
+            var idx = +this.getAttribute('data-del'); var st = dashNormalizeStages(stateDash.draft);
+            if (st[idx] && st[idx].key !== DASH_STAGE_KEY_DEFAULT){ st.splice(idx,1); stateDash.draft.stages = st; renderGantt(); renderLoad(); }
+        }); });
+    }
+
     function renderGantt() {
         var c = byId('dashGanttContainer'); if (!c) return;
         if (!stateDash.draft) { c.innerHTML = '<div class="dash-empty">Выберите проверку или создайте новую, чтобы открыть песочницу планирования</div>'; return; }
         var d = stateDash.draft, stages = dashNormalizeStages(d);
         var bankNames = (d.department_ids||[]).map(function(id){ var dep = deptById(id); return dep ? dep.name : id; });
-        var stageChips = stages.map(function(s){ return '<span class="dash-stage-chip"><span class="dash-stage-dot" style="background:' + escapeHtml((TASK_STAGE_COLORS&&TASK_STAGE_COLORS[s.key]) || '#94a3b8') + ';"></span>' + escapeHtml(stageLabel(s.key)) + ' · ' + escapeHtml(s.start || '') + ' → ' + escapeHtml(s.end || s.start || '') + '</span>'; }).join('');
+        var minISO = d.start_date || todayISO(), maxISO = d.deadline || minISO;
+        stages.forEach(function(s){ if (s.start && s.start < minISO) minISO = s.start; if ((s.end||s.start) && (s.end||s.start) > maxISO) maxISO = s.end || s.start; });
+        var pad = stateDash.mode === 'day' ? 2 : 7;
+        var rangeStart = addDaysISO(minISO, -pad), rangeEnd = addDaysISO(maxISO, pad);
+        var totalDays = Math.max(1, Math.round((parse(rangeEnd)-parse(rangeStart))/86400000));
+        stateDash._range = { start: rangeStart, end: rangeEnd, days: totalDays };
+        function pctX(iso){ var dd = Math.round((parse(iso)-parse(rangeStart))/86400000); return Math.max(0, Math.min(100, (dd/totalDays)*100)); }
+        var ticks = [], step = stateDash.mode === 'day' ? 1 : 7;
+        for (var ti=0; ti<=totalDays; ti+=step){ var iso = addDaysISO(rangeStart, ti); ticks.push('<div class="dash-tl-tick" style="left:'+((ti/totalDays)*100)+'%"><span>'+escapeHtml(String(parse(iso).getDate()).padStart(2,'0')+'.'+String(parse(iso).getMonth()+1).padStart(2,'0'))+'</span></div>'); }
+        var segs = stages.map(function(s, idx){
+            var x0 = pctX(s.start), x1 = pctX(s.end || s.start), w = Math.max(1.2, x1 - x0);
+            var col = (TASK_STAGE_COLORS&&TASK_STAGE_COLORS[s.key]) || '#94a3b8';
+            var lead = s.key === DASH_STAGE_KEY_DEFAULT;
+            return '<div class="dash-seg'+(lead?' dash-seg-lead':'')+'" data-idx="'+idx+'" style="left:'+x0+'%;width:'+w+'%;background:'+escapeHtml(col)+'">'
+                + '<span class="dash-seg-h dash-seg-h-l" data-idx="'+idx+'" data-edge="start"></span>'
+                + '<span class="dash-seg-lab">'+escapeHtml(stageLabel(s.key))+'</span>'
+                + '<span class="dash-seg-h dash-seg-h-r" data-idx="'+idx+'" data-edge="end"></span>'
+                + (lead ? '' : '<button class="dash-seg-del" type="button" data-del="'+idx+'" title="Удалить этап">×</button>')
+                + '</div>';
+        }).join('');
         c.innerHTML = ''
             + '<div class="dash-summary"><div class="dash-summary-main"><div class="dash-summary-title">' + escapeHtml(d.name || 'Новая проверка') + '</div><div class="dash-summary-meta">' + escapeHtml(d.task_type || dirTaskType(stateDash.dir)) + ' · ' + escapeHtml(d.start_date || '—') + ' → ' + escapeHtml(d.deadline || '—') + '</div></div><div class="dash-summary-side"><button class="btn btn-secondary" type="button" id="dashAddStageBtn">+ Добавить этап</button><button class="btn btn-secondary" type="button" id="dashAddBankBtn">+ Добавить банк</button></div></div>'
-            + '<div class="dash-stage-strip">' + stageChips + '</div>'
-            + '<div class="dash-placeholder">Интерактивная колбаска будет дорисована следующим проходом. Верхняя панель, выбор проверки, фильтры и нижний блок банков уже работают на черновике.</div>'
+            + '<div class="dash-timeline"><div class="dash-tl-axis">' + ticks.join('') + '</div><div class="dash-tl-track" id="dashTlTrack"><div class="dash-tl-bar" id="dashTlBar">' + segs + '</div></div></div>'
+            + '<div class="dash-tl-hint">Тяни середину этапа — сдвиг этапа; края — изменение границ; серую подложку — вся проверка целиком.</div>'
             + '<div class="dash-bank-inline"><b>Банки в проверке:</b> ' + (bankNames.length ? bankNames.map(escapeHtml).join(', ') : 'не выбраны') + '</div>';
+        dashAttachDrag(c, stages);
         var addStageBtn = byId('dashAddStageBtn'); if (addStageBtn) addStageBtn.onclick = function(){
             var existing = {}; dashNormalizeStages(stateDash.draft).forEach(function(s){ existing[s.key]=true; });
             var options = (typeof TASK_STAGE_ORDER!=='undefined' ? TASK_STAGE_ORDER : []).filter(function(k){ return k !== DASH_STAGE_KEY_DEFAULT && !existing[k]; });
@@ -18607,7 +18699,20 @@ setTimeout(buildGanttTab, 1500);
             var ans = window.prompt('Добавить этап:\n' + labels + '\n\nВведите номер этапа'); var idx = parseInt(ans, 10) - 1; if (isNaN(idx) || idx < 0 || idx >= options.length) return;
             var key = options[idx]; stateDash.draft.stages = dashNormalizeStages(stateDash.draft); stateDash.draft.stages.push({ key:key, start: stateDash.draft.deadline || stateDash.draft.start_date || todayISO(), end: stateDash.draft.deadline || stateDash.draft.start_date || todayISO(), weight:1 }); stateDash.draft.stages = dashNormalizeStages(stateDash.draft); renderGantt(); renderLoad();
         };
-        var addBankBtn = byId('dashAddBankBtn'); if (addBankBtn) addBankBtn.onclick = function(){ notify('Для добавления банка пока используйте карточку проверки. Следующим проходом перенесу picker прямо в дашборд.', 'info'); };
+        var addBankBtn = byId('dashAddBankBtn'); if (addBankBtn) addBankBtn.onclick = function(){
+            if (!stateDash.draft) return;
+            var cur = stateDash.draft.department_ids || [];
+            var avail = (st().departments||[]).filter(function(dep){ return cur.indexOf(dep.id) < 0; });
+            if (!avail.length) { notify('Все банки уже добавлены в проверку', 'info'); return; }
+            var labels = avail.map(function(dep, i){ return (i+1) + '. ' + dep.name; }).join('\n');
+            var ans = window.prompt('Добавить банк в проверку:\n' + labels + '\n\nВведите номер банка'); var idx = parseInt(ans, 10) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= avail.length) return;
+            var dep = avail[idx]; stateDash.draft.department_ids = cur.concat([dep.id]);
+            stateDash.draft.department_shares = stateDash.draft.department_shares || {};
+            if (stateDash.draft.department_shares[dep.id] == null) stateDash.draft.department_shares[dep.id] = 100;
+            if (!stateDash.draft.lead_department) stateDash.draft.lead_department = dep.id;
+            renderGantt(); renderLoad();
+        };
     }
     function renderLoad(){
         var box = byId('dashLoadContainer'); if (!box) return;
