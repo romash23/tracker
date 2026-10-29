@@ -18486,7 +18486,12 @@ setTimeout(buildGanttTab, 1500);
     if (window.__trkDashboardsV2) return;
     window.__trkDashboardsV2 = true;
 
-    var stateDash = { task:null, mode:'week', dir:'retail', draft:null };
+    var stateDash = { task:null, mode:'medium', dir:'retail', draft:null, lanes:[{task:null,draft:null}], activeLane:0, todayOffset:0 };
+    var MODE_MONTHS = { small:12, medium:6, large:3 };
+    function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
+    function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
+    function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null}); switchLane(stateDash.lanes.length-1); return true; }
+    function removeLane(i){ if(stateDash.lanes.length<=1) return false; stateDash.lanes.splice(i,1); if(stateDash.activeLane>=stateDash.lanes.length) stateDash.activeLane=stateDash.lanes.length-1; switchLane(stateDash.activeLane); return true; }
     var DASH_DIR_LABEL = { retail:'Розничное', corp:'Корпоративное' };
     var DASH_STAGE_KEY_DEFAULT = 'проверка_нжя';
 
@@ -18772,6 +18777,15 @@ setTimeout(buildGanttTab, 1500);
                 btn.classList.toggle('active', btn.getAttribute('data-mode') === stateDash.mode);
             });
         }
+        var slider = byId('dashTodaySlider');
+        if (slider) {
+            slider.value = stateDash.todayOffset || 0;
+        }
+        var lbl = byId('dashTodayLabel');
+        if (lbl) {
+            var off = stateDash.todayOffset || 0;
+            lbl.textContent = off === 0 ? 'по центру' : (off > 0 ? '+' + off + ' дн' : off + ' дн');
+        }
     }
 
     function renderSelector(){
@@ -18798,52 +18812,37 @@ setTimeout(buildGanttTab, 1500);
     }
 
     function dashTimeBounds(){
-        var startISO = todayISO();
-        var endISO = addDaysISO(startISO, 90);
-        if (stateDash.draft) {
-            var d = stateDash.draft;
-            var stages = dashNormalizeStages(d);
-            startISO = d.start_date || startISO;
-            endISO = d.deadline || endISO;
-            stages.forEach(function(s){
-                if (s.start && s.start < startISO) startISO = s.start;
-                var se = s.end || s.start;
-                if (se && se > endISO) endISO = se;
-            });
-        }
-        if (endISO < startISO) endISO = startISO;
-        return { startISO: startISO, endISO: endISO };
+        var months = MODE_MONTHS[stateDash.mode] || 6;
+        var totalDays = Math.round(months * 30.44);
+        var center = addDaysISO(todayISO(), stateDash.todayOffset || 0);
+        var half = Math.floor(totalDays / 2);
+        var startISO = addDaysISO(center, -half);
+        var endISO = addDaysISO(center, totalDays - half);
+        return { startISO: startISO, endISO: endISO, days: totalDays };
     }
 
     function dashSlots(){
         var b = dashTimeBounds();
         var start = parse(b.startISO) || new Date(); start.setHours(0,0,0,0);
-        var end = parse(b.endISO) || addDays(start, 90); end.setHours(0,0,0,0);
+        var end = parse(b.endISO) || addDays(start, 180); end.setHours(0,0,0,0);
         if (end < start) { var tmp = start; start = end; end = tmp; }
         var slots = [];
-        if (stateDash.mode === 'day') {
+        var useDays = (stateDash.mode === 'large');
+        if (useDays) {
             var maxDays = 120, cnt = 0;
             for (var d = new Date(start.getTime()); d <= end && cnt < maxDays; d = addDays(d, 1), cnt++) {
-                slots.push({
-                    key: ymd(d),
-                    start: new Date(d.getTime()),
-                    end: new Date(d.getTime()),
-                    label: String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0')
-                });
+                slots.push({ key: ymd(d), start: new Date(d.getTime()), end: new Date(d.getTime()),
+                    label: String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') });
             }
         } else {
             var mon = new Date(start.getTime());
             var wd = (mon.getDay() + 6) % 7;
             mon.setDate(mon.getDate() - wd);
-            var maxWeeks = 52, wcnt = 0;
+            var maxWeeks = 80, wcnt = 0;
             while (mon <= end && wcnt < maxWeeks) {
                 var we = addDays(mon, 6);
-                slots.push({
-                    key: ymd(mon),
-                    start: new Date(mon.getTime()),
-                    end: we,
-                    label: String(mon.getDate()).padStart(2,'0') + '.' + String(mon.getMonth()+1).padStart(2,'0')
-                });
+                slots.push({ key: ymd(mon), start: new Date(mon.getTime()), end: we,
+                    label: String(mon.getDate()).padStart(2,'0') + '.' + String(mon.getMonth()+1).padStart(2,'0') });
                 mon = addDays(mon, 7);
                 wcnt++;
             }
@@ -18918,16 +18917,20 @@ setTimeout(buildGanttTab, 1500);
         var track = byId('dashTlTrack');
         if (!track || !stateDash.draft) return;
         var rng = stateDash._range || {};
-        var days = rng.days || 1;
+        var days = rng.days || 180;
+        /* Cache track width at drag start — NOT re-read during move (it can be 0 after innerHTML swap) */
+        var trackW = track.getBoundingClientRect().width || track.offsetWidth || 800;
         function pxToDays(px){
-            var w = track.getBoundingClientRect().width || 1;
-            return Math.round((px / w) * days);
+            return Math.round((px / trackW) * days);
         }
         var drag = null;
         function onDown(e){
             if (e.button !== undefined && e.button !== 0) return;
             var t = e.target;
             if (t.closest && t.closest('.dash-seg-del')) return;
+            if (t.closest && t.closest('[data-lane]')) return;
+            if (t.closest && t.closest('.dash-lane-close')) return;
+            if (t.closest && t.closest('#dashAddLaneBtn')) return;
             var handle = t.closest ? t.closest('.dash-seg-h') : null;
             var seg = t.closest ? t.closest('.dash-seg') : null;
             if (handle) {
@@ -18938,11 +18941,14 @@ setTimeout(buildGanttTab, 1500);
                 drag = { type:'all' };
             }
             drag.x0 = e.clientX;
+            /* Snapshot the current stages ONCE at drag start */
             drag.snap = dashNormalizeStages(stateDash.draft).map(function(s){
                 return { key:s.key, start:s.start, end:s.end, weight:s.weight };
             });
             drag.baseStart = stateDash.draft.start_date;
             drag.baseDeadline = stateDash.draft.deadline;
+            /* Re-read track width in case layout changed */
+            trackW = track.getBoundingClientRect().width || track.offsetWidth || 800;
             e.preventDefault();
             window.addEventListener('pointermove', onMove);
             window.addEventListener('pointerup', onUp);
@@ -18950,12 +18956,13 @@ setTimeout(buildGanttTab, 1500);
         function onMove(e){
             if (!drag || !stateDash.draft) return;
             var dd = pxToDays(e.clientX - drag.x0);
+            if (dd === 0) return;
             var snap = drag.snap;
             if (drag.type === 'all') {
-                stateDash.draft.stages = snap.map(function(s){ return { key:s.key, start:s.start, end:s.end, weight:s.weight }; });
-                stateDash.draft.start_date = drag.baseStart;
-                stateDash.draft.deadline = drag.baseDeadline;
-                dashShiftAll(dd);
+                /* Apply delta from snapshot, not from current state */
+                stateDash.draft.stages = snap.map(function(s){ return { key:s.key, start:addDaysISO(s.start, dd), end:addDaysISO(s.end||s.start, dd), weight:s.weight }; });
+                stateDash.draft.start_date = addDaysISO(drag.baseStart, dd);
+                stateDash.draft.deadline = addDaysISO(drag.baseDeadline, dd);
             } else {
                 var i = drag.idx, s = snap[i];
                 if (!s) return;
@@ -18984,6 +18991,7 @@ setTimeout(buildGanttTab, 1500);
                 stateDash.draft.start_date = mn;
                 stateDash.draft.deadline = mx;
             }
+            syncLane();
             renderGantt();
             renderLoad();
         }
@@ -19001,8 +19009,8 @@ setTimeout(buildGanttTab, 1500);
                 if (stg[idx] && stg[idx].key !== DASH_STAGE_KEY_DEFAULT) {
                     stg.splice(idx, 1);
                     stateDash.draft.stages = stg;
-                    renderGantt();
-                    renderLoad();
+                    syncLane();
+                    renderGantt(); renderLoad();
                 }
             });
         });
@@ -19064,26 +19072,23 @@ setTimeout(buildGanttTab, 1500);
             stages: []
         };
         var stages = hasDraft ? dashNormalizeStages(d) : [];
-        var minISO = d.start_date || todayISO();
-        var maxISO = d.deadline || addDaysISO(minISO, 90);
-        stages.forEach(function(s){
-            if (s.start && s.start < minISO) minISO = s.start;
-            var se = s.end || s.start;
-            if (se && se > maxISO) maxISO = se;
-        });
-        var pad = stateDash.mode === 'day' ? 3 : 7;
-        var rangeStart = addDaysISO(minISO, -pad);
-        var rangeEnd = addDaysISO(maxISO, pad);
-        var totalDays = Math.max(1, Math.round((parse(rangeEnd) - parse(rangeStart)) / 86400000));
+
+        /* Fixed time range from mode, not from task dates */
+        var b = dashTimeBounds();
+        var rangeStart = b.startISO;
+        var rangeEnd = b.endISO;
+        var totalDays = b.days || 180;
         stateDash._range = { start: rangeStart, end: rangeEnd, days: totalDays };
 
         function pctX(iso){
             var dd = Math.round((parse(iso) - parse(rangeStart)) / 86400000);
-            return Math.max(0, Math.min(100, (dd / totalDays) * 100));
+            return Math.max(-5, Math.min(105, (dd / totalDays) * 100));
         }
 
+        /* Ticks */
         var ticks = [];
-        var step = stateDash.mode === 'day' ? (totalDays > 45 ? 3 : 1) : 7;
+        var useDays = (stateDash.mode === 'large');
+        var step = useDays ? (totalDays > 60 ? 3 : 1) : 7;
         for (var ti = 0; ti <= totalDays; ti += step) {
             var iso = addDaysISO(rangeStart, ti);
             var dt = parse(iso);
@@ -19091,12 +19096,17 @@ setTimeout(buildGanttTab, 1500);
             ticks.push('<div class="dash-tl-tick" style="left:' + ((ti / totalDays) * 100) + '%"><span>' + escapeHtml(lbl) + '</span></div>');
         }
 
+        /* Today marker */
+        var todayPct = pctX(todayISO());
+        var todayMarker = '<div class="dash-tl-today" style="left:' + todayPct + '%" title="Сегодня"></div>';
+
+        /* Segments */
         var segs = '';
         if (hasDraft) {
             segs = stages.map(function(s, idx){
                 var x0 = pctX(s.start);
                 var x1 = pctX(s.end || addDaysISO(s.start, 1));
-                var w = Math.max(2.2, x1 - x0);
+                var w = Math.max(1.5, x1 - x0);
                 var col = STAGE_COLORS[s.key] || '#48c9b0';
                 var isDefault = (s.key === DASH_STAGE_KEY_DEFAULT);
                 var tip = stageLabel(s.key) + ': ' + s.start + ' → ' + (s.end || s.start) + ' (вес ' + fmtNum(s.weight) + ')';
@@ -19108,9 +19118,10 @@ setTimeout(buildGanttTab, 1500);
                     + '</div>';
             }).join('');
         } else {
-            segs = '<div class="dash-tl-empty-bar">Показана пустая временная шкала (' + escapeHtml(minISO) + ' → ' + escapeHtml(maxISO) + '). Выберите проверку сверху или нажмите «+ Создать проверку», чтобы разместить колбаску.</div>';
+            segs = '<div class="dash-tl-empty-bar">Показана пустая временная шкала (' + escapeHtml(rangeStart) + ' → ' + escapeHtml(rangeEnd) + '). Выберите проверку сверху или нажмите «+ Создать проверку», чтобы разместить колбаску.</div>';
         }
 
+        /* Bank chips */
         var bankChips = '';
         if (hasDraft) {
             var allDeps = st().departments || [];
@@ -19120,106 +19131,120 @@ setTimeout(buildGanttTab, 1500);
                     var on = curIds.indexOf(dep.id) >= 0;
                     var isLead = (d.lead_department === dep.id);
                     var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
-                    return '<button type="button" class="dash-bank-chip' + (on ? ' active' : '') + (isLead ? ' is-lead' : '') + '" data-toggle-bank="' + escapeHtml(dep.id) + '">'
-                        + escapeHtml(dep.name)
-                        + (on ? (' · ' + escapeHtml(String(sh)) + '%' + (isLead ? ' ★рук' : '')) : '')
-                        + '</button>';
+                    return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" title="' + escapeHtml(dep.name + (isLead ? ' (руководитель)' : '') + (on ? ' · доля ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + '</button>';
                 }).join('')
                 + '</div>';
         }
 
-        var titleHtml = hasDraft
-            ? '<div class="dash-title-edit-row">'
-                + '<input type="text" id="dashDraftNameInput" class="form-control dash-name-input" value="' + escapeHtml(d.name || '') + '" placeholder="Название проверки">'
-                + '<span class="dash-summary-dates">С <input type="date" id="dashDraftStartInput" value="' + escapeHtml(d.start_date || '') + '"> по <input type="date" id="dashDraftEndInput" value="' + escapeHtml(d.deadline || '') + '"></span>'
-              + '</div>'
-            : '<div class="dash-summary-title">Временная шкала планирования (3 месяца от сегодня)</div>';
+        /* Lane tabs */
+        var laneTabs = '<div class="dash-lanes">';
+        stateDash.lanes.forEach(function(l, i){
+            var label = l.draft ? escapeHtml(l.draft.name || 'Черновик') : (l.task ? escapeHtml(l.task.name || 'Проверка') : 'Ось ' + (i+1));
+            var active = (i === stateDash.activeLane);
+            var canClose = stateDash.lanes.length > 1;
+            laneTabs += '<div class="dash-lane-tab' + (active ? ' active' : '') + '" data-lane="' + i + '">'
+                + '<span class="dash-lane-label">' + label + '</span>'
+                + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + i + '" title="Удалить ось">×</button>' : '')
+                + '</div>';
+        });
+        if (stateDash.lanes.length < 5) {
+            laneTabs += '<button class="dash-lane-add" type="button" id="dashAddLaneBtn" title="Добавить ось">+ Ось</button>';
+        }
+        laneTabs += '</div>';
 
-        c.innerHTML = ''
-            + '<div class="dash-summary">'
-                + '<div class="dash-summary-main">'
-                    + titleHtml
-                    + '<div class="dash-summary-meta">Направление: <b>' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + '</b> · Масштаб: <b>' + (stateDash.mode === 'day' ? 'Дни' : 'Недели') + '</b>'
-                    + (hasDraft ? (' · Этапов: <b>' + stages.length + '</b> (по умолчанию вся проверка = этап «Проверка НЖЯ»)') : '')
-                    + '</div>'
-                + '</div>'
-                + '<div class="dash-summary-side">'
-                    + '<button class="btn btn-secondary" type="button" id="dashAddStageBtn">+ Добавить этап</button>'
-                    + '<button class="btn btn-secondary" type="button" id="dashAddBankBtn">+ Добавить банк</button>'
-                + '</div>'
-            + '</div>'
-            + '<div class="dash-timeline" id="dashTimelineBox">'
-                + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
-                + '<div class="dash-tl-track" id="dashTlTrack">'
-                    + '<div class="dash-tl-line"></div>'
-                    + '<div class="dash-tl-bar" id="dashTlBar">' + segs + '</div>'
-                + '</div>'
-            + '</div>'
-            + '<div class="dash-tl-hint">💡 Тяни за края этапа — меняются его даты; тяни сам этап — сдвиг этапа; тяни серую полосу шкалы (или ПКМ по колбаске) — сдвиг всей проверки / добавление этапа.</div>'
-            + bankChips;
-
+        /* Draft meta inputs */
+        var metaHtml = '';
         if (hasDraft) {
-            dashAttachDrag(c);
-            var tlBox = byId('dashTimelineBox');
-            if (tlBox) {
-                tlBox.addEventListener('contextmenu', function(ev){
-                    ev.preventDefault();
-                    openAddStageDialog();
-                });
-            }
-            var nameInp = byId('dashDraftNameInput');
-            if (nameInp) {
-                nameInp.addEventListener('input', function(){
-                    if (stateDash.draft) stateDash.draft.name = this.value;
-                });
-            }
-            var stInp = byId('dashDraftStartInput');
-            if (stInp) {
-                stInp.addEventListener('change', function(){
-                    if (!stateDash.draft || !this.value) return;
-                    stateDash.draft.start_date = this.value;
-                    var stg = dashNormalizeStages(stateDash.draft);
-                    if (stg.length) stg[0].start = this.value;
-                    stateDash.draft.stages = stg;
-                    renderGantt();
-                    renderLoad();
-                });
-            }
-            var endInp = byId('dashDraftEndInput');
-            if (endInp) {
-                endInp.addEventListener('change', function(){
-                    if (!stateDash.draft || !this.value) return;
-                    stateDash.draft.deadline = this.value;
-                    var stg = dashNormalizeStages(stateDash.draft);
-                    if (stg.length) stg[stg.length - 1].end = this.value;
-                    stateDash.draft.stages = stg;
-                    renderGantt();
-                    renderLoad();
-                });
-            }
-            c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
-                btn.addEventListener('click', function(){
-                    if (!stateDash.draft) return;
-                    var depId = this.getAttribute('data-toggle-bank');
-                    var cur = (stateDash.draft.department_ids || []).slice();
-                    var i = cur.indexOf(depId);
-                    if (i >= 0) {
-                        cur.splice(i, 1);
-                        if (stateDash.draft.lead_department === depId) {
-                            stateDash.draft.lead_department = cur[0] || '';
-                        }
-                    } else {
-                        cur.push(depId);
-                        stateDash.draft.department_shares = stateDash.draft.department_shares || {};
-                        if (stateDash.draft.department_shares[depId] == null) stateDash.draft.department_shares[depId] = 100;
-                        if (!stateDash.draft.lead_department) stateDash.draft.lead_department = depId;
-                    }
-                    stateDash.draft.department_ids = cur;
-                    renderGantt();
-                    renderLoad();
-                });
+            metaHtml = '<div class="dash-draft-meta">'
+                + '<input type="text" id="dashDraftNameInput" class="form-control dash-draft-name" value="' + escapeHtml(d.name || '') + '" placeholder="Название проверки">'
+                + '<label class="dash-mini-lbl">Начало</label><input type="date" id="dashDraftStartInput" class="form-control dash-draft-date" value="' + escapeHtml(d.start_date || '') + '">'
+                + '<label class="dash-mini-lbl">Конец</label><input type="date" id="dashDraftEndInput" class="form-control dash-draft-date" value="' + escapeHtml(d.deadline || '') + '">'
+                + '</div>';
+        }
+
+        var html = laneTabs
+            + metaHtml
+            + '<div class="dash-timeline">'
+            + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
+            + '<div class="dash-tl-track" id="dashTlTrack">' + todayMarker + segs + '</div>'
+            + '</div>'
+            + '<div class="dash-bank-row">'
+            + bankChips
+            + '<div class="dash-bank-actions-top">'
+            + '<button class="btn btn-secondary btn-sm" type="button" id="dashAddStageBtn">+ Добавить этап</button>'
+            + '<button class="btn btn-secondary btn-sm" type="button" id="dashAddBankBtn">+ Добавить банк</button>'
+            + '</div>'
+            + '</div>';
+        c.innerHTML = html;
+
+        /* Bind events */
+        dashAttachDrag(c);
+        var nameInp = byId('dashDraftNameInput');
+        if (nameInp) nameInp.addEventListener('change', function(){ if (stateDash.draft) { stateDash.draft.name = this.value; syncLane(); renderSelector(); } });
+        var startInp = byId('dashDraftStartInput');
+        if (startInp) {
+            startInp.addEventListener('change', function(){
+                if (!stateDash.draft || !this.value) return;
+                stateDash.draft.start_date = this.value;
+                var stg = dashNormalizeStages(stateDash.draft);
+                if (stg.length) stg[0].start = this.value;
+                stateDash.draft.stages = stg;
+                syncLane();
+                renderGantt(); renderLoad();
             });
         }
+        var endInp = byId('dashDraftEndInput');
+        if (endInp) {
+            endInp.addEventListener('change', function(){
+                if (!stateDash.draft || !this.value) return;
+                stateDash.draft.deadline = this.value;
+                var stg = dashNormalizeStages(stateDash.draft);
+                if (stg.length) stg[stg.length - 1].end = this.value;
+                stateDash.draft.stages = stg;
+                syncLane();
+                renderGantt(); renderLoad();
+            });
+        }
+        c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
+            btn.addEventListener('click', function(){
+                if (!stateDash.draft) return;
+                var depId = this.getAttribute('data-toggle-bank');
+                var cur = (stateDash.draft.department_ids || []).slice();
+                var i = cur.indexOf(depId);
+                if (i >= 0) {
+                    cur.splice(i, 1);
+                    if (stateDash.draft.lead_department === depId) stateDash.draft.lead_department = cur[0] || '';
+                } else {
+                    cur.push(depId);
+                    stateDash.draft.department_shares = stateDash.draft.department_shares || {};
+                    if (stateDash.draft.department_shares[depId] == null) stateDash.draft.department_shares[depId] = 100;
+                    if (!stateDash.draft.lead_department) stateDash.draft.lead_department = depId;
+                }
+                stateDash.draft.department_ids = cur;
+                syncLane();
+                renderGantt(); renderLoad();
+            });
+        });
+        /* Lane tabs */
+        c.querySelectorAll('[data-lane]').forEach(function(tab){
+            tab.addEventListener('click', function(e){
+                if (e.target.closest && e.target.closest('[data-lane-close]')) return;
+                var li = +this.getAttribute('data-lane');
+                switchLane(li);
+                renderSelector(); syncControls(); renderGantt(); renderLoad();
+            });
+        });
+        c.querySelectorAll('[data-lane-close]').forEach(function(btn){
+            btn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var li = +this.getAttribute('data-lane-close');
+                if (removeLane(li)) { renderSelector(); syncControls(); renderGantt(); renderLoad(); }
+            });
+        });
+        var addLaneBtn = byId('dashAddLaneBtn');
+        if (addLaneBtn) addLaneBtn.addEventListener('click', function(){
+            if (addLane()) { dashNewDraft(); renderSelector(); syncControls(); renderGantt(); renderLoad(); }
+        });
         var addStageBtn = byId('dashAddStageBtn');
         if (addStageBtn) addStageBtn.onclick = openAddStageDialog;
         var addBankBtn = byId('dashAddBankBtn');
@@ -19519,7 +19544,17 @@ setTimeout(buildGanttTab, 1500);
             modeBox.addEventListener('click', function(e){
                 var b = e.target && e.target.closest ? e.target.closest('[data-mode]') : null;
                 if (!b) return;
-                stateDash.mode = b.getAttribute('data-mode') || 'week';
+                stateDash.mode = b.getAttribute('data-mode') || 'medium';
+                syncControls();
+                renderGantt();
+                renderLoad();
+            });
+        }
+        var slider = byId('dashTodaySlider');
+        if (slider && !slider.__dashBound) {
+            slider.__dashBound = true;
+            slider.addEventListener('input', function(){
+                stateDash.todayOffset = +this.value || 0;
                 syncControls();
                 renderGantt();
                 renderLoad();
