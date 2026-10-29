@@ -1704,6 +1704,18 @@ def create_app():
         if not isinstance(dep_ids_raw, list):
             dep_ids_raw = []
         dep_ids = [str(x).strip() for x in dep_ids_raw if str(x).strip()]
+        # PATCH dashboards: доля участия банка в проверке {dep_id: 0..100}
+        _shares_raw = body.get('department_shares') or {}
+        department_shares = {}
+        if isinstance(_shares_raw, dict):
+            for _dk, _dv in _shares_raw.items():
+                try:
+                    _dvf = float(_dv)
+                except (TypeError, ValueError):
+                    continue
+                if _dvf < 0: _dvf = 0.0
+                if _dvf > 100: _dvf = 100.0
+                department_shares[str(_dk).strip()] = _dvf
 
         if not name:
             return jsonify({'success': False, 'error': 'Название обязательно'}), 400
@@ -1849,6 +1861,7 @@ def create_app():
                 'status': status, 'start_date': start_date, 'deadline': deadline,
                 'completed_at': completed_at, 'folder': folder, 'order_ref': order_ref,
                 'tags': tags, 'assignees': assignees, 'department_ids': dep_ids,
+                'department_shares': department_shares,
                 'created_at': now_str,
                 'is_urgent': is_urgent,
                 'links': links,
