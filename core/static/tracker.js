@@ -19277,7 +19277,7 @@ setTimeout(buildGanttTab, 1500);
         var curIds = d.department_ids || [];
 
         /* Bank chips: white -> blue (on), lead -> yellow */
-        var bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b, \u043f\u0440\u0430\u0432\u0430\u044f \u043a\u043d\u043e\u043f\u043a\u0430 \u2014 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c):</span>'
+        var bankChips = '<div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b, \u0434\u0432\u043e\u0439\u043d\u043e\u0439 \u043a\u043b\u0438\u043a \u2014 \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c):</span>'
             + allDeps.map(function(dep){
                 var on = curIds.indexOf(dep.id) >= 0;
                 var isLead = (d.lead_department === dep.id);
@@ -19326,7 +19326,7 @@ setTimeout(buildGanttTab, 1500);
         c.querySelectorAll('[data-lane-end]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.deadline=this.value; var stg=dashNormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
         c.querySelectorAll('[data-toggle-bank]').forEach(function(btn){
             btn.addEventListener('click', function(){ var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]).slice(); var k=cur.indexOf(depId); if (k>=0){ cur.splice(k,1); if(stateDash.draft.lead_department===depId) stateDash.draft.lead_department=cur[0]||''; } else { cur.push(depId); stateDash.draft.department_shares=stateDash.draft.department_shares||{}; if(stateDash.draft.department_shares[depId]==null)stateDash.draft.department_shares[depId]=100; if(!stateDash.draft.lead_department)stateDash.draft.lead_department=depId; } stateDash.draft.department_ids=cur; syncLane(); renderGantt(); renderLoad(); });
-            btn.addEventListener('contextmenu', function(e){ e.preventDefault(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]); if (cur.indexOf(depId)<0){ notify('Сначала включите банк в проверку', 'info'); return; } stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId; syncLane(); renderGantt(); renderLoad(); });
+            btn.addEventListener('dblclick', function(e){ e.preventDefault(); e.stopPropagation(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var depId=this.getAttribute('data-toggle-bank'); var cur=(stateDash.draft.department_ids||[]); if (cur.indexOf(depId)<0){ notify('Сначала включите банк в проверку', 'info'); return; } stateDash.draft.lead_department = (stateDash.draft.lead_department===depId)?'':depId; if(!stateDash.draft.lead_department) stateDash.draft.lead_department=cur[0]||''; syncLane(); renderGantt(); renderLoad(); });
         });
         c.querySelectorAll('[data-toggle-stage]').forEach(function(btn){
             btn.addEventListener('click', function(){
@@ -19418,9 +19418,9 @@ setTimeout(buildGanttTab, 1500);
                 + '</div>'
                 + '</div>'
                 + '<div class="dash-bank-actions">'
-                + '<button class="btn btn-mini ' + (inDraft ? 'btn-secondary' : 'btn-primary') + '" type="button" data-dep="' + depId + '" data-act="' + (inDraft ? 'remove' : 'add') + '">' + (inDraft ? 'Убрать' : 'Добавить') + '</button>'
-                + (inDraft ? '<button class="btn btn-mini btn-secondary" type="button" data-dep="' + depId + '" data-act="lead">' + (lead ? 'Снять руководство' : 'Сделать руководителем') + '</button>' : '')
-                + (inDraft ? '<button class="btn btn-mini btn-secondary" type="button" data-dep="' + depId + '" data-act="share">Доля</button>' : '')
+                + ''
+                + ''
+                + ''
                 + '</div>'
                 + '</div>'
                 + '<div class="dash-bank-stats">'
