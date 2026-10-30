@@ -887,6 +887,7 @@ function refreshEmployeeVacationViews(employeeId, keepCardOpen) {
         }
     });
 }
+window.refreshEmployeeVacationViews = refreshEmployeeVacationViews;
 
 function renderEmployees() {
     var list = $('employeesList'), cnt = $('employeesCount');
@@ -18412,10 +18413,21 @@ setTimeout(buildGanttTab, 1500);
     postJson('/api/tracker/employee/vacation/delete', payload).then(function(res){
       if(res && res.success){
         if(typeof window.trkRefreshAll === 'function'){
-          window.trkRefreshAll().then(function(){ renderBanks(); renderForm(); refreshEmployeeVacationViews(selEmp.id, false); });
+          window.trkRefreshAll().then(function(){
+            renderBanks();
+            renderForm();
+            if (typeof window.refreshEmployeeVacationViews === 'function') {
+              window.refreshEmployeeVacationViews(selEmp.id, false);
+            }
+          });
+        } else if (typeof window.refreshEmployeeVacationViews === 'function') {
+          window.refreshEmployeeVacationViews(selEmp.id, false).then(function(){
+            renderBanks();
+            renderForm();
+          });
         } else {
+          renderBanks();
           renderForm();
-          refreshEmployeeVacationViews(selEmp.id, false);
         }
       } else {
         var msg = document.getElementById('vacMsg');
@@ -18455,7 +18467,9 @@ setTimeout(buildGanttTab, 1500);
         var afterRefresh = function(){
           renderBanks();
           renderForm();
-          refreshEmployeeVacationViews(selEmp.id, false);
+          if (typeof window.refreshEmployeeVacationViews === 'function') {
+            window.refreshEmployeeVacationViews(selEmp.id, false);
+          }
           var m2 = document.getElementById('vacMsg');
           if(m2){ m2.textContent = 'Сохранено ✓'; m2.className = 'vac-msg ok'; }
         };
