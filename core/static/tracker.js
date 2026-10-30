@@ -18230,6 +18230,13 @@ setTimeout(buildGanttTab, 1500);
     document.querySelectorAll('.tracker-panel').forEach(function(p){ p.classList.toggle('active', p.id==='panel-vacations'); });
     renderBanks();
     if(selEmp) renderForm();
+    else {
+      var wa = document.getElementById('vacWorkArea');
+      if(wa && bankStatsBankId){
+        var activeBank = Object.values(st().departments||{}).find(function(x){ return String(x.id)===String(bankStatsBankId); }) || null;
+        if(activeBank) wa.innerHTML = renderBankStatsPanel(activeBank);
+      }
+    }
   }
 
 function renderBanks(){
@@ -18263,30 +18270,21 @@ function renderBanks(){
       list.appendChild(row);
     });
     if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='нет сотрудников'; list.appendChild(em); }
-    var statsHost=document.createElement('div');
-    statsHost.className='vac-bank-stats-host';
-    statsHost.style.display='none';
     titleMain.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'▾':'▸'; };
     statsBtn.onclick=function(ev){
       ev.stopPropagation();
-      var opened = statsHost.style.display !== 'none';
-      if(opened){
-        statsHost.style.display='none';
-        statsBtn.classList.remove('active');
-      } else {
-        statsHost.innerHTML = renderBankStatsPanel(b);
-        statsHost.style.display='block';
-        statsBtn.classList.add('active');
+      var isSameBank = selEmp && String(selEmp.department_id||'')===String(b.id);
+      if(!isSameBank){
+        var firstEmp = mine[0] || null;
+        if(firstEmp) selEmp = firstEmp;
       }
+      bankStatsBankId = (bankStatsBankId && String(bankStatsBankId)===String(b.id)) ? '' : b.id;
+      renderBanks();
+      renderForm();
     };
-    statsHost.addEventListener('click', function(ev){
-      var btn = ev.target && ev.target.closest ? ev.target.closest('[data-bank-collapse]') : null;
-      if(btn){ statsHost.style.display='none'; statsBtn.classList.remove('active'); return; }
-      if(ev.target && ev.target.classList && ev.target.classList.contains('vacBankYPrev')){ bankStatsYear -= 1; statsHost.innerHTML = renderBankStatsPanel(b); statsHost.style.display='block'; statsBtn.classList.add('active'); return; }
-      if(ev.target && ev.target.classList && ev.target.classList.contains('vacBankYNext')){ bankStatsYear += 1; statsHost.innerHTML = renderBankStatsPanel(b); statsHost.style.display='block'; statsBtn.classList.add('active'); return; }
-    });
     if(activeBankId && activeBankId===b.id){ item.classList.add('expanded'); caret.textContent='▾'; }
-    item.appendChild(title); item.appendChild(list); item.appendChild(statsHost); sb.appendChild(item);
+    if(bankStatsBankId && String(bankStatsBankId)===String(b.id)) statsBtn.classList.add('active');
+    item.appendChild(title); item.appendChild(list); sb.appendChild(item);
   });
 }
   function fmtDateRu(iso){
@@ -18393,7 +18391,13 @@ function renderBankStatsPanel(bank){
 }
   function renderForm(){
     var wa = document.getElementById('vacWorkArea'); if(!wa) return;
-    if(!selEmp){ wa.innerHTML='<div class="vac-empty">Выберите сотрудника слева</div>'; return; }
+    if(!selEmp){
+      if(bankStatsBankId){
+        var statsBank = Object.values(st().departments||{}).find(function(x){ return String(x.id)===String(bankStatsBankId); });
+        if(statsBank){ wa.innerHTML = renderBankStatsPanel(statsBank); return; }
+      }
+      wa.innerHTML='<div class="vac-empty">Выберите сотрудника слева</div>'; return;
+    }
     var freshEmp = Object.values(st().employees||{}).find(function(x){ return x.id===selEmp.id; });
     if(freshEmp) selEmp = freshEmp;
 
@@ -18401,7 +18405,10 @@ function renderBankStatsPanel(bank){
     var prevTo   = document.getElementById('vacTo') ? document.getElementById('vacTo').value : '';
     var prevCm   = document.getElementById('vacComment') ? document.getElementById('vacComment').value : '';
 
-    var html = '<div class="vac-form-head">'+(selEmp.name||'')+'</div><div class="vac-types">';
+    var html = '';
+    var statsBankTop = bankStatsBankId ? Object.values(st().departments||{}).find(function(x){ return String(x.id)===String(bankStatsBankId); }) : null;
+    if(statsBankTop){ html += renderBankStatsPanel(statsBankTop); }
+    html += '<div class="vac-form-head">'+(selEmp.name||'')+'</div><div class="vac-types">';
     ABS_TYPES.forEach(function(t){
       html += '<button type="button" class="vac-type-btn '+(selType===t[0]?'active':'')+'" data-vtype="'+t[0]+'">'+t[1]+'</button>';
     });
