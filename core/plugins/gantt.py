@@ -86,32 +86,41 @@ def _heatmap_compute(data, d1, d2, mode):
             b = pe
         return _ov(a, b, ps, pe)
 
+    def _day_meta(e, day):
+        wd = day.weekday()
+        holidays = data.get('holidays') or {}
+        is_holiday = str(day) in holidays or wd >= 5
+        absent = False
+        if not is_holiday:
+            for v in (e.get('vacations') or []):
+                if (v.get('type') or 'vacation') == 'remote':
+                    continue
+                a = _d(v.get('from'))
+                b = _d(v.get('to'))
+                if a is None or b is None:
+                    continue
+                if a <= day <= b:
+                    absent = True
+                    break
+        return {'weekend': wd >= 5, 'holiday': is_holiday, 'absent': absent, 'working': (not is_holiday) and (not absent)}
+
     def _absence_availability(e, ps, pe):
-        # Доля доступности сотрудника в периоде.
-        # Любой тип отсутствия, кроме remote, уменьшает доступность.
+        # Доля доступности сотрудника в периоде. Выходные/праздники имеют вес 0.
         workdays = 0
-        absent_days = 0
+        available_days = 0
         cur = ps
         while cur <= pe:
-            if cur.weekday() < 5:
-                workdays += 1
-                absent = False
-                for v in (e.get('vacations') or []):
-                    if (v.get('type') or 'vacation') == 'remote':
-                        continue
-                    a = _d(v.get('from'))
-                    b = _d(v.get('to'))
-                    if a is None or b is None:
-                        continue
-                    if a <= cur <= b:
-                        absent = True
-                        break
-                if absent:
-                    absent_days += 1
+            meta = _day_meta(e, cur)
+            if meta['holiday']:
+                cur += timedelta(days=1)
+                continue
+            workdays += 1
+            if meta['working']:
+                available_days += 1
             cur += timedelta(days=1)
         if workdays <= 0:
             return 1.0
-        return max(0.0, (workdays - absent_days) / workdays)
+        return max(0.0, available_days / workdays)
 
     banks = []
     for dep in sorted(emp_by_dep.keys(), key=lambda d: dept_name.get(d, d).lower()):
@@ -140,12 +149,16 @@ def _heatmap_compute(data, d1, d2, mode):
             dr = float(e.get('dir_retail') or 0)
             dc = float(e.get('dir_corp') or 0)
             cells = []
+            cell_flags = []
             for pi, (ps, pe, _lab) in enumerate(periods):
+                cell_meta = _day_meta(e, ps) if mode != 'week' else None
                 emp_av = _absence_availability(e, ps, pe)
                 eff_dr = dr * emp_av
                 eff_dc = dc * emp_av
                 if eff_dr <= 0 and eff_dc <= 0:
                     cells.append(0.0)
+                    if mode != 'week':
+                        cell_flags.append(cell_meta)
                     continue
                 r_av = sum(float(e2.get('dir_retail') or 0) * _absence_availability(e2, ps, pe) for e2 in es)
                 c_av = sum(float(e2.get('dir_corp') or 0) * _absence_availability(e2, ps, pe) for e2 in es)
@@ -171,11 +184,18 @@ def _heatmap_compute(data, d1, d2, mode):
                 val = (eff_dr * (lr / r_av if r_av > 0 else 0)
                        + eff_dc * (lc / c_av if c_av > 0 else 0)
                        + oth)
+                if mode != 'week' and cell_meta and cell_meta['holiday']:
+                    val = 0.0
                 cells.append(round(val, 2))
+                if mode != 'week':
+                    cell_flags.append(cell_meta)
             kind = ('hybrid' if (dr > 0 and dc > 0)
                     else ('retail' if dr > 0 else ('corp' if dc > 0 else 'none')))
-            rows.append({'id': e['id'], 'name': e.get('name', ''),
-                         'kind': kind, 'cells': cells})
+            row = {'id': e['id'], 'name': e.get('name', ''),
+                   'kind': kind, 'cells': cells}
+            if mode != 'week':
+                row['cell_flags'] = cell_flags
+            rows.append(row)
         banks.append({'id': dep, 'name': dept_name.get(dep, dep),
                       'total': round(r_cnt + c_cnt, 2),
                       'retail': round(r_cnt, 2), 'corp': round(c_cnt, 2),

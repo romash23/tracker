@@ -875,6 +875,19 @@ function renderDepartments() {
 /* ============================================================
    СОТРУДНИКИ
    ============================================================ */
+function refreshEmployeeVacationViews(employeeId, keepCardOpen) {
+    return loadState().then(function() {
+        renderEmployees();
+        if (keepCardOpen && employeeId) {
+            var emp = (state.employees || []).find(function(x){ return x.id === employeeId; });
+            if (emp) openEmployeeModal(emp, true);
+        }
+        if (state.currentTab === 'absence' && typeof window.__renderAbsenceTab === 'function') {
+            try { window.__renderAbsenceTab(); } catch (e) { console.error(e); }
+        }
+    });
+}
+
 function renderEmployees() {
     var list = $('employeesList'), cnt = $('employeesCount');
     if (!list) return;
@@ -891,10 +904,14 @@ function renderEmployees() {
         var vac = (e.vacations || []).filter(function(v) { return (v.type||'vacation') === 'vacation'; }).length;
         var sick = (e.vacations || []).filter(function(v) { return v.type === 'sick_leave'; }).length;
         var trip = (e.vacations || []).filter(function(v) { return v.type === 'business_trip'; }).length;
+        var remote = (e.vacations || []).filter(function(v) { return v.type === 'remote'; }).length;
+        var other = (e.vacations || []).filter(function(v) { return v.type === 'other'; }).length;
         var badges = '';
         if (vac) badges += '<span class="badge badge-vac">🌞 ' + vac + '</span>';
         if (sick) badges += '<span class="badge badge-sick">🤒 ' + sick + '</span>';
         if (trip) badges += '<span class="badge badge-trip">✈️ ' + trip + '</span>';
+        if (remote) badges += '<span class="badge badge-remote">🏠 ' + remote + '</span>';
+        if (other) badges += '<span class="badge badge-other">📝 ' + other + '</span>';
         var metaArr = [];
         if (e.role) metaArr.push(escapeHtml(e.role));
         if (e.fired) metaArr.push('<span class="badge badge-fired">🚪 уволен ' + escapeHtml(e.fired_date || '') + '</span>');
@@ -956,6 +973,10 @@ function renderEmployees() {
         var id = item.getAttribute('data-id');
         var eb = item.querySelector('[data-act="edit"]');
         var db = item.querySelector('[data-act="delete"]');
+        item.addEventListener('click', function() {
+            var emp = state.employees.find(function(x) { return x.id === id; });
+            if (emp) openEmployeeModal(emp, true);
+        });
         if (eb) eb.addEventListener('click', function(ev) {
             ev.stopPropagation();
             var emp = state.employees.find(function(x) { return x.id === id; });
@@ -2545,8 +2566,9 @@ on('addDepartmentBtn', 'click', function() { openDepartmentModal(null); });
    СОТРУДНИКИ CRUD
    ============================================================ */
 var _vacDraftEmpId = null;
-function openEmployeeModal(emp) {
+function openEmployeeModal(emp, readonlyCard) {
     emp = emp || null;
+    var readonly = !!readonlyCard;
     _vacDraftEmpId = emp ? emp.id : null;
     var t = $('employeeModalTitle'); if (t) t.textContent = emp ? 'Редактировать сотрудника' : 'Новый сотрудник';
     var g = function(id, v) { var el = $(id); if (el) el.value = v; };
@@ -2589,8 +2611,15 @@ function openEmployeeModal(emp) {
         d.classList.toggle('active', d.getAttribute('data-color') === color);
     });
     renderVacations(emp);
+    var title = $('employeeModalTitle');
+    if (title && readonly && emp) title.textContent = 'Карточка сотрудника';
+    ['emp_name','emp_role','emp_color','emp_direction','emp_department_select','emp_hired_date','emp_fired','emp_fired_date'].forEach(function(id){
+        var el = $(id); if (el) el.disabled = readonly;
+    });
+    var saveBtn = $('empSaveBtn');
+    if (saveBtn) saveBtn.style.display = readonly ? 'none' : '';
     var m = $('employeeModal'); if (m) m.classList.add('active');
-    setTimeout(function() { var n = $('emp_name'); if (n) n.focus(); }, 50);
+    setTimeout(function() { var n = $('emp_name'); if (n && !readonly) n.focus(); }, 50);
 }
 on('emp_fired', 'change', function() {
     var cb = $('emp_fired'), fd = $('emp_fired_date');
@@ -2631,6 +2660,7 @@ on('vacAddBtn', 'click', function() {
     }).then(function() {
         var emp2 = state.employees.find(function(x) { return x.id === _vacDraftEmpId; });
         renderVacations(emp2);
+        renderEmployees();
     }).catch(function(err) { if (err && (err.message || '').indexOf('cancelled') !== -1) return; notify('❌ ' + (err.message || 'Ошибка'), 'error'); });
 });
 function saveEmployee() {
@@ -17798,9 +17828,13 @@ function openTaskFromUrl(){
           if (!dirVisible(r.kind)) return;
           h += '<tr class="hm-emp-row"><td class="hm-emp-name hm-emp-sub">'
              + dirEmoji(r.kind)+' '+esc(r.name)+' <span class="hm-emp-dir">('+dirLabel(r.kind)+')</span></td>';
-          (r.cells||[]).forEach(function(c){
+          (r.cells||[]).forEach(function(c, i){
             var hot = (Number(c)||0) >= 1.5 ? ' hm-cell-hot' : '';
-            h += '<td class="hm-emp-cell'+hot+'">'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
+            var meta = (r.cell_flags && r.cell_flags[i]) || null;
+            var extra = '';
+            if (meta && meta.holiday) extra = ' hm-cell-off';
+            else if (meta && meta.absent) extra = ' hm-cell-absent';
+            h += '<td class="hm-emp-cell'+hot+extra+'">'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
           });
           h += '</tr>';
         });
@@ -18378,9 +18412,10 @@ setTimeout(buildGanttTab, 1500);
     postJson('/api/tracker/employee/vacation/delete', payload).then(function(res){
       if(res && res.success){
         if(typeof window.trkRefreshAll === 'function'){
-          window.trkRefreshAll().then(function(){ renderBanks(); renderForm(); });
+          window.trkRefreshAll().then(function(){ renderBanks(); renderForm(); refreshEmployeeVacationViews(selEmp.id, false); });
         } else {
           renderForm();
+          refreshEmployeeVacationViews(selEmp.id, false);
         }
       } else {
         var msg = document.getElementById('vacMsg');
@@ -18420,6 +18455,7 @@ setTimeout(buildGanttTab, 1500);
         var afterRefresh = function(){
           renderBanks();
           renderForm();
+          refreshEmployeeVacationViews(selEmp.id, false);
           var m2 = document.getElementById('vacMsg');
           if(m2){ m2.textContent = 'Сохранено ✓'; m2.className = 'vac-msg ok'; }
         };

@@ -10185,3 +10185,11 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-lead-option.active{background:#fef3c7;border-color:#f59e0b;color:#92400e}
 .dash-global-slider{cursor:grab}
 .dash-global-slider:active,.dash-global-slider.is-grabbing{cursor:grabbing}
+
+.badge-remote { background:#e0f2fe; color:#075985; }
+.badge-other { background:#ede9fe; color:#5b21b6; }
+.dict-emp-item { cursor:pointer; }
+.hm-emp-cell.hm-cell-off, .hm-emp-cell.hm-cell-absent { position:relative; color:transparent; }
+.hm-emp-cell.hm-cell-off::before, .hm-emp-cell.hm-cell-absent::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(135deg, rgba(148,163,184,.22) 0 6px, rgba(148,163,184,.08) 6px 12px); }
+.hm-emp-cell.hm-cell-off::after { content:''; position:absolute; inset:0; background:rgba(148,163,184,.12); }
+.hm-emp-cell.hm-cell-absent::after { content:''; position:absolute; inset:0; background:rgba(148,163,184,.08); }
