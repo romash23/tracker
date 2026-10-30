@@ -18195,7 +18195,7 @@ setTimeout(buildGanttTab, 1500);
     'remote': '🏠',
     'other': '📝'
   };
-  var selEmp = null, selType = 'vacation', selYear = new Date().getFullYear(), bankStatsYear = new Date().getFullYear();
+  var selEmp = null, selType = 'vacation', selYear = new Date().getFullYear(), bankStatsYear = new Date().getFullYear(), bankStatsBankId = '';
   function st(){ return window.__trkState || {departments:[], employees:[]}; }
   function ensureTab(){
     var tabs = document.querySelector('.tracker-tabs');
