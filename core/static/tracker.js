@@ -2588,7 +2588,7 @@ function openEmployeeModal(emp) {
     if (pal) pal.querySelectorAll('.palette-dot').forEach(function(d) {
         d.classList.toggle('active', d.getAttribute('data-color') === color);
     });
-    // Блок отпусков/отсутствий перенесён во вкладку «Отсутствия».
+    renderVacations(emp);
     var m = $('employeeModal'); if (m) m.classList.add('active');
     setTimeout(function() { var n = $('emp_name'); if (n) n.focus(); }, 50);
 }
@@ -2603,42 +2603,15 @@ function renderVacations(emp) {
     var vac = (emp && emp.vacations) || [];
     if (!vac.length) { list.innerHTML = '<div class="vac-empty">Пока нет периодов отсутствия</div>'; return; }
     var html = '';
-    vac.forEach(function(v, i) {
+    vac.forEach(function(v) {
         var vt = v.type || 'vacation';
-        // PATCH v1.0.6: используем реальный id для удаления (не индекс)
-        var _vid = (v.id != null) ? v.id : '';
         html += '<div class="vac-item type-' + vt + '"><div class="vac-item-body">'
             + '<div class="vac-item-dates">' + absenceIcon(vt) + ' ' + escapeHtml(absenceLabel(vt)) + ': '
             + escapeHtml(formatDateHuman(v.from || '')) + ' — ' + escapeHtml(formatDateHuman(v.to || '')) + '</div>'
             + (v.comment ? '<div class="vac-item-comment">' + escapeHtml(v.comment) + '</div>' : '')
-            + '</div><button class="dict-action-btn danger" data-vac-id="' + _vid + '" data-idx="' + i + '" type="button">🗑</button></div>';
+            + '</div></div>';
     });
     list.innerHTML = html;
-    list.querySelectorAll('.dict-action-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var idx = parseInt(this.getAttribute('data-idx'), 10);
-            var vid = this.getAttribute('data-vac-id');
-            if (!_vacDraftEmpId) return;
-            // PATCH v1.0.6: отправляем id, если он есть; иначе fallback на index
-            var _payload = { employee_id: _vacDraftEmpId };
-            var _vidInt = parseInt(vid, 10);
-            if (!isNaN(_vidInt)) {
-                _payload.id = _vidInt;
-            } else {
-                _payload.index = idx;
-            }
-            apiJson('/api/tracker/employee/vacation/delete', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(_payload)
-            }).then(function(d) {
-                if (!d.success) throw new Error(d.error || 'Ошибка');
-                return loadState();
-            }).then(function() {
-                var emp2 = state.employees.find(function(x) { return x.id === _vacDraftEmpId; });
-                renderVacations(emp2);
-            }).catch(function(err) { if (err && (err.message || '').indexOf('cancelled') !== -1) return; notify('❌ ' + (err.message || 'Ошибка'), 'error'); });
-        });
-    });
 }
 on('vacAddBtn', 'click', function() {
     if (!_vacDraftEmpId) return;
