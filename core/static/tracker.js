@@ -2588,10 +2588,7 @@ function openEmployeeModal(emp) {
     if (pal) pal.querySelectorAll('.palette-dot').forEach(function(d) {
         d.classList.toggle('active', d.getAttribute('data-color') === color);
     });
-    var vs = $('vacSection'); if (vs) vs.style.display = emp ? '' : 'none';
-    renderVacations(emp);
-    g('vac_from', ''); g('vac_to', ''); g('vac_comment', '');
-    var vt = $('vac_type'); if (vt) vt.value = 'vacation';
+    // Блок отпусков/отсутствий перенесён во вкладку «Отсутствия».
     var m = $('employeeModal'); if (m) m.classList.add('active');
     setTimeout(function() { var n = $('emp_name'); if (n) n.focus(); }, 50);
 }

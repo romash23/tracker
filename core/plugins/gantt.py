@@ -86,18 +86,32 @@ def _heatmap_compute(data, d1, d2, mode):
             b = pe
         return _ov(a, b, ps, pe)
 
-    def _vac_absent(e, ps, pe, mode):
-        # Отсутствие (отпуск/больничный). В недельном режиме берём понедельник
-        # недели (как договорились — аппроксимация). В дневном — сам день ps.
-        chk = ps if mode == 'day' else ps  # ps в неделе уже понедельник
-        for v in (e.get('vacations') or []):
-            a = _d(v.get('from'))
-            b = _d(v.get('to'))
-            if a is None or b is None:
-                continue
-            if a <= chk <= b:
-                return True
-        return False
+    def _absence_availability(e, ps, pe):
+        # Доля доступности сотрудника в периоде.
+        # Любой тип отсутствия, кроме remote, уменьшает доступность.
+        workdays = 0
+        absent_days = 0
+        cur = ps
+        while cur <= pe:
+            if cur.weekday() < 5:
+                workdays += 1
+                absent = False
+                for v in (e.get('vacations') or []):
+                    if (v.get('type') or 'vacation') == 'remote':
+                        continue
+                    a = _d(v.get('from'))
+                    b = _d(v.get('to'))
+                    if a is None or b is None:
+                        continue
+                    if a <= cur <= b:
+                        absent = True
+                        break
+                if absent:
+                    absent_days += 1
+            cur += timedelta(days=1)
+        if workdays <= 0:
+            return 1.0
+        return max(0.0, (workdays - absent_days) / workdays)
 
     banks = []
     for dep in sorted(emp_by_dep.keys(), key=lambda d: dept_name.get(d, d).lower()):
@@ -127,18 +141,14 @@ def _heatmap_compute(data, d1, d2, mode):
             dc = float(e.get('dir_corp') or 0)
             cells = []
             for pi, (ps, pe, _lab) in enumerate(periods):
-                # Если сотрудник в отпуске в этом периоде — его ячейка 0,
-                # а знаменатель направления уменьшается на его доли.
-                if _vac_absent(e, ps, pe, mode):
+                emp_av = _absence_availability(e, ps, pe)
+                eff_dr = dr * emp_av
+                eff_dc = dc * emp_av
+                if eff_dr <= 0 and eff_dc <= 0:
                     cells.append(0.0)
                     continue
-                # Численность направлений в этом периоде = штат минус отсутствующие.
-                r_av = r_cnt
-                c_av = c_cnt
-                for e2 in es:
-                    if _vac_absent(e2, ps, pe, mode):
-                        r_av -= float(e2.get('dir_retail') or 0)
-                        c_av -= float(e2.get('dir_corp') or 0)
+                r_av = sum(float(e2.get('dir_retail') or 0) * _absence_availability(e2, ps, pe) for e2 in es)
+                c_av = sum(float(e2.get('dir_corp') or 0) * _absence_availability(e2, ps, pe) for e2 in es)
                 lr = 0.0
                 lc = 0.0
                 oth = 0.0
@@ -157,9 +167,9 @@ def _heatmap_compute(data, d1, d2, mode):
                             lc += contrib
                     else:
                         if e['id'] in (t.get('assignees') or []) and other_active(t, ps, pe):
-                            oth += float(t.get('load_coef') or 0)
-                val = (dr * (lr / r_av if r_av > 0 else 0)
-                       + dc * (lc / c_av if c_av > 0 else 0)
+                            oth += float(t.get('load_coef') or 0) * emp_av
+                val = (eff_dr * (lr / r_av if r_av > 0 else 0)
+                       + eff_dc * (lc / c_av if c_av > 0 else 0)
                        + oth)
                 cells.append(round(val, 2))
             kind = ('hybrid' if (dr > 0 and dc > 0)

@@ -398,23 +398,6 @@
         </div>
         <div class="form-group"><label>Дата увольнения</label><input type="date" id="emp_fired_date"></div>
     </div>
-    <div class="form-group" id="vacSection" style="display:none;">
-        <label>🌞 Отпуска / Больничные / Командировки</label>
-        <div class="vac-list" id="vacList"></div>
-        <div class="vac-type-row">
-            <select id="vac_type">
-                <option value="vacation">🌞 Отпуск</option>
-                <option value="sick_leave">🤒 Больничный</option>
-                <option value="business_trip">✈️ Командировка</option>
-                <option value="remote">🏠 Удаленка</option>
-            </select>
-        </div>
-        <div class="vac-add-row">
-            <input type="date" id="vac_from"><input type="date" id="vac_to"><button type="button" id="vacAddBtn">➕</button>
-        </div>
-        <input type="text" id="vac_comment" placeholder="Комментарий" maxlength="200"
-               style="margin-top:4px;padding:6px 10px;border:1px solid var(--trk-input-border);border-radius:8px;background:var(--trk-input-bg);color:var(--trk-text);font-size:0.82rem;outline:none;font-family:inherit;">
-    </div>
     <div class="modal-actions">
         <button class="btn btn-primary" id="saveEmployeeBtn">💾 Сохранить</button>
         <button class="btn btn-secondary" data-close="employeeModal">Закрыть</button>
