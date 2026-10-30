@@ -18195,7 +18195,7 @@ setTimeout(buildGanttTab, 1500);
     'remote': '🏠',
     'other': '📝'
   };
-  var selEmp = null, selType = 'vacation', selYear = new Date().getFullYear();
+  var selEmp = null, selType = 'vacation', selYear = new Date().getFullYear(), bankStatsYear = new Date().getFullYear();
   function st(){ return window.__trkState || {departments:[], employees:[]}; }
   function ensureTab(){
     var tabs = document.querySelector('.tracker-tabs');
@@ -18231,37 +18231,166 @@ setTimeout(buildGanttTab, 1500);
     renderBanks();
     if(selEmp) renderForm();
   }
-  function renderBanks(){
-    var sb = document.getElementById('vacBanksList'); if(!sb) return;
-    var s = st();
-    var banks = Object.values(s.departments||{}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
-    var emps  = Object.values(s.employees||{}).filter(function(e){return !e.fired;});
-    sb.innerHTML = '';
-    banks.forEach(function(b){
-      var item=document.createElement('div'); item.className='vac-bank-item';
-      var title=document.createElement('div'); title.className='vac-bank-title';
-      var caret=document.createElement('span'); caret.className='vac-caret'; caret.textContent='▸';
-      var label=document.createElement('span'); label.textContent=b.name;
-      title.appendChild(caret); title.appendChild(label);
-      var list=document.createElement('div'); list.className='vac-emp-list';
-      var mine=emps.filter(function(e){return e.department_id===b.id;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
-      mine.forEach(function(e){
-        var row=document.createElement('div'); row.className='vac-emp-row'; row.textContent=e.name;
-        if(selEmp && selEmp.id===e.id) row.classList.add('active');
-        row.onclick=function(){ selEmp=e; renderBanks(); renderForm(); };
-        list.appendChild(row);
-      });
-      if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='нет сотрудников'; list.appendChild(em); }
-      title.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'▾':'▸'; };
-      if(selEmp && mine.some(function(e){return e.id===selEmp.id;})){ item.classList.add('expanded'); caret.textContent='▾'; }
-      item.appendChild(title); item.appendChild(list); sb.appendChild(item);
+
+function renderBanks(){
+  var sb = document.getElementById('vacBanksList'); if(!sb) return;
+  var s = st();
+  var banks = Object.values(s.departments||{}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var emps  = Object.values(s.employees||{}).filter(function(e){return !e.fired;});
+  var activeBankId = selEmp ? selEmp.department_id : '';
+  sb.innerHTML = '';
+  banks.forEach(function(b){
+    var item=document.createElement('div'); item.className='vac-bank-item';
+    var title=document.createElement('div'); title.className='vac-bank-title';
+    var titleMain=document.createElement('div'); titleMain.className='vac-bank-title-main';
+    var caret=document.createElement('span'); caret.className='vac-caret'; caret.textContent='▸';
+    var label=document.createElement('span'); label.className='vac-bank-label'; label.textContent=b.name;
+    titleMain.appendChild(caret); titleMain.appendChild(label);
+    title.appendChild(titleMain);
+    var statsBtn=document.createElement('button');
+    statsBtn.type='button';
+    statsBtn.className='vac-bank-stat-btn';
+    statsBtn.setAttribute('title','Статистика по банку');
+    statsBtn.setAttribute('aria-label','Статистика по банку');
+    statsBtn.textContent='📊';
+    title.appendChild(statsBtn);
+    var list=document.createElement('div'); list.className='vac-emp-list';
+    var mine=emps.filter(function(e){return e.department_id===b.id;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    mine.forEach(function(e){
+      var row=document.createElement('div'); row.className='vac-emp-row'; row.textContent=e.name;
+      if(selEmp && selEmp.id===e.id) row.classList.add('active');
+      row.onclick=function(){ selEmp=e; renderBanks(); renderForm(); };
+      list.appendChild(row);
     });
-  }
+    if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='нет сотрудников'; list.appendChild(em); }
+    var statsHost=document.createElement('div');
+    statsHost.className='vac-bank-stats-host';
+    statsHost.style.display='none';
+    titleMain.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'▾':'▸'; };
+    statsBtn.onclick=function(ev){
+      ev.stopPropagation();
+      var opened = statsHost.style.display !== 'none';
+      if(opened){
+        statsHost.style.display='none';
+        statsBtn.classList.remove('active');
+      } else {
+        statsHost.innerHTML = renderBankStatsPanel(b);
+        statsHost.style.display='block';
+        statsBtn.classList.add('active');
+      }
+    };
+    statsHost.addEventListener('click', function(ev){
+      var btn = ev.target && ev.target.closest ? ev.target.closest('[data-bank-collapse]') : null;
+      if(btn){ statsHost.style.display='none'; statsBtn.classList.remove('active'); return; }
+      if(ev.target && ev.target.classList && ev.target.classList.contains('vacBankYPrev')){ bankStatsYear -= 1; statsHost.innerHTML = renderBankStatsPanel(b); statsHost.style.display='block'; statsBtn.classList.add('active'); return; }
+      if(ev.target && ev.target.classList && ev.target.classList.contains('vacBankYNext')){ bankStatsYear += 1; statsHost.innerHTML = renderBankStatsPanel(b); statsHost.style.display='block'; statsBtn.classList.add('active'); return; }
+    });
+    if(activeBankId && activeBankId===b.id){ item.classList.add('expanded'); caret.textContent='▾'; }
+    item.appendChild(title); item.appendChild(list); item.appendChild(statsHost); sb.appendChild(item);
+  });
+}
   function fmtDateRu(iso){
     if(!iso) return '';
     var p = iso.split('-');
     return p.length===3 ? (p[2]+'.'+p[1]+'.'+p[0]) : iso;
   }
+
+function bankColor(bank){
+  return (bank && bank.color) || '#60a5fa';
+}
+function escapeAttr(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function parseISODate(iso){
+  if(!iso) return null;
+  var p = String(iso).split('-');
+  return p.length===3 ? new Date(+p[0], +p[1]-1, +p[2]) : null;
+}
+function formatStatDate(iso){
+  var d = parseISODate(iso);
+  if(!d) return iso || '';
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  return dd + '.' + mm + '.' + d.getFullYear();
+}
+function bankEmployees(bankId){
+  return Object.values(st().employees||{}).filter(function(e){ return !e.fired && e.department_id===bankId; })
+    .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+}
+function bankVacations(bankId){
+  var rows = [];
+  bankEmployees(bankId).forEach(function(emp){
+    (emp.vacations || []).forEach(function(v){
+      rows.push({ employee_id: emp.id, employee_name: emp.name || '', type: v.type || 'vacation', from: v.from || '', to: v.to || '', comment: v.comment || '' });
+    });
+  });
+  rows.sort(function(a,b){
+    return String(a.from||'').localeCompare(String(b.from||'')) || (a.employee_name||'').localeCompare(b.employee_name||'');
+  });
+  return rows;
+}
+function countBankActiveHeadcount(bankId, year){
+  var emps = bankEmployees(bankId), vals = [];
+  for(var m=0; m<12; m++){
+    var days = new Date(year, m+1, 0).getDate();
+    for(var d=1; d<=days; d++){
+      var iso = year + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var cnt = 0;
+      emps.forEach(function(emp){
+        var absent = false;
+        (emp.vacations || []).forEach(function(v){
+          var tp = v.type || 'vacation';
+          if(tp === 'remote') return;
+          if((v.from || '') <= iso && iso <= (v.to || '')) absent = true;
+        });
+        if(!absent) cnt += 1;
+      });
+      vals.push(cnt);
+    }
+  }
+  return vals;
+}
+function sparklinePath(values, w, h, pad){
+  if(!values || !values.length) return '';
+  var min = Math.min.apply(null, values), max = Math.max.apply(null, values), span = Math.max(1, max - min);
+  var innerW = Math.max(1, w - pad*2), innerH = Math.max(1, h - pad*2);
+  var pts = values.map(function(v, i){
+    var x = pad + (values.length === 1 ? innerW/2 : (i * innerW / (values.length - 1)));
+    var y = h - pad - ((v - min) / span) * innerH;
+    return [x, y];
+  });
+  var line = pts.map(function(p, i){ return (i ? 'L' : 'M') + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join(' ');
+  var area = 'M' + pts[0][0].toFixed(2) + ' ' + (h-pad).toFixed(2) + ' ' + pts.map(function(p){ return 'L' + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join(' ') + ' L' + pts[pts.length-1][0].toFixed(2) + ' ' + (h-pad).toFixed(2) + ' Z';
+  return { line: line, area: area, min: min, max: max, last: values[values.length-1] };
+}
+function renderBankStatsPanel(bank){
+  if(!bank) return '';
+  var rows = bankVacations(bank.id), color = bankColor(bank), values = countBankActiveHeadcount(bank.id, bankStatsYear), spark = sparklinePath(values, 860, 190, 16);
+  var mNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  var html = '<div class="vac-bank-stats" data-bank-stats="' + escapeAttr(bank.id) + '">';
+  html += '<div class="vac-bank-stats-head"><div class="vac-bank-stats-title">Статистика по банку</div><button type="button" class="vac-bank-collapse" data-bank-collapse="' + escapeAttr(bank.id) + '">«</button></div>';
+  html += '<div class="vac-bank-stats-body">';
+  html += '<div class="vac-bank-stats-listwrap"><div class="vac-list-title">Список отсутствий (' + rows.length + ')</div><div class="vac-list-box vac-bank-list-box">';
+  if(!rows.length){
+    html += '<div class="vac-list-empty">Записей об отсутствиях пока нет</div>';
+  } else {
+    rows.forEach(function(v){
+      var tPair = ABS_TYPES.find(function(x){ return x[0]===v.type; });
+      var tLabel = tPair ? tPair[1] : ('🌞 ' + v.type);
+      html += '<div class="vac-list-item vac-bank-stat-item"><div class="vac-list-main"><span class="vac-list-badge">' + tLabel + '</span><span class="vac-list-dates">' + formatStatDate(v.from) + ' — ' + formatStatDate(v.to) + '</span>' + (v.comment ? '<span class="vac-list-cm">· ' + String(v.comment).replace(/</g,'&lt;') + '</span>' : '') + '</div><div class="vac-bank-stat-emp">' + escapeAttr(v.employee_name) + '</div></div>';
+    });
+  }
+  html += '</div></div>';
+  html += '<div class="vac-bank-chart-wrap"><div class="vac-year-head"><span class="vac-year-title">Фактическая численность банка</span><div class="vac-year-ctrl"><button type="button" class="vacBankYPrev">◀</button><span class="vac-year-num">' + bankStatsYear + '</span><button type="button" class="vacBankYNext">▶</button></div></div>';
+  html += '<div class="vac-bank-chart">';
+  if(spark){
+    html += '<svg viewBox="0 0 860 190" preserveAspectRatio="none" aria-label="Фактическая численность банка"><path d="' + spark.area + '" fill="' + color + '" opacity="0.18"></path><path d="' + spark.line + '" fill="none" stroke="' + color + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></path></svg><div class="vac-bank-chart-meta">Мин: ' + spark.min + ' · Макс: ' + spark.max + ' · На конец года: ' + spark.last + '</div>';
+  } else {
+    html += '<div class="vac-list-empty">Нет данных для графика</div>';
+  }
+  html += '<div class="vac-bank-chart-months">' + mNames.map(function(name){ return '<span>' + name + '</span>'; }).join('') + '</div></div></div></div></div>';
+  return html;
+}
   function renderForm(){
     var wa = document.getElementById('vacWorkArea'); if(!wa) return;
     if(!selEmp){ wa.innerHTML='<div class="vac-empty">Выберите сотрудника слева</div>'; return; }
