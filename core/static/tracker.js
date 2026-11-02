@@ -19648,11 +19648,7 @@ function renderBankStatsPanel(bank){
                 + '<div class="dash-bank-head">'
                 + '<div>'
                 + '<div class="dash-bank-name">' + escapeHtml(dep.name || dep.id) + '</div>'
-                + '<div class="dash-bank-meta">'
-                + (lead ? '<span class="dash-badge lead">Руководитель</span>' : '')
-                + (inDraft ? '<span class="dash-badge">Участвует</span>' : '<span class="dash-badge ghost">Не участвует</span>')
-                + (share !== null ? '<span class="dash-badge ghost">Доля ' + fmtNum(share) + '%</span>' : '')
-                + '</div>'
+                + (lead ? '<div class="dash-bank-meta"><span class="dash-badge lead">Руководитель</span></div>' : '')
                 + '</div>'
                 + '<div class="dash-bank-actions">'
                 + ''
@@ -19673,6 +19669,7 @@ function renderBankStatsPanel(bank){
                           var possY = Math.round((poss / maxVal) * 108);
                           grid += '<div class="dash-limit-zone" style="bottom:' + possY + 'px;"></div>';
                           grid += '<div class="dash-limit-line" style="bottom:' + possY + 'px;"></div>';
+                          grid += '<div class="dash-limit-label" style="bottom:' + (possY + 2) + 'px; right: 2px; position: absolute; color: rgba(239, 68, 68, 0.8); font-size: 0.65rem; font-weight: 600; line-height: 1; z-index: 3;">' + fmtNum(poss) + '</div>';
                       }
                       return grid;
                   })()
@@ -19683,7 +19680,7 @@ function renderBankStatsPanel(bank){
 
         box.innerHTML = ''
             + '<div class="dash-load-head">'
-                + '<div class="dash-load-title">Нагрузка на ТБ (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'large' ? 'по дням' : 'по неделям') + ')</div>'
+                + '<div class="dash-load-title">Нагрузка на ТБ</div>'
             + '</div>'
             + '<div class="dash-bank-grid">' + cards + '</div>';
 
