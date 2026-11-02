@@ -16,7 +16,7 @@ PERMISSION_GROUPS = [
         'items': [
             ('tab.calendar', '📅 Календарь'),
             ('tab.tasks',    '📋 Задачи'),
-            ('tab.heatmap',  '🔥 Тепловая карта'),
+            ('tab.heatmap',  '🔥 Тепловая карта нагрузки'),
             ('tab.summary',  '📊 Свод'),
             ('tab.stats',    '📈 Статистика'),
             ('tab.dicts',    '⚙️ Справочники'),

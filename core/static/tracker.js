@@ -17629,7 +17629,7 @@ function buildGanttTab(){
     var btn = document.createElement('button');
     btn.className = 'tracker-tab';
     btn.setAttribute('data-tab-plugin', 'gantt');
-    btn.innerHTML = '<span>📅</span><span>План проверок</span>';
+    btn.innerHTML = '<span>📅</span><span>Текущие проверки</span>';
     btn.addEventListener('click', function(e){
         e.preventDefault();
         e.stopPropagation();
@@ -17853,7 +17853,17 @@ function openTaskFromUrl(){
     var b = e.target.closest && e.target.closest('#hmeMode button');
     if (!b) return;
     document.querySelectorAll('#hmeMode button').forEach(function(x){x.classList.remove('active');});
-    b.classList.add('active'); HM.mode = b.getAttribute('data-m')||'week'; hmLoad();
+    b.classList.add('active'); 
+    HM.mode = b.getAttribute('data-m')||'week';
+    var f = document.getElementById('hmeFrom'), t = document.getElementById('hmeTo');
+    if (f && t && f.value) {
+        var startDt = new Date(f.value);
+        var days = (HM.mode === 'day') ? 60 : 180;
+        var newEnd = new Date(startDt.getTime() + days * 86400000);
+        function iso(dt){ return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0'); }
+        t.value = iso(newEnd);
+    }
+    hmLoad();
   });
   var ap = document.getElementById('hmeApply'); if (ap) ap.onclick = hmLoad;
 
@@ -17863,11 +17873,11 @@ function openTaskFromUrl(){
     if (!fromEl || !toEl) return;
     if (!fromEl.value || !toEl.value){
       var today = new Date();
-      var dow = (today.getDay() + 6) % 7;
-      var mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
-      var sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
-      fromEl.value = mon.getFullYear() + '-' + String(mon.getMonth()+1).padStart(2,'0') + '-' + String(mon.getDate()).padStart(2,'0');
-      toEl.value = sun.getFullYear() + '-' + String(sun.getMonth()+1).padStart(2,'0') + '-' + String(sun.getDate()).padStart(2,'0');
+      var days = (HM.mode === 'day') ? 60 : 180;
+      var d2 = new Date(today.getTime() + days * 86400000);
+      function iso(dt){ return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0'); }
+      fromEl.value = iso(today);
+      toEl.value = iso(d2);
     }
     HM.mode = 'week';
     document.querySelectorAll('#hmeMode button').forEach(function(x){ x.classList.toggle('active', x.getAttribute('data-m') === 'week'); });
@@ -18216,15 +18226,18 @@ setTimeout(buildGanttTab, 1500);
   function ensureTab(){
     var tabs = document.querySelector('.tracker-tabs');
     if (!tabs) return;
-    if (!tabs.querySelector('[data-tab="vacations"]')){
-      var anchor = tabs.querySelector('.tracker-tab[data-tab="dicts"]');
+    var oldBtn = tabs.querySelector('.tracker-tab[data-tab="vacations"]');
+    if (oldBtn) oldBtn.remove();
+    var drop = document.getElementById('employeesTabDropdown');
+    if (drop && !drop.querySelector('[data-target-tab="vacations"]')) {
+      var anchor = drop.querySelector('[data-target-tab="dicts"]');
       var btn = document.createElement('button');
-      btn.className = 'tracker-tab';
-      btn.setAttribute('data-tab','vacations');
+      btn.className = 'tracker-tab-drop-item';
+      btn.setAttribute('type', 'button');
+      btn.setAttribute('data-target-tab', 'vacations');
       btn.innerHTML = '<span>🌞</span><span>Отсутствия</span>';
-      if (anchor && anchor.parentNode===tabs) tabs.insertBefore(btn, anchor);
-      else tabs.appendChild(btn);
-      btn.addEventListener('click', function(e){ e.preventDefault(); activate(); });
+      if (anchor && anchor.parentNode === drop) drop.insertBefore(btn, anchor);
+      else drop.appendChild(btn);
     }
     if (!document.getElementById('panel-vacations')){
       var host = document.querySelector('.tracker-panel');
@@ -18242,7 +18255,8 @@ setTimeout(buildGanttTab, 1500);
   }
   function activate(){
     ensureTab();
-    document.querySelectorAll('.tracker-tab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-tab')==='vacations'); });
+    document.querySelectorAll('.tracker-tab').forEach(function(t){ t.classList.toggle('active', t.id==='employeesTabBtn'); });
+    document.querySelectorAll('#employeesTabDropdown [data-target-tab]').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-target-tab')==='vacations'); });
     document.querySelectorAll('.tracker-panel').forEach(function(p){ p.classList.toggle('active', p.id==='panel-vacations'); });
     renderBanks();
     if(selEmp) renderForm();

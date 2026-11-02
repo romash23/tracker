@@ -221,7 +221,7 @@ function register(){
     window.__trkRegisterPlugin({
         id: 'gantt',
         icon: '📊',
-        name: 'План проверок',
+        name: 'Текущие проверки',
         url: '/plugins/gantt/',
         perm: 'plugin.gantt.use'
     });
@@ -241,7 +241,7 @@ def _page_html():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>План проверок</title>
+<title>Текущие проверки</title>
 <script src="/static/plugin_theme.js"></script>
 <script src="/static/plugin_mask.js"></script>
 <style>
@@ -827,7 +827,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
     <div class="head">
         <div class="head-top">
             <a class="back" href="/">← К трекеру</a>
-            <h1>📅 План проверок</h1>
+            <h1>📅 Текущие проверки</h1>
         </div>
         <div class="head-filters">
             <div class="ms-dd-group" id="fKindGroup">

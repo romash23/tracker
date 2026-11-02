@@ -10334,33 +10334,19 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .plan-dashboards-btn {
     display:inline-flex;
     align-items:center;
-    gap:10px;
+    justify-content:center;
     border:none;
-    border-radius:999px;
-    padding:10px 18px;
-    background:linear-gradient(90deg,#17b26a 0%, #f59e0b 100%);
+    border-radius:14px;
+    padding:5px 12px;
+    background:linear-gradient(135deg, #c0392b, #111111);
     color:#fff;
     font:inherit;
+    font-size:0.78rem;
     font-weight:700;
-    box-shadow:0 10px 24px rgba(245,158,11,.18), 0 6px 16px rgba(23,178,106,.18);
     cursor:pointer;
-    transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    transition:transform 0.15s ease;
 }
 .plan-dashboards-btn:hover {
-    transform:translateY(-1px);
-    box-shadow:0 14px 28px rgba(245,158,11,.22), 0 8px 20px rgba(23,178,106,.22);
-    filter:saturate(1.05);
+    transform: scale(1.05);
 }
-.plan-dashboards-btn:active { transform:translateY(0); }
-.plan-dashboards-icon {
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    width:22px;
-    height:22px;
-    color:#fff;
-    font-size:.95rem;
-    font-weight:800;
-}
-.plan-dashboards-text { display:inline-flex; align-items:center; }
-.plan-dashboards-title { color:#fff; font-size:.94rem; font-weight:800; line-height:1; }
+.plan-dashboards-btn:active { transform:scale(0.98); }
