@@ -19660,11 +19660,24 @@ function renderBankStatsPanel(bank){
                 + ''
                 + '</div>'
                 + '</div>'
-                + '<div class="dash-bank-stats">'
-                + '<div class="dash-stat"><span>Пик</span><b>' + fmtNum(peakVal) + '</b></div>'
-                + '<div class="dash-stat"><span>Возможное число проверок (красный лимит)</span><b class="dash-limit-val">' + fmtNum(poss) + '</b></div>'
+                + '<div class="dash-mini-chart-wrap" style="position:relative; margin-top:12px;">'
+                + (function(){
+                      var grid = '';
+                      // Сетка: 4 линии
+                      for(var i=1; i<=4; i++){
+                          var y = Math.round((i/5) * 108);
+                          grid += '<div class="dash-grid-line" style="bottom:' + y + 'px;"></div>';
+                      }
+                      // Лимит и красная зона
+                      if (poss !== null && maxVal > 0) {
+                          var possY = Math.round((poss / maxVal) * 108);
+                          grid += '<div class="dash-limit-zone" style="bottom:' + possY + 'px;"></div>';
+                          grid += '<div class="dash-limit-line" style="bottom:' + possY + 'px;"></div>';
+                      }
+                      return grid;
+                  })()
+                + '<div class="dash-mini-chart" style="position:relative; z-index:2;">' + bars + '</div>'
                 + '</div>'
-                + '<div class="dash-mini-chart">' + bars + '</div>'
                 + '</div>';
         }).join('');
 

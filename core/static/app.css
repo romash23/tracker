@@ -10274,3 +10274,18 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .vac-bank-chart-months{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;font-size:11px;color:#94a3b8}
 .vac-bank-chart-months span{text-align:center}
 @media (max-width: 1200px){.vac-bank-stats-body{grid-template-columns:1fr}.vac-bank-stat-emp{flex-basis:140px;max-width:140px}}
+
+/* --- Dashboards UI Updates --- */
+.dash-mini-chart-wrap { position: relative; min-height: 110px; }
+.dash-grid-line { position: absolute; left: 0; right: 0; border-bottom: 1px dashed rgba(0,0,0,0.06); z-index: 1; }
+.dash-limit-zone { position: absolute; left: 0; right: 0; top: 0; background: rgba(239, 68, 68, 0.08); z-index: 1; }
+.dash-limit-line { position: absolute; left: 0; right: 0; border-bottom: 1px solid rgba(239, 68, 68, 0.4); z-index: 2; }
+.dash-topbar { gap: 12px; }
+.dash-label { font-size: 0.75rem; }
+.btn-seg-btn { padding: 4px 12px !important; font-size: 0.8rem !important; }
+.btn-seg { border-radius: 999px !important; }
+.btn-seg-btn:first-child { border-radius: 999px 0 0 999px !important; }
+.btn-seg-btn:last-child { border-radius: 0 999px 999px 0 !important; }
+#dashCreateTaskBtn { padding: 4px 12px !important; font-size: 0.8rem !important; border-radius: 999px !important; }
+#dashTaskSelector { padding: 4px 12px !important; font-size: 0.8rem !important; border-radius: 999px !important; }
+.dash-save-btn { padding: 6px 16px !important; font-size: 0.85rem !important; border-radius: 999px !important; }
