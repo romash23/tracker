@@ -168,45 +168,37 @@ body.login-body {
     min-height: 300px;
 }
  .tracker-panel.active { display: block; }
-
-.tracker-container {
-    zoom: 0.85;
-}
-@supports not (zoom: 1) {
-    .tracker-container {
-        transform: scale(0.85);
-        transform-origin: top left;
-        width: 117.6471%;
-    }
-}
-
 #panel-dashboards{
-    overflow:hidden;
+    overflow: hidden;
 }
 .dash-split-wrap {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
+    flex-wrap: nowrap;
 }
 .dash-main-pane,
 .dash-side-pane {
+    flex: 1 1 0;
+    width: 50%;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
-.dash-side-pane {
-    align-self: stretch;
-}
-.dash-side-pane .dash-load-container,
-.dash-main-pane .dash-gantt-container {
+.dash-main-pane .dash-selector-row,
+.dash-main-pane .dash-gantt-container,
+.dash-side-pane .dash-load-container {
+    width: 100%;
+    max-width: 100%;
     margin-top: 0;
-    min-height: 100%;
+}
+.dash-main-pane .dash-gantt-container,
+.dash-side-pane .dash-load-container {
+    flex: 1 1 auto;
 }
 .dash-side-pane .dash-load-container {
-    position: sticky;
-    top: 12px;
+    position: static;
 }
 .dash-load-head {
     margin-bottom: 12px;
@@ -219,12 +211,13 @@ body.login-body {
 .dash-load-head .dash-load-sub {
     display: none;
 }
-@media (max-width: 1480px) {
+@media (max-width: 980px) {
     .dash-split-wrap {
-        grid-template-columns: minmax(0, 1fr);
+        flex-direction: column;
     }
-    .dash-side-pane .dash-load-container {
-        position: static;
+    .dash-main-pane,
+    .dash-side-pane {
+        width: 100%;
     }
 }
 
