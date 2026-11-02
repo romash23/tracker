@@ -19898,26 +19898,17 @@ function renderBankStatsPanel(bank){
         var gantt = byId('dashGanttContainer');
         var load = byId('dashLoadContainer');
         if (!selector || !gantt || !load) return;
-        var split = byId('dashSplitWrap');
-        if (!split) {
-            split = document.createElement('div');
-            split.id = 'dashSplitWrap';
-            split.className = 'dash-split-wrap';
-            var main = document.createElement('div');
-            main.className = 'dash-main-pane';
-            main.id = 'dashMainPane';
-            var side = document.createElement('div');
-            side.className = 'dash-side-pane';
-            side.id = 'dashSidePane';
-            if (selector.parentNode === panel) panel.insertBefore(split, selector);
-            split.appendChild(main);
-            split.appendChild(side);
-        }
-        var mainPane = byId('dashMainPane') || split.firstElementChild;
-        var sidePane = byId('dashSidePane') || split.lastElementChild;
-        if (mainPane && selector.parentNode !== mainPane) mainPane.appendChild(selector);
-        if (mainPane && gantt.parentNode !== mainPane) mainPane.appendChild(gantt);
-        if (sidePane && load.parentNode !== sidePane) sidePane.appendChild(load);
+
+        var split = panel.querySelector('.dash-split-wrap');
+        if (!split) return;
+
+        var mainPane = split.querySelector('.dash-main-pane');
+        var sidePane = split.querySelector('.dash-side-pane');
+        if (!mainPane || !sidePane) return;
+
+        if (selector.parentNode !== mainPane) mainPane.insertBefore(selector, mainPane.firstChild || null);
+        if (gantt.parentNode !== mainPane) mainPane.appendChild(gantt);
+        if (load.parentNode !== sidePane) sidePane.appendChild(load);
     }
 
     function boot(){
