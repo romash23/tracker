@@ -18843,6 +18843,7 @@ function renderBankStatsPanel(bank){
         try { localStorage.setItem('tracker_activeTab', 'dashboards'); } catch(e){}
         renderSelector();
         syncControls();
+        renderDashboardsLayout();
         renderGantt();
         renderLoad();
     }
@@ -19669,10 +19670,7 @@ function renderBankStatsPanel(bank){
 
         box.innerHTML = ''
             + '<div class="dash-load-head">'
-                + '<div>'
-                    + '<div class="dash-load-title">Гистограммы по всем банкам (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'large' ? 'по дням' : 'по неделям') + ')</div>'
-                    + '<div class="dash-load-sub">Справа всегда показаны все банки справочника. Бейджи «Участвует» и «Руководитель» отмечают банки из открытых черновиков. Тонкая вертикальная линия показывает текущий день.</div>'
-                + '</div>'
+                + '<div class="dash-load-title">Нагрузка на ТБ (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'large' ? 'по дням' : 'по неделям') + ')</div>'
             + '</div>'
             + '<div class="dash-bank-grid">' + cards + '</div>';
 
@@ -19883,6 +19881,7 @@ function renderBankStatsPanel(bank){
         if (hasData) {
             renderSelector();
             syncControls();
+            renderDashboardsLayout();
             renderGantt();
             renderLoad();
             return;
@@ -19892,11 +19891,41 @@ function renderBankStatsPanel(bank){
         }
     }
 
+    function renderDashboardsLayout(){
+        var panel = byId('panel-dashboards');
+        if (!panel) return;
+        var selector = byId('dashSelectorRow');
+        var gantt = byId('dashGanttContainer');
+        var load = byId('dashLoadContainer');
+        if (!selector || !gantt || !load) return;
+        var split = byId('dashSplitWrap');
+        if (!split) {
+            split = document.createElement('div');
+            split.id = 'dashSplitWrap';
+            split.className = 'dash-split-wrap';
+            var main = document.createElement('div');
+            main.className = 'dash-main-pane';
+            main.id = 'dashMainPane';
+            var side = document.createElement('div');
+            side.className = 'dash-side-pane';
+            side.id = 'dashSidePane';
+            if (selector.parentNode === panel) panel.insertBefore(split, selector);
+            split.appendChild(main);
+            split.appendChild(side);
+        }
+        var mainPane = byId('dashMainPane') || split.firstElementChild;
+        var sidePane = byId('dashSidePane') || split.lastElementChild;
+        if (mainPane && selector.parentNode !== mainPane) mainPane.appendChild(selector);
+        if (mainPane && gantt.parentNode !== mainPane) mainPane.appendChild(gantt);
+        if (sidePane && load.parentNode !== sidePane) sidePane.appendChild(load);
+    }
+
     function boot(){
         ensureDashboardsTab();
         bindControls();
         renderSelector();
         syncControls();
+        renderDashboardsLayout();
         renderGantt();
         renderLoad();
         waitStateAndRefresh();
@@ -19910,6 +19939,7 @@ function renderBankStatsPanel(bank){
                 bindControls();
                 renderSelector();
                 syncControls();
+                renderDashboardsLayout();
                 renderGantt();
                 renderLoad();
             }, 40);

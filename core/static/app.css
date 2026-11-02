@@ -180,33 +180,50 @@ body.login-body {
     }
 }
 
+#panel-dashboards{
+    overflow:hidden;
+}
 .dash-split-wrap {
     display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.9fr);
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
     align-items: start;
 }
 .dash-main-pane,
 .dash-side-pane {
     min-width: 0;
-}
-.dash-main-pane {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 .dash-side-pane {
+    align-self: stretch;
+}
+.dash-side-pane .dash-load-container,
+.dash-main-pane .dash-gantt-container {
+    margin-top: 0;
+    min-height: 100%;
+}
+.dash-side-pane .dash-load-container {
     position: sticky;
     top: 12px;
 }
-.dash-side-pane .dash-load-container {
-    margin-top: 0;
+.dash-load-head {
+    margin-bottom: 12px;
+}
+.dash-load-head .dash-load-title {
+    font-size: 1.08rem;
+    font-weight: 800;
+    color: var(--trk-text);
+}
+.dash-load-head .dash-load-sub {
+    display: none;
 }
 @media (max-width: 1480px) {
     .dash-split-wrap {
         grid-template-columns: minmax(0, 1fr);
     }
-    .dash-side-pane {
+    .dash-side-pane .dash-load-container {
         position: static;
     }
 }

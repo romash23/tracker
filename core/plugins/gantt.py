@@ -256,7 +256,22 @@ body {
     color: var(--pg-text, #e8e8e8);
     min-height: 100vh;
 }
-.wrap { max-width: none; padding: 0 16px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.wrap {
+    max-width: none;
+    padding: 0 16px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    zoom: 0.85;
+}
+@supports not (zoom: 1) {
+    .wrap {
+        transform: scale(0.85);
+        transform-origin: top left;
+        width: 117.6471%;
+    }
+}
 
 /* Шапка */
 .head {
