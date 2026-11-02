@@ -17857,8 +17857,24 @@ function openTaskFromUrl(){
   });
   var ap = document.getElementById('hmeApply'); if (ap) ap.onclick = hmLoad;
 
-  // единственные точки входа тепловой карты сотрудников (делегаты наверху файла зовут их)
-  window.__hmEmpLoad = function(){ if(!HM.data) buildFilters(); hmLoad(); };
+  function hmInitDefaults(){
+    var fromEl = document.getElementById('hmeFrom');
+    var toEl = document.getElementById('hmeTo');
+    if (!fromEl || !toEl) return;
+    if (!fromEl.value || !toEl.value){
+      var today = new Date();
+      var dow = (today.getDay() + 6) % 7;
+      var mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
+      var sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+      fromEl.value = mon.getFullYear() + '-' + String(mon.getMonth()+1).padStart(2,'0') + '-' + String(mon.getDate()).padStart(2,'0');
+      toEl.value = sun.getFullYear() + '-' + String(sun.getMonth()+1).padStart(2,'0') + '-' + String(sun.getDate()).padStart(2,'0');
+    }
+    HM.mode = 'week';
+    document.querySelectorAll('#hmeMode button').forEach(function(x){ x.classList.toggle('active', x.getAttribute('data-m') === 'week'); });
+  }
+
+  // единственные точки входа тепловой карты нагрузки (делегаты наверху файла зовут их)
+  window.__hmEmpLoad = function(){ if(!HM.data) buildFilters(); hmInitDefaults(); hmLoad(); };
   window.__hmEmpRender = function(){ hmRender(); };
   /* PATCH hm-emp: автозапуск, если вкладка тепловой карты уже активна при загрузке */
   function hmBootIfActive(){
@@ -18238,6 +18254,7 @@ setTimeout(buildGanttTab, 1500);
       }
     }
   }
+  window.__trkVacTabV3Activate = activate;
 
 function renderBanks(){
   var sb = document.getElementById('vacBanksList'); if(!sb) return;
@@ -19955,6 +19972,11 @@ function renderBankStatsPanel(bank){
 if (window.__trkNestedTabsV20261102) return;
 window.__trkNestedTabsV20261102 = true;
 
+window.loadVacationTab = window.loadVacationTab || function(){
+    if (window.__trkVacTabV3Activate) { try { window.__trkVacTabV3Activate(); } catch(e){} }
+};
+window.loadDicts = window.loadDicts || function(){};
+
 function setActiveTab(tab){
     var employeeTabs = { heatmap:true, vacations:true, dicts:true };
     document.querySelectorAll('.tracker-panel').forEach(function(p){
@@ -19968,6 +19990,7 @@ function setActiveTab(tab){
     if (empBtn) empBtn.classList.toggle('active', !!employeeTabs[tab]);
     try { localStorage.setItem('tracker_activeTab', tab); } catch(e){}
     if (tab === 'heatmap' && typeof window.loadHeatmap === 'function') { try { window.loadHeatmap(); } catch(e){} }
+    if (tab === 'heatmap' && typeof window.__hmEmpLoad === 'function') { try { window.__hmEmpLoad(); } catch(e){} }
     if (tab === 'vacations' && typeof window.loadVacationTab === 'function') { try { window.loadVacationTab(); } catch(e){} }
     if (tab === 'dicts' && typeof window.loadDicts === 'function') { try { window.loadDicts(); } catch(e){} }
     if (tab === 'dashboards' && window.__dashRender && typeof window.__dashRender.activate === 'function') {

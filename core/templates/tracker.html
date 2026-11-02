@@ -63,7 +63,7 @@
                 <span>👥</span><span>Сотрудники</span><span class="tab-menu-arrow">▾</span>
             </button>
             <div class="tracker-tab-dropdown" id="employeesTabDropdown">
-                {% if P.get('tab.heatmap') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="heatmap"><span>🔥</span><span>Тепловая карта сотрудников</span></button>{% endif %}
+                {% if P.get('tab.heatmap') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="heatmap"><span>🔥</span><span>Тепловая карта нагрузки</span></button>{% endif %}
                 {% if P.get('tab.vacations') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="vacations"><span>🌞</span><span>Отсутствия</span></button>{% endif %}
                 {% if P.get('tab.dicts') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="dicts"><span>⚙️</span><span>Справочники</span></button>{% endif %}
             </div>
@@ -120,7 +120,7 @@
     <div class="tracker-panel{% if AT == 'calendar' %} active{% endif %}" id="panel-calendar">
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
-            <button class="dict-add-btn" id="openDashboardsInlineBtn" type="button">📊 Дашборды</button>
+            <button class="plan-dashboards-btn" id="openDashboardsInlineBtn" type="button"><span class="plan-dashboards-icon">✓</span><span class="plan-dashboards-text"><span class="plan-dashboards-title">Дашборды</span></span></button>
             <div class="export-menu-wrap" style="position:relative;display:inline-block;">
                 <button class="dict-add-btn" id="exportMenuBtn" style="background:linear-gradient(135deg,#27ae60,#229954);">📥 Экспорт ▾</button>
                 <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
@@ -264,7 +264,7 @@
             </div>
             <button class="btn btn-primary" id="hmeApply">✓ Применить</button>
         </div>
-        <div class="hm-table-wrap" id="hmeWrap"><div class="sum-empty">Нажмите «Применить» или выберите вкладку.</div></div>
+        <div class="hm-table-wrap" id="hmeWrap"><div class="sum-empty">Загрузка...</div></div>
     </div>
     {% endif %}
     <!-- ============================== СВОД ============================== -->
