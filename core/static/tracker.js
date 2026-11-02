@@ -19894,10 +19894,11 @@ function renderBankStatsPanel(bank){
     function renderDashboardsLayout(){
         var panel = byId('panel-dashboards');
         if (!panel) return;
-        var selector = byId('dashSelectorRow');
+        var toolbar = byId('dashToolbar') || panel.querySelector('.dash-toolbar');
+        var selector = byId('dashSelectorRow') || panel.querySelector('.dash-topbar');
         var gantt = byId('dashGanttContainer');
         var load = byId('dashLoadContainer');
-        if (!selector || !gantt || !load) return;
+        if (!gantt || !load) return;
 
         var split = panel.querySelector('.dash-split-wrap');
         if (!split) return;
@@ -19906,7 +19907,16 @@ function renderBankStatsPanel(bank){
         var sidePane = split.querySelector('.dash-side-pane');
         if (!mainPane || !sidePane) return;
 
-        if (selector.parentNode !== mainPane) mainPane.insertBefore(selector, mainPane.firstChild || null);
+        if (toolbar && toolbar.parentNode !== mainPane) {
+            mainPane.insertBefore(toolbar, mainPane.firstChild || null);
+        }
+        if (selector && selector.parentNode !== mainPane) {
+            if (toolbar && toolbar.parentNode === mainPane) {
+                mainPane.insertBefore(selector, toolbar.nextSibling || null);
+            } else {
+                mainPane.insertBefore(selector, mainPane.firstChild || null);
+            }
+        }
         if (gantt.parentNode !== mainPane) mainPane.appendChild(gantt);
         if (load.parentNode !== sidePane) sidePane.appendChild(load);
     }

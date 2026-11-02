@@ -10037,6 +10037,12 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 
 /* ============================== DASHBOARDS ============================== */
 .dash-wrap{padding:20px;display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box}
+#panel-dashboards .dash-wrap.dash-split-wrap{display:grid!important;grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)!important;gap:16px!important;align-items:start!important;flex-direction:row!important}
+#panel-dashboards .dash-main-pane,#panel-dashboards .dash-side-pane{width:100%!important;min-width:0!important;max-width:100%!important;display:flex!important;flex-direction:column!important;gap:12px!important;box-sizing:border-box!important}
+#panel-dashboards .dash-main-pane .dash-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;margin:0!important;box-sizing:border-box!important}
+#panel-dashboards .dash-main-pane .dash-topbar{display:flex!important;flex-wrap:wrap!important;gap:12px!important;align-items:flex-end!important;width:100%!important}
+#panel-dashboards .dash-main-pane .dash-field-task{flex:1 1 260px!important}
+#panel-dashboards .dash-main-pane .dash-field{flex:0 1 auto}
 .dash-toolbar{align-items:center}
 .dash-toolbar-right{margin-left:auto;display:flex;justify-content:flex-end}
 .dash-save-btn{background:#22c55e!important;color:#fff!important}

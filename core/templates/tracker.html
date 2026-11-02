@@ -69,15 +69,15 @@
 
     <!-- ============================== ДАШБОРДЫ ============================== -->
     <div class="tracker-panel{% if AT == 'dashboards' %} active{% endif %}" id="panel-dashboards">
-        <div class="plan-toolbar dash-toolbar">
-            <div class="plan-title">📊 Песочница планирования</div>
-            <div class="dash-toolbar-right">
-                <button class="btn dash-save-btn" id="dashSaveBtn">Сохранить изменения</button>
-            </div>
-        </div>
         <div class="dash-wrap dash-split-wrap">
             <div class="dash-main-pane">
-                <div class="dash-topbar">
+                <div class="plan-toolbar dash-toolbar" id="dashToolbar">
+                    <div class="plan-title">📊 Песочница планирования</div>
+                    <div class="dash-toolbar-right">
+                        <button class="btn dash-save-btn" id="dashSaveBtn">Сохранить изменения</button>
+                    </div>
+                </div>
+                <div class="dash-topbar" id="dashSelectorRow">
                     <div class="dash-field dash-field-task">
                         <label class="dash-label" for="dashTaskSelector">Проверка</label>
                         <div class="dash-task-row">
