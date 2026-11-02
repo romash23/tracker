@@ -57,14 +57,19 @@
     <div class="tracker-tabs">
         {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>📋</span><span>Задачи</span></button>{% endif %}
-        {# PATCH: «План проверок» вставляется сюда JS-ом buildGanttTab() — между «Задачи» и «Тепловая карта» #}
-        {% if P.get('tab.heatmap') %}<button class="tracker-tab{% if AT == 'heatmap' %} active{% endif %}" data-tab="heatmap"><span>🔥</span><span>Тепловая карта сотрудников</span></button>{% endif %}
-        {# PATCH DASHBOARDS: Вкладка песочницы #}
-        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'dashboards' %} active{% endif %}" data-tab="dashboards" id="tabDashboardsBtn"><span>📊</span><span>Дашборды</span></button>{% endif %}
-
+        {# PATCH: «План проверок» вставляется сюда JS-ом buildGanttTab() — между «Задачи» и «Сотрудники» #}
+        <div class="tracker-tab-menu" id="employeesTabMenu">
+            <button class="tracker-tab{% if AT in ['heatmap','vacations','dicts'] %} active{% endif %}" type="button" id="employeesTabBtn" data-menu="employees">
+                <span>👥</span><span>Сотрудники</span><span class="tab-menu-arrow">▾</span>
+            </button>
+            <div class="tracker-tab-dropdown" id="employeesTabDropdown">
+                {% if P.get('tab.heatmap') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="heatmap"><span>🔥</span><span>Тепловая карта сотрудников</span></button>{% endif %}
+                {% if P.get('tab.vacations') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="vacations"><span>🌞</span><span>Отсутствия</span></button>{% endif %}
+                {% if P.get('tab.dicts') %}<button class="tracker-tab-drop-item" type="button" data-target-tab="dicts"><span>⚙️</span><span>Справочники</span></button>{% endif %}
+            </div>
+        </div>
         {# PATCH: кнопка «Свод» убрана из верхнего ряда — теперь пункт меню «Статистика» (панель #panel-summary остаётся в DOM). #}
         {% if P.get('tab.stats') %}<button class="tracker-tab{% if AT == 'stats' %} active{% endif %}" data-tab="stats"><span>📈</span><span>Статистика</span></button>{% endif %}
-        {% if P.get('tab.dicts') %}<button class="tracker-tab{% if AT == 'dicts' %} active{% endif %}" data-tab="dicts"><span>⚙️</span><span>Справочники</span></button>{% endif %}
     </div>
 
     <!-- ============================== ДАШБОРДЫ ============================== -->
@@ -115,6 +120,7 @@
     <div class="tracker-panel{% if AT == 'calendar' %} active{% endif %}" id="panel-calendar">
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
+            <button class="dict-add-btn" id="openDashboardsInlineBtn" type="button">📊 Дашборды</button>
             <div class="export-menu-wrap" style="position:relative;display:inline-block;">
                 <button class="dict-add-btn" id="exportMenuBtn" style="background:linear-gradient(135deg,#27ae60,#229954);">📥 Экспорт ▾</button>
                 <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">

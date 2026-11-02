@@ -18818,25 +18818,13 @@ function renderBankStatsPanel(bank){
         return isFinite(n) && n > 0 ? (n / 100.0) : 1.0;
     }
 
-    function ensureDashboardsTab(){
-        var tabs = document.querySelector('.tracker-tabs');
-        if (!tabs) return;
-        if (!tabs.querySelector('[data-tab="dashboards"]')) {
-            var anchor = tabs.querySelector('.tracker-tab[data-tab="stats"]');
-            var btn = document.createElement('button');
-            btn.className = 'tracker-tab';
-            btn.setAttribute('data-tab', 'dashboards');
-            btn.id = 'tabDashboardsBtn';
-            btn.innerHTML = '<span>📊</span><span>Дашборды</span>';
-            if (anchor && anchor.parentNode === tabs) tabs.insertBefore(btn, anchor);
-            else tabs.appendChild(btn);
-        }
-    }
+    function ensureDashboardsTab(){ return null; }
     function activateDashboardsTab(){
-        ensureDashboardsTab();
         document.querySelectorAll('.tracker-tab').forEach(function(t){
-            t.classList.toggle('active', t.getAttribute('data-tab') === 'dashboards');
+            t.classList.remove('active');
         });
+        var calendarTab = document.querySelector('.tracker-tab[data-tab="calendar"]');
+        if (calendarTab) calendarTab.classList.add('active');
         document.querySelectorAll('.tracker-panel').forEach(function(p){
             p.classList.toggle('active', p.id === 'panel-dashboards');
         });
@@ -19956,4 +19944,67 @@ function renderBankStatsPanel(bank){
             }, 40);
         }
     });
+})();
+
+
+/* ============================================================
+   PATCH 2026-11-02 — nesting tabs: Employees menu + inline dashboards
+   ============================================================ */
+(function(){
+'use strict';
+if (window.__trkNestedTabsV20261102) return;
+window.__trkNestedTabsV20261102 = true;
+
+function setActiveTab(tab){
+    var employeeTabs = { heatmap:true, vacations:true, dicts:true };
+    document.querySelectorAll('.tracker-panel').forEach(function(p){
+        p.classList.toggle('active', p.id === 'panel-' + tab);
+    });
+    document.querySelectorAll('.tracker-tab').forEach(function(btn){
+        var btab = btn.getAttribute('data-tab') || '';
+        btn.classList.toggle('active', btab === tab);
+    });
+    var empBtn = document.getElementById('employeesTabBtn');
+    if (empBtn) empBtn.classList.toggle('active', !!employeeTabs[tab]);
+    try { localStorage.setItem('tracker_activeTab', tab); } catch(e){}
+    if (tab === 'heatmap' && typeof window.loadHeatmap === 'function') { try { window.loadHeatmap(); } catch(e){} }
+    if (tab === 'vacations' && typeof window.loadVacationTab === 'function') { try { window.loadVacationTab(); } catch(e){} }
+    if (tab === 'dicts' && typeof window.loadDicts === 'function') { try { window.loadDicts(); } catch(e){} }
+    if (tab === 'dashboards' && window.__dashRender && typeof window.__dashRender.activate === 'function') {
+        try { window.__dashRender.activate(); } catch(e){}
+    }
+}
+
+function closeEmployeesMenu(){
+    var wrap = document.getElementById('employeesTabMenu');
+    if (wrap) wrap.classList.remove('open');
+}
+
+document.addEventListener('click', function(e){
+    var menuBtn = e.target && e.target.closest ? e.target.closest('#employeesTabBtn') : null;
+    if (menuBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        var wrap = document.getElementById('employeesTabMenu');
+        if (wrap) wrap.classList.toggle('open');
+        return;
+    }
+    var menuItem = e.target && e.target.closest ? e.target.closest('#employeesTabDropdown [data-target-tab]') : null;
+    if (menuItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveTab(menuItem.getAttribute('data-target-tab') || 'heatmap');
+        closeEmployeesMenu();
+        return;
+    }
+    if (!e.target || !e.target.closest || !e.target.closest('#employeesTabMenu')) closeEmployeesMenu();
+}, true);
+
+document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest ? e.target.closest('#openDashboardsInlineBtn') : null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveTab('dashboards');
+}, true);
 })();

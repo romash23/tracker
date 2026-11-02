@@ -10289,3 +10289,46 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 #dashCreateTaskBtn { padding: 4px 12px !important; font-size: 0.8rem !important; border-radius: 999px !important; }
 #dashTaskSelector { padding: 4px 12px !important; font-size: 0.8rem !important; border-radius: 999px !important; }
 .dash-save-btn { padding: 6px 16px !important; font-size: 0.85rem !important; border-radius: 999px !important; }
+
+
+/* PATCH 2026-11-02 — nested employees menu */
+.tracker-tab-menu {
+    position: relative;
+    display: inline-flex;
+}
+.tracker-tab-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 260px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    background: var(--trk-panel-bg);
+    border: 1px solid var(--trk-card-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+    z-index: 60;
+}
+.tracker-tab-menu.open .tracker-tab-dropdown { display: flex; }
+.tracker-tab-drop-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--trk-text);
+    padding: 10px 12px;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+.tracker-tab-drop-item:hover {
+    background: var(--trk-filter-active-bg);
+    border-color: var(--trk-filter-active);
+    color: var(--trk-filter-active);
+}
+#openDashboardsInlineBtn { background: transparent; }
