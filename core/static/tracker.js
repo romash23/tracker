@@ -19599,7 +19599,7 @@ function renderBankStatsPanel(bank){
         var drafts = dashDraftsForLoad();
         var depMap = {};
         drafts.forEach(function(d){ ((d && d.department_ids) || []).forEach(function(id){ depMap[id] = 1; }); });
-        var shownDeps = Object.keys(depMap).length ? allDeps.filter(function(d){ return depMap[d.id]; }) : allDeps;
+        var shownDeps = allDeps.slice();
         var offsets = dashLoadOffsets();
         var slotGroups = offsets.map(function(off){ return { offset: off, slots: dashSlots(off) }; });
 
@@ -19670,8 +19670,8 @@ function renderBankStatsPanel(bank){
         box.innerHTML = ''
             + '<div class="dash-load-head">'
                 + '<div>'
-                    + '<div class="dash-load-title">Нагрузка на ТБ (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'large' ? 'по дням' : 'по неделям') + ')</div>'
-                    + '<div class="dash-load-sub">Гистограммы синхронизированы с общим ползунком и всеми открытыми черновиками. Тонкая вертикальная линия показывает текущий день.</div>'
+                    + '<div class="dash-load-title">Гистограммы по всем банкам (' + escapeHtml(DASH_DIR_LABEL[stateDash.dir]) + ' направление · ' + (stateDash.mode === 'large' ? 'по дням' : 'по неделям') + ')</div>'
+                    + '<div class="dash-load-sub">Справа всегда показаны все банки справочника. Бейджи «Участвует» и «Руководитель» отмечают банки из открытых черновиков. Тонкая вертикальная линия показывает текущий день.</div>'
                 + '</div>'
             + '</div>'
             + '<div class="dash-bank-grid">' + cards + '</div>';

@@ -167,7 +167,49 @@ body.login-body {
     box-shadow: var(--trk-shadow);
     min-height: 300px;
 }
-.tracker-panel.active { display: block; }
+ .tracker-panel.active { display: block; }
+
+.tracker-container {
+    zoom: 0.85;
+}
+@supports not (zoom: 1) {
+    .tracker-container {
+        transform: scale(0.85);
+        transform-origin: top left;
+        width: 117.6471%;
+    }
+}
+
+.dash-split-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 0.9fr);
+    gap: 14px;
+    align-items: start;
+}
+.dash-main-pane,
+.dash-side-pane {
+    min-width: 0;
+}
+.dash-main-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.dash-side-pane {
+    position: sticky;
+    top: 12px;
+}
+.dash-side-pane .dash-load-container {
+    margin-top: 0;
+}
+@media (max-width: 1480px) {
+    .dash-split-wrap {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .dash-side-pane {
+        position: static;
+    }
+}
 
 .segmented {
     display: inline-flex; background: var(--trk-hover-row);

@@ -75,34 +75,38 @@
                 <button class="btn dash-save-btn" id="dashSaveBtn">Сохранить изменения</button>
             </div>
         </div>
-        <div class="dash-wrap">
-            <div class="dash-topbar">
-                <div class="dash-field dash-field-task">
-                    <label class="dash-label" for="dashTaskSelector">Проверка</label>
-                    <div class="dash-task-row">
-                        <select id="dashTaskSelector" class="form-control"></select>
-                        <button class="btn btn-secondary" id="dashCreateTaskBtn" type="button">+ Создать проверку</button>
+        <div class="dash-wrap dash-split-wrap">
+            <div class="dash-main-pane">
+                <div class="dash-topbar">
+                    <div class="dash-field dash-field-task">
+                        <label class="dash-label" for="dashTaskSelector">Проверка</label>
+                        <div class="dash-task-row">
+                            <select id="dashTaskSelector" class="form-control"></select>
+                            <button class="btn btn-secondary" id="dashCreateTaskBtn" type="button">+ Создать проверку</button>
+                        </div>
+                    </div>
+                    <div class="dash-field">
+                        <label class="dash-label">Направление</label>
+                        <div class="btn-seg" id="dashDirSwitch">
+                            <button class="btn-seg-btn active" type="button" data-dir="all">Все</button>
+                            <button class="btn-seg-btn" type="button" data-dir="corp">Корп</button>
+                            <button class="btn-seg-btn" type="button" data-dir="retail">Розн</button>
+                        </div>
+                    </div>
+                    <div class="dash-field">
+                        <label class="dash-label">Масштаб</label>
+                        <div class="btn-seg" id="dashModeSwitch">
+                            <button class="btn-seg-btn" type="button" data-mode="small">Малый (12м)</button>
+                            <button class="btn-seg-btn active" type="button" data-mode="medium">Средний (6м)</button>
+                            <button class="btn-seg-btn" type="button" data-mode="large">Крупный (3м)</button>
+                        </div>
                     </div>
                 </div>
-                <div class="dash-field">
-                    <label class="dash-label">Направление</label>
-                    <div class="btn-seg" id="dashDirSwitch">
-                        <button class="btn-seg-btn active" type="button" data-dir="all">Все</button>
-                        <button class="btn-seg-btn" type="button" data-dir="corp">Корп</button>
-                        <button class="btn-seg-btn" type="button" data-dir="retail">Розн</button>
-                    </div>
-                </div>
-                <div class="dash-field">
-                    <label class="dash-label">Масштаб</label>
-                    <div class="btn-seg" id="dashModeSwitch">
-                        <button class="btn-seg-btn" type="button" data-mode="small">Малый (12м)</button>
-                        <button class="btn-seg-btn active" type="button" data-mode="medium">Средний (6м)</button>
-                        <button class="btn-seg-btn" type="button" data-mode="large">Крупный (3м)</button>
-                    </div>
-                </div>
+                <div id="dashGanttContainer" class="dash-gantt-container"></div>
             </div>
-            <div id="dashGanttContainer" class="dash-gantt-container"></div>
-            <div id="dashLoadContainer" class="dash-load-container"></div>
+            <aside class="dash-side-pane">
+                <div id="dashLoadContainer" class="dash-load-container"></div>
+            </aside>
         </div>
     </div>
 
