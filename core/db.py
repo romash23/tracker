@@ -372,6 +372,7 @@ class TrackerDB:
             # Этапы: собираем производный объект stages из колонок stage_*_start.
             # Конец этапа = начало следующего НЕПУСТОГО этапа - 1 день;
             # у последнего заполненного этапа конец = deadline задачи (если задан).
+            t['curator'] = t.get('curator') or ''
             t['stages'] = _compute_task_stages(t)
 
         if since:
@@ -557,6 +558,7 @@ class TrackerDB:
                     % ', '.join(TASK_TYPES))
             _load_coef = 0.0
         _pocket = str(payload.get('pocket') or '').strip()
+        _curator = str(payload.get('curator') or '').strip()
         # Руководитель проверки: банк (обязателен на уровне API) + сотрудник (опц.)
         _lead_dep = str(payload.get('lead_department') or '').strip()
         _lead_emp = str(payload.get('lead_employee') or '').strip()
@@ -568,12 +570,12 @@ class TrackerDB:
                 tx.exec(
                     'UPDATE tasks SET name=?, icon=?, description=?, status=?, start_date=?, '
                     'deadline=?, completed_at=?, folder=?, order_ref=?, is_urgent=?, links_json=?, orders_json=?, '
-                    'task_type=?, pocket=?, task_kind=?, load_coef=?, lead_department=?, lead_employee=?, ' + _stage_set + ' WHERE id=?',
+                    'task_type=?, pocket=?, curator=?, task_kind=?, load_coef=?, lead_department=?, lead_employee=?, ' + _stage_set + ' WHERE id=?',
                     (payload['name'], payload['icon'], payload['description'], payload['status'],
                      payload['start_date'], payload['deadline'], payload['completed_at'],
                      payload['folder'], payload['order_ref'],
                      1 if payload.get('is_urgent') else 0, _links_json, _orders_json,
-                     _task_type, _pocket, _task_kind, _load_coef, _lead_dep, _lead_emp, *_stage_vals, task_id))
+                     _task_type, _pocket, _curator, _task_kind, _load_coef, _lead_dep, _lead_emp, *_stage_vals, task_id))
                 created = False
             else:
                 _links_json = json.dumps(payload.get('links') or [], ensure_ascii=False)
@@ -583,13 +585,13 @@ class TrackerDB:
                 tx.exec(
                     'INSERT INTO tasks (id,name,icon,description,status,start_date,deadline,'
                     'completed_at,folder,order_ref,is_urgent,links_json,orders_json,'
-                    'task_type,pocket,task_kind,load_coef,lead_department,lead_employee,' + _stage_cols_sql + ',created_at) '
-                    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,' + _stage_ph + ',?)',
+                    'task_type,pocket,curator,task_kind,load_coef,lead_department,lead_employee,' + _stage_cols_sql + ',created_at) '
+                    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,' + _stage_ph + ',?)',
                     (task_id, payload['name'], payload['icon'], payload['description'],
                      payload['status'], payload['start_date'], payload['deadline'],
                      payload['completed_at'], payload['folder'], payload['order_ref'],
                      1 if payload.get('is_urgent') else 0, _links_json, _orders_json,
-                     _task_type, _pocket, _task_kind, _load_coef, _lead_dep, _lead_emp, *_stage_vals,
+                     _task_type, _pocket, _curator, _task_kind, _load_coef, _lead_dep, _lead_emp, *_stage_vals,
                      payload['created_at']))
                 created = True
             tx.exec('DELETE FROM task_tags WHERE task_id=?', (task_id,))

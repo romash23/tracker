@@ -10350,3 +10350,42 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
     transform: scale(1.05);
 }
 .plan-dashboards-btn:active { transform:scale(0.98); }
+
+/* Новые статусы проверок и куратор ЦА */
+.task-card-badge.status-planning {
+    background: rgba(59, 130, 246, 0.14);
+    color: #2563eb;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.task-card-badge.status-approved {
+    background: rgba(139, 92, 246, 0.14);
+    color: #7c3aed;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+.task-card-badge.status-active {
+    background: rgba(16, 185, 129, 0.14);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.task-card-badge.status-done {
+    background: rgba(34, 197, 94, 0.16);
+    color: #15803d;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+.task-card-badge.status-cancelled {
+    background: rgba(107, 114, 128, 0.16);
+    color: #4b5563;
+    border: 1px solid rgba(107, 114, 128, 0.35);
+}
+.badge.badge-curator {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    font-weight: 600;
+}
+#taskModal #taskDescFolderRow {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+}

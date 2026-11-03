@@ -39,26 +39,24 @@
             row3.classList.add('task-row-4col');
         }
 
-        if (gDesc && gTags) {
-            var oldTagsRow = gTags.closest('.form-row');
-            var w1 = document.createElement('div');
-            w1.className = 'form-row task-row-2';
-            gDesc.parentNode.insertBefore(w1, gDesc);
-            w1.appendChild(gDesc);
-            w1.appendChild(gTags);
-            if (oldTagsRow && oldTagsRow.parentNode &&
-                oldTagsRow.parentNode === content &&
-                oldTagsRow.children.length === 0) {
-                oldTagsRow.parentNode.removeChild(oldTagsRow);
-            }
+        if (gTags) {
+            gTags.style.display = 'none';
         }
 
-        if (gFolder && gOrder && gFolder.parentNode === content) {
-            var w2 = document.createElement('div');
-            w2.className = 'form-row task-row-2';
-            gFolder.parentNode.insertBefore(w2, gFolder);
-            w2.appendChild(gFolder);
-            w2.appendChild(gOrder);
+        if (gDesc && gFolder) {
+            var existingRow = document.getElementById('taskDescFolderRow') || gDesc.closest('.task-row-2');
+            if (!existingRow) {
+                var w1 = document.createElement('div');
+                w1.className = 'form-row task-row-2';
+                w1.id = 'taskDescFolderRow';
+                gDesc.parentNode.insertBefore(w1, gDesc);
+                w1.appendChild(gDesc);
+                w1.appendChild(gFolder);
+            } else {
+                existingRow.classList.add('form-row', 'task-row-2');
+                if (gDesc.parentNode !== existingRow) existingRow.appendChild(gDesc);
+                if (gFolder.parentNode !== existingRow) existingRow.appendChild(gFolder);
+            }
         }
 
         if (gDepts && gAssignees && gDepts.parentNode === content) {

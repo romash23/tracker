@@ -1103,6 +1103,9 @@ def create_app():
         if 'lead_employee' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN lead_employee TEXT DEFAULT ''")
             print('[INIT] tasks.lead_employee добавлено')
+        if 'curator' not in cols:
+            db.exec("ALTER TABLE tasks ADD COLUMN curator TEXT DEFAULT ''")
+            print('[INIT] tasks.curator добавлено')
     except Exception as _e:
         print(f'[INIT] migration task lead: {_e}')
     # PATCH v1.0.4 — миграция: JSON-поля в work_logs
@@ -1190,11 +1193,11 @@ def create_app():
 
     def _first_available_tab():
         u = current_user(db)
-        for k in ('tab.calendar', 'tab.tasks', 'tab.heatmap', 'tab.summary',
+        for k in ('tab.tasks', 'tab.calendar', 'tab.heatmap', 'tab.summary',
                   'tab.stats', 'tab.dicts'):
             if user_has(db, u, k):
                 return k.split('.', 1)[1]
-        return 'calendar'
+        return 'tasks'
 
     @app.route('/login', methods=['GET', 'POST'])
     def login_page():
@@ -1496,6 +1499,8 @@ def create_app():
             headcount = int(round(_total))
         if not name:
             return jsonify({'success': False, 'error': 'Название обязательно'}), 400
+        if curator not in ('Куратор1', 'Куратор2', 'Куратор3', 'нет'):
+            return jsonify({'success': False, 'error': 'Укажите ответственного (куратора ЦА)'}), 400
         u = current_user(db)
         need = 'action.department.edit' if dep_id else 'action.department.create'
         if not user_has(db, u, need):
@@ -1626,6 +1631,7 @@ def create_app():
         if task_type not in _TASK_TYPES:
             task_type = ''
         pocket = str(body.get('pocket', '')).strip()[:200]
+        curator = str(body.get('curator', '')).strip()[:100]
         # Вид задачи: 'audit' (аудиторская проверка) | 'other' (другое) + коэф. нагрузки
         task_kind = str(body.get('task_kind', 'audit')).strip()
         if task_kind not in ('audit', 'other'):
@@ -1879,6 +1885,7 @@ def create_app():
                 'orders': orders,
                 'task_type': task_type,
                 'pocket': pocket,
+                'curator': curator,
                 'task_kind': task_kind,
                 'load_coef': load_coef,
                 'lead_department': lead_department,

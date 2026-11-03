@@ -190,3 +190,28 @@
     white-space: normal !important;
     word-break: break-word !important;
 }
+
+/* Описание (слева 50%) и Дополнительные данные (справа 50%) одинакового размера */
+#taskModal #taskDescFolderRow,
+#taskModal .form-row.task-row-2 {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+}
+#taskModal #taskDescFolderRow > .form-group {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    margin-bottom: 0 !important;
+}
+#taskModal #task_description,
+#taskModal #task_folder {
+    width: 100% !important;
+    min-height: 88px !important;
+    height: 88px !important;
+    box-sizing: border-box !important;
+    resize: vertical !important;
+}

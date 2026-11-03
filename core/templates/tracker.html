@@ -55,9 +55,10 @@
         </div>
     </div>
     <div class="tracker-tabs">
-        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>📋</span><span>Задачи</span></button>{% endif %}
-        {# PATCH: «План проверок» вставляется сюда JS-ом buildGanttTab() — между «Задачи» и «Сотрудники» #}
+        {# PATCH: «Текущие проверки» вставляется сюда JS-ом buildGanttTab() — сразу после «Задачи» (второй вкладкой) #}
+        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
+        {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'completed' %} active{% endif %}" data-tab="completed"><span>✅</span><span>Завершенные</span></button>{% endif %}
         <div class="tracker-tab-menu" id="employeesTabMenu">
             <button class="tracker-tab{% if AT in ['heatmap','vacations','dicts'] %} active{% endif %}" type="button" id="employeesTabBtn" data-menu="employees">
                 <span>👥</span><span>Сотрудники</span><span class="tab-menu-arrow">▾</span>
@@ -150,19 +151,19 @@
     {% if P.get('tab.tasks') %}
     <div class="tracker-panel{% if AT == 'tasks' %} active{% endif %}" id="panel-tasks">
         <div class="sum-toolbar">
-            <label class="sum-filter" title="Отдел"><span>🏢</span>
-                <select id="tskDeptFilter"><option value="">Отделы</option></select>
+            <label class="sum-filter" title="Банк"><span>🏢</span>
+                <select id="tskDeptFilter"><option value="">Банки</option></select>
             </label>
-            <label class="sum-filter" title="Команда"><span>👥</span>
-                <select id="tskTeamFilter"><option value="">Команды</option></select>
+            <label class="sum-filter" title="Куратор ЦА"><span>👤</span>
+                <select id="tskCuratorFilter">
+                    <option value="">Куратор ЦА</option>
+                    <option value="Куратор1">Куратор1</option>
+                    <option value="Куратор2">Куратор2</option>
+                    <option value="Куратор3">Куратор3</option>
+                    <option value="нет">нет</option>
+                </select>
             </label>
-            <label class="sum-filter" title="Сотрудник"><span>👤</span>
-                <select id="tskEmployeeFilter"><option value="">Сотрудники</option></select>
-            </label>
-            <label class="sum-filter" title="Тег"><span>🏷</span>
-                <select id="tskTagFilter" class="tag-filter-select"><option value="">Все теги</option></select>
-            </label>
-            <label class="sum-filter tsk-search-wrap" title="Поиск по названию, описанию, приказу, папке и тегам">
+            <label class="sum-filter tsk-search-wrap" title="Поиск по названию, описанию, приказу и доп. данным">
                 <span>🔍</span>
                 <input type="text" id="tskSearchInput" placeholder="Поиск…" autocomplete="off">
                 <button type="button" class="tsk-search-clear" id="tskSearchClear" title="Очистить (Esc)" style="display:none;">×</button>
@@ -197,17 +198,44 @@
             </label>
             <div class="segmented" id="tskViewMode" style="margin-left:auto;">
                 <button class="active" data-mode="all">Все</button>
-                <button data-mode="active">Активные</button>
-                <button data-mode="overdue">Просроченные</button>
-                <button data-mode="attention">🚨 Проблемные</button>
-                <button data-mode="done">Выполненные</button>
-                <button data-mode="archived">Архив</button>
+                <button data-mode="planning">Планирование</button>
+                <button data-mode="approved">Утверждена</button>
+                <button data-mode="active">Активна</button>
+                <button data-mode="done">Завершена</button>
+                <button data-mode="cancelled">Отменена</button>
             </div>
             {% if P.get('action.task.create') %}
             <button class="dict-add-btn" id="addTaskBtn2">➕ Новая</button>
             {% endif %}
         </div>
         <div class="tasks-grid" id="tasksFullList" data-cols="3"><div class="dict-empty">Загрузка...</div></div>
+    </div>
+    <!-- ============================== ЗАВЕРШЕННЫЕ ============================== -->
+    <div class="tracker-panel{% if AT == 'completed' %} active{% endif %}" id="panel-completed">
+        <div class="sum-toolbar">
+            <label class="sum-filter" title="Банк"><span>🏢</span>
+                <select id="cmpDeptFilter"><option value="">Банки</option></select>
+            </label>
+            <label class="sum-filter" title="Куратор ЦА"><span>👤</span>
+                <select id="cmpCuratorFilter">
+                    <option value="">Куратор ЦА</option>
+                    <option value="Куратор1">Куратор1</option>
+                    <option value="Куратор2">Куратор2</option>
+                    <option value="Куратор3">Куратор3</option>
+                    <option value="нет">нет</option>
+                </select>
+            </label>
+            <label class="sum-filter tsk-search-wrap" title="Поиск по завершенным проверкам и задачам">
+                <span>🔍</span>
+                <input type="text" id="cmpSearchInput" placeholder="Поиск…" autocomplete="off">
+            </label>
+            <div class="segmented" id="cmpViewMode" style="margin-left:auto;">
+                <button class="active" data-mode="all_completed">Все завершенные</button>
+                <button data-mode="done">Завершена</button>
+                <button data-mode="cancelled">Отменена</button>
+            </div>
+        </div>
+        <div class="tasks-grid" id="completedFullList" data-cols="3"><div class="dict-empty">Загрузка...</div></div>
     </div>
     {% endif %}
     <!-- ============================== HEATMAP ============================== -->
@@ -484,8 +512,10 @@
         </div>
         <div class="form-group"><label>Название *</label><input type="text" id="task_name" maxlength="200" autocomplete="off"><div class="task-dup-hint" id="taskDupHint" hidden></div></div>
     </div>
-    <div class="form-group tk-audit-only"><label>Описание</label><textarea id="task_description"></textarea></div>
-    <div class="form-group tk-audit-only"><label>📁 Дополнительные данные (по одной записи на строку)</label><textarea id="task_folder" rows="3" maxlength="2000"></textarea></div>
+    <div class="form-row task-row-2" id="taskDescFolderRow">
+        <div class="form-group"><label>Описание</label><textarea id="task_description" rows="4"></textarea></div>
+        <div class="form-group"><label>📁 Дополнительные данные (по одной записи на строку)</label><textarea id="task_folder" rows="4" maxlength="2000"></textarea></div>
+    </div>
     <div class="form-group" id="taskOrdersGroup">
         <label>📄 Приказы / распоряжения</label>
         <div id="taskOrdersList" class="task-links-list"></div>
@@ -510,6 +540,22 @@
         </div>
         <div class="form-group"><label>🚀 Начало</label><input type="date" id="task_start_date"></div>
         <div class="form-group"><label>⏰ Дедлайн</label><input type="date" id="task_deadline"></div>
+    </div>
+    <div class="form-row" id="taskCuratorCompletedRow">
+        <div class="form-group" id="taskCuratorGroup">
+            <label>👤 Ответственный (куратор ЦА) <span class="lead-req">*</span></label>
+            <select id="task_curator" required>
+                <option value="">— выберите куратора —</option>
+                <option value="Куратор1">Куратор1</option>
+                <option value="Куратор2">Куратор2</option>
+                <option value="Куратор3">Куратор3</option>
+                <option value="нет">нет</option>
+            </select>
+        </div>
+        <div class="form-group"><label>✅ Админ. завершение</label>
+            <input type="date" id="task_completed_at">
+            <div class="assignees-hint" id="taskCompletionHint"></div>
+        </div>
     </div>
     <div class="form-group tk-other-only" id="taskLoadCoefGroup">
         <label>⚖️ Коэффициент нагрузки <span class="lead-req">*</span></label>
@@ -541,23 +587,11 @@
         <button type="button" class="btn btn-secondary" id="taskLinkAddBtn" style="align-self:flex-start;margin-top:6px;padding:6px 14px;font-size:0.82rem;">➕ Добавить ссылку</button>
         <div class="assignees-hint">Внешние (http/https) открываются в новой вкладке. Локальные пути копируются в буфер по клику.</div>
     </div>
-    <div class="form-row">
-        <div class="form-group"><label>✅ Админ. завершение</label>
-            <input type="date" id="task_completed_at">
-            <div class="assignees-hint" id="taskCompletionHint"></div>
+    <div class="form-group" style="display:none !important;" aria-hidden="true">
+        <div class="tag-pills" id="taskTagsBox">
+            <input type="text" id="task_tags_input" maxlength="40" autocomplete="off">
         </div>
-        <div class="form-group">
-            <label>🏷️ Теги</label>
-            <div class="tag-pills" id="taskTagsBox">
-                <input type="text" id="task_tags_input" placeholder="Начните вводить и нажмите Enter…" maxlength="40" autocomplete="off">
-            </div>
-            <div class="tag-presets" id="tagPresets">
-                {% for preset in DEFAULT_TAG_PRESETS %}
-                <button type="button" class="tag-preset-btn" data-tag="{{ preset }}">#{{ preset }}</button>
-                {% endfor %}
-            </div>
-            <div class="assignees-hint">Enter — добавить. Backspace — удалить последний.</div>
-        </div>
+        <div class="tag-presets" id="tagPresets"></div>
     </div>
     <div class="form-group"><label>🏢 Отделы</label>
         <div class="dept-multi-list" id="taskDepartmentsList"></div>

@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   task_type TEXT DEFAULT '',
   -- Карман: свободный текст, редактируется админом
   pocket TEXT DEFAULT '',
+  -- Ответственный (куратор ЦА): 'Куратор1' | 'Куратор2' | 'Куратор3' | 'нет'
+  curator TEXT DEFAULT '',
   -- Вид задачи: 'audit' (аудиторская проверка, по умолчанию) | 'other' (другое)
   task_kind TEXT DEFAULT 'audit',
   -- Коэффициент нагрузки (обязателен только для task_kind='other')

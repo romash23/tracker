@@ -611,6 +611,7 @@ document.querySelectorAll('.tracker-tab').forEach(function(tab) {
         });
         try { localStorage.setItem('tracker_activeTab', id); } catch (e) {}
         if (id === 'tasks') renderTasksFull();
+        if (id === 'completed' && typeof renderCompletedFull === 'function') renderCompletedFull();
         if (id === 'heatmap') loadHeatmap();
         if (id === 'summary') loadSummary();
         if (id === 'stats') {
@@ -623,11 +624,6 @@ document.querySelectorAll('.tracker-tab').forEach(function(tab) {
 });
 (function restoreTab() {
     try {
-        var savedTab = localStorage.getItem('tracker_activeTab');
-        if (savedTab && savedTab !== 'calendar') {
-            var tabBtn = document.querySelector('.tracker-tab[data-tab="' + savedTab + '"]');
-            if (tabBtn) setTimeout(function() { tabBtn.click(); }, 50);
-        }
         var savedDept = localStorage.getItem('tracker_calDept');
         if (savedDept) state.currentDepartment = savedDept;
     } catch (e) {}
@@ -1098,6 +1094,7 @@ function taskCardRow(t) {
     }
     var db = _deptBadgesForTask(t);
     if (db) meta.push(db);
+    if (t.curator) meta.push('<span class="badge badge-curator">👤 ' + escapeHtml(t.curator) + '</span>');
     if (t.start_date) meta.push('🚀 ' + escapeHtml(t.start_date));
     if (t.deadline) meta.push('⏰ ' + escapeHtml(t.deadline));
     if (t.assignees && t.assignees.length) {
@@ -1107,7 +1104,7 @@ function taskCardRow(t) {
         }).slice(0, 3);
         meta.push('👥 ' + names.map(escapeHtml).join(', ') + (t.assignees.length > 3 ? ' +' + (t.assignees.length - 3) : ''));
     }
-    var tagsHtml = _tagChipsForTask(t);
+    var tagsHtml = '';
     var compBadge = _completionBadge(t);
     var canCard = hasPerm('tab.summary') || hasPerm('tab.stats');
     var canEdit = hasPerm('action.task.edit');
@@ -1236,21 +1233,26 @@ function taskCardRowGrid(t) {
         : '';
 
     var _urgBadge = t.is_urgent ? '<span class="task-card-badge urgent">🚨 Срочно</span>' : '';
-    var statusBadge = '';
-    if (t.overdue) {
-        statusBadge = '<span class="task-card-badge overdue"' + _autoTitle + _progTitle + '>⚠ Просрочено' + _autoSuffix + _progSuffix + '</span>' + _urgBadge;
-    } else if (t.status && t.status !== 'active') {
-        var slbl = state.taskStatusLabels[t.status] || t.status;
-        var _cls = 'task-card-badge status-' + escapeHtml(t.status)
-            + (_autoClosed ? ' auto-closed' : '');
-        statusBadge = '<span class="' + _cls + '"' + _autoTitle + _progTitle + '>' + escapeHtml(slbl) + _autoSuffix + _progSuffix + '</span>' + _urgBadge;
-    } else if (_prog && _prog.total > 1 && _prog.closed > 0) {
-        statusBadge = '<span class="task-card-badge status-active"' + _progTitle + '>🔵 В работе' + _progSuffix + '</span>' + _urgBadge;
-    } else if (t.is_urgent) {
-        statusBadge = _urgBadge;
+    var _stMap = {
+        planning: 'Планирование',
+        approved: 'Утверждена',
+        active: 'Активна',
+        done: 'Завершена',
+        cancelled: 'Отменена'
+    };
+    var _stVal = t.status || 'active';
+    var slbl = (state.taskStatusLabels && state.taskStatusLabels[_stVal]) || _stMap[_stVal] || _stVal;
+    var _cls = 'task-card-badge status-' + escapeHtml(_stVal) + (_autoClosed ? ' auto-closed' : '');
+    var statusBadge = '<span class="' + _cls + '"' + _autoTitle + _progTitle + '>' + escapeHtml(slbl) + _autoSuffix + _progSuffix + '</span>';
+    if (t.overdue && _stVal !== 'done' && _stVal !== 'cancelled') {
+        statusBadge = '<span class="task-card-badge overdue"' + _autoTitle + _progTitle + '>⚠ Просрочено</span>' + statusBadge;
     }
+    if (_urgBadge) statusBadge += _urgBadge;
 
     var deptBadges = _deptBadgesForTask(t);
+    if (t.curator) {
+        deptBadges = (deptBadges ? deptBadges + ' ' : '') + '<span class="badge badge-curator">👤 ' + escapeHtml(t.curator) + '</span>';
+    }
 
     var pct = progress();
     var progressHtml = '';
@@ -1276,14 +1278,6 @@ function taskCardRowGrid(t) {
     var cdHtml = cd ? '<span class="task-card-countdown ' + cd.kind + '">' + escapeHtml(cd.text) + '</span>' : '';
 
     var tagsHtml = '';
-    if (t.tags && t.tags.length) {
-        tagsHtml = '<div class="task-card-tags">'
-            + t.tags.slice(0, 4).map(function(x) {
-                return '<span class="task-tag-chip">#' + escapeHtml(x) + '</span>';
-            }).join('')
-            + (t.tags.length > 4 ? '<span class="task-tag-chip more">+' + (t.tags.length - 4) + '</span>' : '')
-            + '</div>';
-    }
 
     var assigneesHtml = '';
     if (t.assignees && t.assignees.length) {
@@ -1404,7 +1398,7 @@ function renderTasks() {
     var archList = $('tasksArchivedList'), archCnt = $('tasksArchivedCount');
     if (!list) {
         // PATCH 1.0.10: задач в справочниках больше нет — плитку всё равно перерисуем
-        try { renderTasksFull(); } catch (e) { console.error('[renderTasks]', e); }
+        try { renderTasksFull(); if (typeof renderCompletedFull === 'function') renderCompletedFull(); } catch (e) { console.error('[renderTasks]', e); }
         return;
     }
     var active = [], archived = [];
@@ -1452,40 +1446,30 @@ function renderTasksFull() {
         if (_savedCols >= 1 && _savedCols <= 5) state.tskGridCols = _savedCols;
     } catch (e) {}
     var dept = $('tskDeptFilter') ? ($('tskDeptFilter').value || '') : '';
-    var team = $('tskTeamFilter') ? ($('tskTeamFilter').value || '') : '';
-    var emp  = $('tskEmployeeFilter') ? ($('tskEmployeeFilter').value || '') : '';
-    var selectedTags = (window.__trkSelectedTags && window.__trkSelectedTags.tskTagFilter) || [];
+    var curator = $('tskCuratorFilter') ? ($('tskCuratorFilter').value || '') : '';
     var sort = $('tskSortSelect') ? ($('tskSortSelect').value || 'deadline_asc') : 'deadline_asc';
     var mode = state.tskViewMode || 'all';
 
     var tasks = state.tasks.slice();
     if (dept) tasks = tasks.filter(function(t) { return _taskMatchesDept(t, dept); });
-    if (team) tasks = tasks.filter(function(t) { return _taskMatchesTeam(t, team); });
-    if (emp)  tasks = tasks.filter(function(t) { return (t.assignees || []).indexOf(emp) !== -1; });
-    if (selectedTags.length) {
-        var tskMode = (window.__trkTagMode && window.__trkTagMode.tskTagFilter) || 'any';
+    if (curator) {
         tasks = tasks.filter(function(t) {
-            var tg = t.tags || [];
-            if (tskMode === 'all') {
-                return selectedTags.every(function(x) { return tg.indexOf(x) !== -1; });
-            }
-            return selectedTags.some(function(x) { return tg.indexOf(x) !== -1; });
+            var tc = (t.curator || 'нет');
+            return tc === curator;
         });
     }
 
-    if (mode === 'active') tasks = tasks.filter(function(t) { return t.status === 'active' && !t.overdue; });
-    else if (mode === 'overdue') tasks = tasks.filter(function(t) { return t.overdue; });
+    if (mode === 'planning') tasks = tasks.filter(function(t) { return t.status === 'planning'; });
+    else if (mode === 'approved') tasks = tasks.filter(function(t) { return t.status === 'approved'; });
+    else if (mode === 'active') tasks = tasks.filter(function(t) { return t.status === 'active'; });
     else if (mode === 'done') tasks = tasks.filter(function(t) { return t.status === 'done'; });
-    else if (mode === 'archived') tasks = tasks.filter(function(t) { return t.status === 'archived'; });
-    else if (mode === 'attention') {
-        var _ac = (typeof window.__trkAttentionCount === 'function') ? window.__trkAttentionCount() : { byId: {} };
-        tasks = tasks.filter(function(t) { return !!_ac.byId[t.id]; });
-    }
+    else if (mode === 'cancelled') tasks = tasks.filter(function(t) { return t.status === 'cancelled'; });
 
     function statusRank(t) {
-        if (t.status === 'archived') return 5;
+        if (t.status === 'cancelled') return 5;
         if (t.status === 'done') return 4;
-        if (t.status === 'paused') return 2;
+        if (t.status === 'planning') return 3;
+        if (t.status === 'approved') return 2;
         return 1;
     }
     tasks.sort(function(a, b) {
@@ -1571,6 +1555,42 @@ function renderTasksFull() {
     } catch (e) { console.error('[highlight]', e); }
 }
 
+function renderCompletedFull() {
+    var list = $('completedFullList'); if (!list) return;
+    var dept = $('cmpDeptFilter') ? ($('cmpDeptFilter').value || '') : '';
+    var curator = $('cmpCuratorFilter') ? ($('cmpCuratorFilter').value || '') : '';
+    var q = $('cmpSearchInput') ? ($('cmpSearchInput').value || '').trim().toLowerCase() : '';
+    var mode = state.cmpViewMode || 'all_completed';
+
+    var tasks = (state.tasks || []).filter(function(t) {
+        if (mode === 'done') return t.status === 'done';
+        if (mode === 'cancelled') return t.status === 'cancelled';
+        return t.status === 'done' || t.status === 'cancelled';
+    });
+    if (dept) tasks = tasks.filter(function(t) { return _taskMatchesDept(t, dept); });
+    if (curator) tasks = tasks.filter(function(t) { return (t.curator || 'нет') === curator; });
+    if (q) {
+        tasks = tasks.filter(function(t) {
+            var hay = [t.name || '', t.description || '', t.folder || '', t.order_ref || '', t.curator || ''].join(' ').toLowerCase();
+            return hay.indexOf(q) !== -1;
+        });
+    }
+    if (!tasks.length) {
+        list.innerHTML = '<div class="dict-empty">Нет завершенных задач по фильтру</div>';
+        return;
+    }
+    var html = '';
+    tasks.forEach(function(t) { html += taskCardRowGrid(t); });
+    var _cols = parseInt(state.tskGridCols, 10) || 3;
+    list.className = 'tasks-grid';
+    list.setAttribute('data-cols', String(_cols));
+    list.style.maxHeight = 'none';
+    list.style.display = 'grid';
+    list.innerHTML = html;
+    bindTaskCardActions(list, '.task-card');
+}
+window.renderCompletedFull = renderCompletedFull;
+
 /* ============================================================
    ЭМОДЗИ / ПАЛИТРА
    ============================================================ */
@@ -1615,10 +1635,11 @@ function fillDepartmentFilters() {
     var deps = (state.departments || []).slice().sort(function(a, b) {
         return String(a.name || '').toLowerCase().localeCompare(String(b.name || '').toLowerCase(), 'ru');
     });
-    ['calDeptFilter','hmDeptFilter','sumDeptFilter','stDeptFilter','tskDeptFilter'].forEach(function(elId) {
+    ['calDeptFilter','hmDeptFilter','sumDeptFilter','stDeptFilter','tskDeptFilter','cmpDeptFilter'].forEach(function(elId) {
         var sel = $(elId); if (!sel) return;
         var cur = sel.value;
-        sel.innerHTML = '<option value="">Отделы</option>'
+        var defLbl = (elId === 'tskDeptFilter' || elId === 'cmpDeptFilter') ? 'Банки' : 'Отделы';
+        sel.innerHTML = '<option value="">' + defLbl + '</option>'
             + deps.map(function(d) {
                 return '<option value="' + escapeHtml(d.id) + '">' + escapeHtml(d.name) + '</option>';
             }).join('');
@@ -3272,12 +3293,18 @@ function openTaskModal(task, forceKind) {
     var prev = $('taskIconPreview'); if (prev) prev.textContent = iconVal;
     g('task_name', task ? task.name : '');
     g('task_description', (task && task.description) || '');
-    g('task_status', (task && task.status) || 'active');
+    g('task_status', (task && task.status) || 'planning');
     g('task_start_date', (task && task.start_date) || '');
     g('task_deadline', (task && task.deadline) || '');
     g('task_completed_at', (task && task.completed_at) || '');
     g('task_folder', (task && task.folder) || '');
     g('task_order_ref', (task && task.order_ref) || '');
+    g('task_curator', (task && task.curator) || '');
+    var _curEl0 = $('task_curator');
+    if (_curEl0) _curEl0.classList.remove('lead-invalid');
+    if (typeof window.__trkFillTaskModalAll === 'function' && (!task || !task.id)) {
+        try { window.__trkFillTaskModalAll(task || { status: 'planning', curator: '' }); } catch (e) {}
+    }
     // PATCH v1.0.18: чекбокс «очень срочная»
     var _urgCb = $('task_is_urgent');
     if (_urgCb) _urgCb.checked = !!(task && task.is_urgent);
@@ -3320,6 +3347,14 @@ function openTaskModal(task, forceKind) {
 function saveTask() {
     var name = $('task_name') ? $('task_name').value.trim() : '';
     if (!name) { notify('❌ Укажите название', 'error'); return; }
+    var _curatorEl = $('task_curator');
+    var _curator = _curatorEl ? (_curatorEl.value || '').trim() : '';
+    if (!_curator) {
+        notify('❌ Укажите ответственного (куратора ЦА)', 'error');
+        if (_curatorEl) { _curatorEl.classList.add('lead-invalid'); _curatorEl.focus(); }
+        return;
+    }
+    if (_curatorEl) _curatorEl.classList.remove('lead-invalid');
     var _taskKind = $('task_kind') ? ($('task_kind').value || 'audit') : 'audit';
     var _isOther = (_taskKind === 'other');
     var _leadDep = '';
@@ -3385,6 +3420,7 @@ function saveTask() {
         orders: (_taskOrdersDraft || []).slice(),
         task_type: $('task_type') ? $('task_type').value : '',
         pocket: $('task_pocket') ? $('task_pocket').value.trim() : '',
+        curator: _curator,
         department_shares: window.__taskDepSharesDraft || {},
         stages: (function(){ var o = {}; TASK_STAGE_ORDER.forEach(function(k){ o[k] = _taskStagesDraft[k] || ''; }); return o; })(),
     };
@@ -4630,10 +4666,11 @@ function renderEmpDayModal(d) {
    ФИЛЬТРЫ ЗАДАЧ
    ============================================================ */
 on('tskDeptFilter', 'change', renderTasksFull);
-on('tskTeamFilter', 'change', renderTasksFull);
-on('tskEmployeeFilter', 'change', renderTasksFull);
-on('tskTagFilter', 'change', renderTasksFull);
+on('tskCuratorFilter', 'change', renderTasksFull);
 on('tskSortSelect', 'change', renderTasksFull);
+on('cmpDeptFilter', 'change', renderCompletedFull);
+on('cmpCuratorFilter', 'change', renderCompletedFull);
+on('cmpSearchInput', 'input', renderCompletedFull);
 
 on('tskGridCols', 'change', function() {
     var v = parseInt(this.value, 10) || 3;
@@ -4723,6 +4760,8 @@ setupSegmented('sumTaskRowMode', state.sumTaskRowMode || 'full', function(mode) 
     if (state.summaryIsGrid && state.summary) renderSummaryGrid();
 });
 setupSegmented('tskViewMode', state.tskViewMode, function(mode) { state.tskViewMode = mode; renderTasksFull(); });
+state.cmpViewMode = 'all_completed';
+setupSegmented('cmpViewMode', state.cmpViewMode, function(mode) { state.cmpViewMode = mode; renderCompletedFull(); });
 
 /* ============================================================
    СТАРТ
@@ -13969,7 +14008,8 @@ function _fillTaskModal(task){
     if (prev) prev.textContent = icon;
     _s('task_description', task.description || '');
     _s('task_folder', task.folder || '');
-    _s('task_status', task.status || 'active');
+    _s('task_curator', task.curator || '');
+    _s('task_status', task.status || 'planning');
     _s('task_start_date', task.start_date || '');
     _s('task_deadline', task.deadline || '');
     
@@ -13997,7 +14037,7 @@ function _fillTaskModal(task){
         }
     }
     
-    var fieldsToLock = ['task_name', 'task_description', 'task_folder', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'];
+    var fieldsToLock = ['task_name', 'task_description', 'task_folder', 'task_curator', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'];
     fieldsToLock.forEach(function(fid) {
         var el = document.getElementById(fid);
         if (el) el.disabled = !isPlanning;
@@ -17654,8 +17694,8 @@ function buildGanttTab(){
     if (tabs.querySelector('[data-tab-plugin="gantt"]')) return;
     var statsTab = tabs.querySelector('.tracker-tab[data-tab="stats"]');
     /* PATCH: «План проверок» ПОСЛЕ «Задачи» (перед «Тепловая карта») */
-    var anchorTab = tabs.querySelector('.tracker-tab[data-tab="heatmap"]')
-                 || tabs.querySelector('.tracker-tab[data-tab="tasks"]')
+    var anchorTab = tabs.querySelector('.tracker-tab[data-tab="tasks"]')
+                 || tabs.querySelector('.tracker-tab[data-tab="calendar"]')
                  || statsTab;
     var perms = window.REESTR_PERMS || {};
     /* право плагина: если задано в реестре — уважаем; иначе показываем */
@@ -19827,6 +19867,7 @@ function renderBankStatsPanel(bank){
             orders: (base.orders || []).slice(),
             task_type: d.task_type || base.task_type || (stateDash.dir !== 'all' ? dirTaskType(stateDash.dir) : 'розничная'),
             pocket: (d.pocket !== undefined && d.pocket !== null && d.pocket !== '') ? d.pocket : (base.pocket || ''),
+            curator: d.curator || base.curator || 'нет',
             department_shares: clone(d.department_shares || {}),
             stages: stageStarts,
             force_duplicate: true
@@ -20039,6 +20080,8 @@ function setActiveTab(tab){
     var empBtn = document.getElementById('employeesTabBtn');
     if (empBtn) empBtn.classList.toggle('active', !!employeeTabs[tab]);
     try { localStorage.setItem('tracker_activeTab', tab); } catch(e){}
+    if (tab === 'tasks' && typeof renderTasksFull === 'function') { try { renderTasksFull(); } catch(e){} }
+    if (tab === 'completed' && typeof window.renderCompletedFull === 'function') { try { window.renderCompletedFull(); } catch(e){} }
     if (tab === 'heatmap' && typeof window.loadHeatmap === 'function') { try { window.loadHeatmap(); } catch(e){} }
     if (tab === 'heatmap' && typeof window.__hmEmpLoad === 'function') { try { window.__hmEmpLoad(); } catch(e){} }
     if (tab === 'vacations' && typeof window.loadVacationTab === 'function') { try { window.loadVacationTab(); } catch(e){} }
