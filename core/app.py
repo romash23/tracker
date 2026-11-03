@@ -926,18 +926,29 @@ def create_app():
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(
         days=int(cfg.get('session_lifetime_days', 14))
     )
-    # Бампните это значение после любого изменения static/*.js и *.css
-    # PATCH 1.0.6: автоверсия по SHA256 (внутри create_app, отступ 4)
-    try:
-        import hashlib as _hv
-        _hv_data = b''
-        for _hv_f in ('static/tracker.js', 'static/app.css', 'static/settings.js'):
-            _hv_p = BASE_DIR / _hv_f
-            if _hv_p.exists():
-                _hv_data += _hv_p.read_bytes()
-        app.config['STATIC_VERSION'] = _hv.sha256(_hv_data).hexdigest()[:16]
-    except Exception:
-        app.config['STATIC_VERSION'] = '20261019-auto'
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.jinja_env.auto_reload = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+    def _compute_static_version():
+        try:
+            import hashlib as _hv
+            _hv_data = b''
+            for _hv_f in (
+                'static/tracker.js',
+                'static/app.css',
+                'static/settings.js',
+                'static/task_modal_wide.js',
+                'static/task_modal_wide.css',
+            ):
+                _hv_p = BASE_DIR / _hv_f
+                if _hv_p.exists():
+                    _hv_data += _hv_p.read_bytes()
+            return _hv.sha256(_hv_data).hexdigest()[:16]
+        except Exception:
+            return '20261103-auto'
+
+    app.config['STATIC_VERSION'] = _compute_static_version()
 
     db = TrackerDB(cfg['db_path'])
 
@@ -1162,6 +1173,8 @@ def create_app():
         resp.headers.setdefault('X-Frame-Options', 'DENY')
         resp.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
         resp.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+        if request.path.startswith('/static/') or resp.mimetype == 'text/html':
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return resp
 
     @app.context_processor
@@ -1169,7 +1182,7 @@ def create_app():
         user = current_user(db) if session.get('uid') else None
         return {
             'csrf_token': ensure_csrf(),
-            'static_version': app.config.get('STATIC_VERSION', ''),
+            'static_version': _compute_static_version(),
             'current_user': user,
             'perms': effective_permissions(db, user) if user else {},
             'PERMISSION_GROUPS': PERMISSION_GROUPS,
