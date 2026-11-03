@@ -171,3 +171,20 @@ CREATE INDEX IF NOT EXISTS idx_logs_task ON work_logs (task_id);
 CREATE INDEX IF NOT EXISTS idx_assignees_emp ON task_assignees (employee_id);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log (ts);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log (user_id);
+
+CREATE TABLE IF NOT EXISTS task_extensions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id TEXT NOT NULL,
+  extended_at TEXT NOT NULL,
+  days_added INTEGER NOT NULL,
+  initial_start_date TEXT DEFAULT '',
+  initial_deadline TEXT DEFAULT '',
+  prev_deadline TEXT DEFAULT '',
+  new_deadline TEXT DEFAULT '',
+  initial_stages_json TEXT DEFAULT '',
+  prev_stages_json TEXT DEFAULT '',
+  new_stages_json TEXT DEFAULT '',
+  comment TEXT DEFAULT '',
+  created_by TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_task_ext_task ON task_extensions (task_id);

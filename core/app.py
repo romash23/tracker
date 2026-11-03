@@ -37,10 +37,11 @@ STATUS_LABELS = {
     'blocked':     '🔴 Заблокировано',
 }
 TASK_STATUS_LABELS = {
-    'active':   'Активна',
-    'done':     'Выполнена',
-    'paused':   'Приостановлена',
-    'archived': 'Архив',
+    'planning':  'Планирование',
+    'approved':  'Утверждена',
+    'active':    'Активна',
+    'done':      'Завершена',
+    'cancelled': 'Отменена',
 }
 ABSENCE_TYPES = {
     'vacation':      '🌞 Отпуск',
@@ -893,11 +894,9 @@ def _autoclose_if_all_done(db, task_id, u=None):
             print(f'[autoclose] max date failed: {_e}')
         _completed_at = _last_done or date.today().strftime('%Y-%m-%d')
         now_full = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # PATCH v1.0.9: пишем auto_closed_at — по нему UI отличает автозакрытие
-        db.exec(
-            "UPDATE tasks SET status='done', completed_at=?, auto_closed_at=? WHERE id=?",
-            (_completed_at, now_full, task_id),
-        )
+        # PATCH: автозакрытие отключено, статус "Завершена" ставится только вручную!
+        # Обновляем только auto_closed_at (если нужно) или просто логируем
+        pass
         try:
             with db.transaction() as tx:
                 tx.exec(
@@ -1118,6 +1117,18 @@ def create_app():
         if 'links_json' not in cols:
             db.exec("ALTER TABLE work_logs ADD COLUMN links_json TEXT DEFAULT ''")
             print('[INIT] work_logs.links_json добавлено')
+        
+        # PATCH: task extensions and initial dates
+        tcols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
+        if 'initial_start_date' not in tcols:
+            db.exec("ALTER TABLE tasks ADD COLUMN initial_start_date TEXT DEFAULT ''")
+            db.exec("ALTER TABLE tasks ADD COLUMN initial_deadline TEXT DEFAULT ''")
+            db.exec("ALTER TABLE tasks ADD COLUMN extended_deadline TEXT DEFAULT ''")
+            db.exec("ALTER TABLE tasks ADD COLUMN initial_stages_json TEXT DEFAULT ''")
+            # Миграция старых статусов
+            db.exec("UPDATE tasks SET status='planning' WHERE status='paused' OR status='planned'")
+            db.exec("UPDATE tasks SET status='done' WHERE status='archived'")
+            print('[INIT] tasks.initial_* добавлено, статусы обновлены')
     except Exception as _e:
         print(f'[INIT] migration work_logs json: {_e}')
     app.config['DB'] = db
@@ -1898,6 +1909,88 @@ def create_app():
             except Exception as _e:
                 print(f'[notify] task_created hook failed: {_e}')
         return jsonify({'success': True, 'id': task_id, 'created': created})
+
+
+    @app.route('/api/tracker/task/extend', methods=['POST'])
+    @login_required
+    def api_task_extend():
+        body = request.get_json() or {}
+        task_id = str(body.get('id', '')).strip()
+        days = int(body.get('days', 0))
+        comment = str(body.get('comment', '')).strip()[:1000]
+        if not task_id or days <= 0:
+            return jsonify({'success': False, 'error': 'Некорректные данные'}), 400
+        
+        task = db.query_one("SELECT * FROM tasks WHERE id=?", (task_id,))
+        if not task:
+            return jsonify({'success': False, 'error': 'Задача не найдена'}), 404
+        
+        if task.get('status') != 'active':
+            return jsonify({'success': False, 'error': 'Продлить можно только активную проверку'}), 400
+            
+        import json
+        from datetime import datetime, timedelta
+        
+        # Получаем этапы
+        stages_json = {}
+        for k in ['подготовка', 'проверка_нжя', 'проверка_соглЦА', 'ос_проф', 'реализация_возражения', 'реализация_согласования', 'запас', 'оценка_тб']:
+            if task.get(f'stage_{k}_start'):
+                stages_json[k] = task.get(f'stage_{k}_start')
+                
+        initial_stages_json = task.get('initial_stages_json')
+        if not initial_stages_json:
+            initial_stages_json = json.dumps(stages_json)
+            
+        initial_start = task.get('initial_start_date') or task.get('start_date')
+        initial_deadline = task.get('initial_deadline') or task.get('deadline')
+        
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        new_stages = {}
+        
+        for k, v in stages_json.items():
+            if not v: continue
+            if v > today_str:
+                d = datetime.strptime(v, '%Y-%m-%d') + timedelta(days=days)
+                new_stages[k] = d.strftime('%Y-%m-%d')
+            else:
+                new_stages[k] = v
+                
+        prev_deadline = task.get('extended_deadline') or task.get('deadline')
+        new_deadline = ''
+        if prev_deadline:
+            d = datetime.strptime(prev_deadline, '%Y-%m-%d') + timedelta(days=days)
+            new_deadline = d.strftime('%Y-%m-%d')
+            
+        # Обновляем БД
+        try:
+            with db.transaction() as tx:
+                # Фиксируем initial если их не было
+                tx.exec("UPDATE tasks SET initial_start_date=?, initial_deadline=?, initial_stages_json=? WHERE id=? AND (initial_start_date='' OR initial_start_date IS NULL)", (initial_start, initial_deadline, initial_stages_json, task_id))
+                
+                # Записываем историю
+                tx.exec("""INSERT INTO task_extensions (task_id, extended_at, days_added, initial_start_date, initial_deadline, prev_deadline, new_deadline, initial_stages_json, prev_stages_json, new_stages_json, comment, created_by)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", 
+                        (task_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), days, initial_start, initial_deadline, prev_deadline, new_deadline, initial_stages_json, json.dumps(stages_json), json.dumps(new_stages), comment, current_user(db).get('name', '')))
+                
+                # Обновляем саму таску
+                tx.exec("UPDATE tasks SET extended_deadline=?, deadline=? WHERE id=?", (new_deadline, new_deadline, task_id))
+                for k, v in new_stages.items():
+                    tx.exec(f"UPDATE tasks SET stage_{k}_start=? WHERE id=?", (v, task_id))
+                    
+            db._invalidate_cache()
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/tracker/task/dates_history', methods=['GET'])
+    @login_required
+    def api_task_dates_history():
+        task_id = request.args.get('id', '')
+        if not task_id: return jsonify({'success': False})
+        task = db.query_one("SELECT * FROM tasks WHERE id=?", (task_id,))
+        if not task: return jsonify({'success': False})
+        history = db.query("SELECT * FROM task_extensions WHERE task_id=? ORDER BY extended_at DESC", (task_id,))
+        return jsonify({'success': True, 'task': task, 'history': history})
 
     @app.route('/api/tracker/task/delete', methods=['POST'])
     @login_required

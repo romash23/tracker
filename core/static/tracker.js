@@ -2310,7 +2310,7 @@ function syncLogStatusFromTask() {
     }
     var t = (state.tasks || []).find(function(x) { return x.id === tid; });
     if (t) {
-        var map = {active: 'in_progress', done: 'done', paused: 'planned', archived: 'done'};
+        var map = {active: 'in_progress', done: 'done', cancelled: 'planned', planning: 'planned', approved: 'planned'};
         statusSel.value = map[t.status] || 'in_progress';
     }
 }
@@ -13972,7 +13972,43 @@ function _fillTaskModal(task){
     _s('task_status', task.status || 'active');
     _s('task_start_date', task.start_date || '');
     _s('task_deadline', task.deadline || '');
+    
     _s('task_completed_at', task.completed_at || '');
+    
+    // Блокировка полей если не Планирование
+    var isPlanning = !task.id || task.status === 'planning';
+    var banner = document.getElementById('taskModeBanner');
+    var bannerText = document.getElementById('taskModeText');
+    var extendBtn = document.getElementById('taskExtendBtn');
+    if (banner && bannerText) {
+        banner.style.display = 'flex';
+        if (isPlanning) {
+            bannerText.innerHTML = '<b>Режим планирования:</b> редактирование параметров открыто.';
+            extendBtn.style.display = 'none';
+        } else {
+            var txt = '<b>Прямое редактирование сроков закрыто.</b>';
+            if (task.status === 'active') {
+                txt += ' Используйте кнопку Продлить.';
+                extendBtn.style.display = 'block';
+            } else {
+                extendBtn.style.display = 'none';
+            }
+            bannerText.innerHTML = txt;
+        }
+    }
+    
+    var fieldsToLock = ['task_name', 'task_description', 'task_folder', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'];
+    fieldsToLock.forEach(function(fid) {
+        var el = document.getElementById(fid);
+        if (el) el.disabled = !isPlanning;
+    });
+    // Блокируем этапы
+    setTimeout(function() {
+        document.querySelectorAll('#taskStagesList input').forEach(function(el) {
+            el.disabled = !isPlanning;
+        });
+    }, 100);
+
     var urg = document.getElementById('task_is_urgent');
     if (urg) urg.checked = !!task.is_urgent;
 
@@ -20045,3 +20081,58 @@ document.addEventListener('click', function(e){
     setActiveTab('dashboards');
 }, true);
 })();
+
+
+document.addEventListener('click', function(e) {
+    if (!e.target || !e.target.closest) return;
+    
+    if (e.target.closest('#taskExtendBtn')) {
+        var extM = document.getElementById('extendTaskModal');
+        if (extM) extM.classList.add('active');
+    }
+    
+    if (e.target.closest('#confirmExtendBtn')) {
+        var tid = document.getElementById('task_id').value;
+        var days = parseInt(document.getElementById('extendDays').value, 10);
+        var comment = document.getElementById('extendComment').value;
+        if (!tid || days <= 0) return;
+        apiJson('/api/tracker/task/extend', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: tid, days: days, comment: comment})
+        }).then(function(d) {
+            if (d.success) {
+                document.getElementById('extendTaskModal').classList.remove('active');
+                notify('✅ Проверка продлена');
+                trkRefreshAll(); // Перезагрузит данные и карточку закроет
+                document.getElementById('taskModal').classList.remove('active');
+            } else {
+                notify('❌ ' + (d.error || 'Ошибка'), 'error');
+            }
+        });
+    }
+    
+    if (e.target.closest('#taskDatesHistoryBtn')) {
+        var tid = document.getElementById('task_id').value;
+        if (!tid) { notify('Сначала сохраните задачу'); return; }
+        fetch('/api/tracker/task/dates_history?id=' + encodeURIComponent(tid), {credentials: 'same-origin'})
+            .then(r => r.json())
+            .then(d => {
+                if (!d.success) return;
+                var html = '<h3>Начальные и текущие даты</h3><table class="st-table"><tr><th>Параметр</th><th>Начальные</th><th>Текущие</th></tr>';
+                html += '<tr><td>Начало</td><td>' + (d.task.initial_start_date || d.task.start_date || '-') + '</td><td>' + (d.task.start_date || '-') + '</td></tr>';
+                html += '<tr><td>Дедлайн</td><td>' + (d.task.initial_deadline || d.task.deadline || '-') + '</td><td>' + (d.task.deadline || '-') + '</td></tr>';
+                html += '</table><br><h3>История продлений</h3>';
+                if (!d.history || !d.history.length) {
+                    html += '<div class="assignees-hint">Продлений не было.</div>';
+                } else {
+                    html += '<table class="st-table"><tr><th>Дата продления</th><th>+ Дней</th><th>Старый дедлайн</th><th>Новый дедлайн</th><th>Комментарий</th><th>Кто</th></tr>';
+                    d.history.forEach(function(h) {
+                        html += '<tr><td>' + (h.extended_at || '') + '</td><td>+' + h.days_added + '</td><td>' + (h.prev_deadline || '') + '</td><td>' + (h.new_deadline || '') + '</td><td>' + (h.comment || '') + '</td><td>' + (h.created_by || '') + '</td></tr>';
+                    });
+                    html += '</table>';
+                }
+                document.getElementById('taskDatesBody').innerHTML = html;
+                document.getElementById('taskDatesModal').classList.add('active');
+            });
+    }
+}, true);

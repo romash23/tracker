@@ -465,6 +465,13 @@
 </div></div>
 <div class="modal" id="taskModal"><div class="modal-content">
     <h2 id="taskModalTitle">Новая задача</h2>
+    <div id="taskModeBanner" style="display:none; background:rgba(245,215,110,0.1); border:1px solid var(--trk-accent); border-radius:6px; padding:8px 12px; margin-bottom:12px; font-size:0.82rem; display:flex; justify-content:space-between; align-items:center;">
+        <span id="taskModeText"></span>
+        <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-primary" id="taskExtendBtn" style="display:none; padding:4px 10px; font-size:0.8rem;">⏳ Продлить</button>
+            <button type="button" class="btn btn-secondary" id="taskDatesHistoryBtn" style="padding:4px 10px; font-size:0.8rem;">📅 История дат</button>
+        </div>
+    </div>
     <input type="hidden" id="task_id">
     <input type="hidden" id="task_kind" value="audit">
     <div class="form-row">
@@ -494,10 +501,11 @@
     <div class="form-row-3">
         <div class="form-group"><label>Статус</label>
             <select id="task_status">
+                <option value="planning">Планирование</option>
+                <option value="approved">Утверждена</option>
                 <option value="active">Активна</option>
-                <option value="done">Выполнена</option>
-                <option value="paused">Приостановлена</option>
-                <option value="archived">Архив</option>
+                <option value="done">Завершена</option>
+                <option value="cancelled">Отменена</option>
             </select>
         </div>
         <div class="form-group"><label>🚀 Начало</label><input type="date" id="task_start_date"></div>
