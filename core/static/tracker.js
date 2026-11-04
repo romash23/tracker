@@ -69,9 +69,44 @@
     window.trkTaskProblemsBadge = function(t){
         var r = window.trkTaskProblems(t);
         if (!r) return '';
-        var txt = r.join(' · ');
-        return '<span class="task-att-badge" title="' + txt.replace(/"/g, '&quot;') + '">🚨 ' + txt.replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) + '</span>';
+        var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+        return '<div class="trk-prob-chips">' + r.map(function(p){
+            var txt = p.charAt(0).toUpperCase() + p.slice(1);
+            return '<span class="trk-prob-chip" title="' + esc(txt) + '">\u26a0 ' + esc(txt) + '</span>';
+        }).join('') + '</div>';
     };
+    /* Автоматическое число колонок плитки: 5 при масштабе 100%, меняется с масштабом браузера */
+    function _zoom(){
+        var ow = window.outerWidth, iw = window.innerWidth;
+        if (!ow || !iw) return 1;
+        var z = ow / iw;
+        if (!isFinite(z) || z < 0.25 || z > 5) return 1;
+        if (Math.abs(z - 1) < 0.04) return 1;
+        return z;
+    }
+    window.trkAutoColsCount = function(width){
+        var n = Math.round(5 / _zoom());
+        if (n < 1) n = 1;
+        if (n > 12) n = 12;
+        if (width) {
+            var maxByWidth = Math.max(1, Math.floor(width / 170));
+            if (n > maxByWidth) n = maxByWidth;
+        }
+        return n;
+    };
+    window.trkApplyAutoCols = function(el){
+        if (!el) return;
+        var n = window.trkAutoColsCount(el.clientWidth || window.innerWidth);
+        el.style.setProperty('grid-template-columns', 'repeat(' + n + ', minmax(0, 1fr))', 'important');
+        el.setAttribute('data-auto-cols', String(n));
+    };
+    var _acT = null;
+    window.addEventListener('resize', function(){
+        clearTimeout(_acT);
+        _acT = setTimeout(function(){
+            document.querySelectorAll('.tasks-grid.tsk-auto-cols').forEach(window.trkApplyAutoCols);
+        }, 80);
+    });
 })();
 /* PATCH 1.0.35 — B3: глушим старые перехватчики log/save */
 (function(){
@@ -873,7 +908,7 @@ function loadState() {
         // PATCH 1.0.9: читаем сохранённый вид задач
         try {
             var _tv109 = localStorage.getItem('tracker_tsk_view');
-            if (_tv109 !== 'tile' && _tv109 !== 'compact' && _tv109 !== 'list') _tv109 = 'tile';
+            if (_tv109 !== 'list') _tv109 = 'tile';
             state.tskView = _tv109;
         } catch (e) { state.tskView = 'tile'; }
         applyPermsToUI();
@@ -1194,6 +1229,41 @@ function taskCardRow(t) {
         + (canDel ? '<button class="dict-action-btn danger" data-act="delete" title="Удалить">🗑</button>' : '')
         + '</div></div>';
 }
+/* Список задач: одна строка на задачу — название, статус, банки, сроки; проблемы отдельной строкой */
+function taskRowMin(t) {
+    var stMap = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена' };
+    var sv = t.status || 'active';
+    var slbl = (state.taskStatusLabels && state.taskStatusLabels[sv]) || stMap[sv] || sv;
+    var status = '<span class="task-card-badge status-' + escapeHtml(sv) + '">' + escapeHtml(slbl) + '</span>';
+    var banks = _deptBadgesForTask(t);
+    if (!banks && t.assignees && t.assignees.length) {
+        var names = t.assignees.map(function(aid) {
+            var e = (state.employees || []).find(function(x) { return x.id === aid; });
+            return e ? maskName(e.name) : '?';
+        });
+        banks = '<span class="badge badge-dept" title="' + escapeHtml(names.join(', ')) + '">👥 '
+            + escapeHtml(names.slice(0, 2).join(', ')) + (names.length > 2 ? ' +' + (names.length - 2) : '') + '</span>';
+    }
+    var dates = '';
+    if (t.start_date || t.deadline) {
+        dates = (t.start_date ? escapeHtml(formatDateShort(t.start_date)) : '…') + ' → '
+            + '<span class="' + (t.overdue ? 'tsk-row-overdue' : '') + '">' + (t.deadline ? escapeHtml(formatDateShort(t.deadline)) : '…') + '</span>';
+    }
+    var canDel = hasPerm('action.task.delete');
+    return '<div class="dict-item tsk-row" data-id="' + escapeHtml(t.id) + '">'
+        + '<div class="dict-item-body">'
+        +   '<div class="tsk-row-main">'
+        +     '<span class="dict-item-name tsk-row-name' + (t.overdue ? ' overdue' : '') + '" title="' + escapeHtml(t.name || '') + '">' + escapeHtml(t.name || '') + '</span>'
+        +     status
+        +     (banks ? '<span class="tsk-row-banks">' + banks + '</span>' : '')
+        +     (dates ? '<span class="tsk-row-dates">' + dates + '</span>' : '')
+        +   '</div>'
+        +   window.trkTaskProblemsBadge(t)
+        + '</div>'
+        + '<div class="dict-actions">'
+        +   (canDel ? '<button class="dict-action-btn danger" data-act="delete" title="Удалить">🗑</button>' : '')
+        + '</div></div>';
+}
 /* PATCH v1.0.10: K/N по задаче — сколько исполнителей уже закрыли */
 var _lastDoneCacheClient = null;
 var _lastDoneCacheClientSrc = null;
@@ -1352,7 +1422,7 @@ function taskCardRowGrid(t) {
     var tagsHtml = '';
 
     var assigneesHtml = '';
-    if (t.assignees && t.assignees.length) {
+    if (!(t.department_ids || []).length && t.assignees && t.assignees.length) {
         var allNames = t.assignees.map(function(aid) {
             var e = state.employees.find(function(x) { return x.id === aid; });
             return e ? e.name : '?';
@@ -1384,12 +1454,12 @@ function taskCardRowGrid(t) {
         +   '<div class="task-card-titles">'
         +     '<div class="task-card-title' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         +     (deptBadges ? '<div class="task-card-sub">' + deptBadges + '</div>' : '')
-        +     window.trkTaskProblemsBadge(t)
         +   '</div>'
         +   '<div class="task-card-topright">'
         +     (statusBadge || '')
         +   '</div>'
         + '</div>'
+        + window.trkTaskProblemsBadge(t)
         + progressHtml
         + '<div class="task-card-mid">'
         +   (datesHtml || '<div class="task-card-dates"></div>')
@@ -1572,13 +1642,15 @@ function renderTasksFull() {
     if (_view === 'list') {
         // Список: dict-item как на Справочниках, но в N колонках
         var _listHtml = '';
-        tasks.forEach(function(t) { _listHtml += taskCardRow(t); });
-        list.className = 'dict-list tasks-list-view';
-        list.setAttribute('data-cols', String(_cols));
+        tasks.forEach(function(t) { _listHtml += taskRowMin(t); });
+        list.className = 'dict-list tasks-list-view tsk-rows';
+        list.removeAttribute('data-cols');
+        list.removeAttribute('data-auto-cols');
+        list.style.removeProperty('grid-template-columns');
         list.removeAttribute('data-compact');
         list.removeAttribute('data-view');
         list.style.maxHeight = 'none';
-        list.style.display = 'grid';
+        list.style.display = 'flex';
         list.innerHTML = _listHtml;
         bindTaskCardActions(list, '.dict-item');
         try {
@@ -1601,18 +1673,14 @@ function renderTasksFull() {
         return;
     }
 
-    var cols = _cols;
-    list.className = 'tasks-grid';
-    list.setAttribute('data-cols', String(cols));
+    list.className = 'tasks-grid tsk-auto-cols';
+    list.removeAttribute('data-cols');
     list.style.maxHeight = 'none';
     list.style.display = 'grid';
     // PATCH v1.0.12: компактный режим (data-compact=1)
-    if (_view === 'compact') {
-        list.setAttribute('data-compact', '1');
-    } else {
-        list.removeAttribute('data-compact');
-    }
+    list.setAttribute('data-compact', '1');
     list.innerHTML = html;
+    window.trkApplyAutoCols(list);
     bindTaskCardActions(list, '.task-card');
     // PATCH v1.0.12: если поиск активен — сразу подсветить совпадения
     try {
@@ -1652,12 +1720,13 @@ function renderCompletedFull() {
     }
     var html = '';
     tasks.forEach(function(t) { html += taskCardRowGrid(t); });
-    var _cols = parseInt(state.tskGridCols, 10) || 3;
-    list.className = 'tasks-grid';
-    list.setAttribute('data-cols', String(_cols));
+    list.className = 'tasks-grid tsk-auto-cols';
+    list.removeAttribute('data-cols');
+    list.setAttribute('data-compact', '1');
     list.style.maxHeight = 'none';
     list.style.display = 'grid';
     list.innerHTML = html;
+    window.trkApplyAutoCols(list);
     bindTaskCardActions(list, '.task-card');
 }
 window.renderCompletedFull = renderCompletedFull;
@@ -8122,7 +8191,7 @@ loadState().then(function() {
         if (st) st.tskGridCols = cols;
         var list = document.getElementById('tasksFullList');
         if (list && list.classList.contains('tasks-grid')) {
-            list.setAttribute('data-cols', String(cols));
+            list.removeAttribute('data-cols');
         }
         var sel = document.getElementById('tskGridCols');
         if (sel && String(sel.value) !== String(cols)) sel.value = String(cols);
@@ -8180,7 +8249,8 @@ loadState().then(function() {
             var badge = card.querySelector('.task-card-no-assignees-badge');
             if (noAssignees) {
                 card.classList.add('task-card--no-assignees');
-                if (!badge) {
+                if (badge) badge.remove();
+                if (false) {
                     var b = document.createElement('span');
                     b.className = 'task-card-no-assignees-badge';
                     b.textContent = '⚠ Нет исполнителей';
@@ -16559,7 +16629,8 @@ var COLS_KEY = 'tracker_tsk_cols';
 function _read(){
     try {
         var v = localStorage.getItem(KEY);
-        if (v === 'tile' || v === 'compact' || v === 'list') return v;
+        if (v === 'list') return 'list';
+        if (v) return 'tile';
     } catch(e){}
     return 'tile';
 }
@@ -16613,7 +16684,7 @@ function _wire(){
             var b = e.target.closest('button[data-view]');
             if (!b) return;
             var v = b.getAttribute('data-view');
-            if (v !== 'tile' && v !== 'compact' && v !== 'list') v = 'tile';
+            if (v !== 'list') v = 'tile';
             _write(v);
             _apply();
         });
