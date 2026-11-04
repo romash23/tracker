@@ -10469,21 +10469,42 @@ body.trk-theme-light .trk-prob-chip { background: rgba(198, 40, 40, 0.14); color
 .tasks-grid.tsk-auto-cols .task-card-foot { padding-top: 0 !important; border-top: 0 !important; gap: 4px !important; min-height: 0 !important; }
 .tasks-grid.tsk-auto-cols .trk-prob-chip { font-size: 0.6rem; padding: 1px 7px; }
 
-#tasksFullList.tsk-rows { display: flex !important; flex-direction: column !important; gap: 3px !important; grid-template-columns: none !important; }
+/* ===== Список задач: старый вид, строки уже; приглушённые проблемы ===== */
+#tasksFullList.tsk-rows { display: flex !important; flex-direction: column !important; gap: 2px !important; grid-template-columns: none !important; }
 #tasksFullList.tsk-rows .dict-item.tsk-row {
-    display: flex !important; align-items: flex-start !important; gap: 6px !important;
-    padding: 3px 8px !important; min-height: 0 !important; width: 100% !important;
+    display: flex !important; align-items: center !important; gap: 6px !important;
+    padding: 3px 10px !important; min-height: 0 !important; width: 100% !important;
+    border-left: 3px solid transparent !important; background-image: none !important;
 }
+#tasksFullList.tsk-rows .dict-item.tsk-row.tsk-row--prob { border-left-color: rgba(230, 168, 26, 0.75) !important; }
 .tsk-row .dict-item-body { flex: 1 1 auto; min-width: 0; }
-.tsk-row-main { display: grid; grid-template-columns: minmax(120px, 1fr) 110px minmax(0, 280px) 170px; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
-.tsk-row-main > .task-card-badge { justify-self: start; }
-.tsk-row-name { flex: 1 1 auto; min-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem !important; font-weight: 600; margin: 0 !important; }
-.tsk-row-banks { display: inline-flex; gap: 4px; min-width: 0; overflow: hidden; }
-.tsk-row-banks .badge { font-size: 0.66rem; padding: 1px 6px; }
-.tsk-row-dates { flex: 0 0 auto; font-size: 0.72rem; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.tsk-row-line { display: flex; align-items: baseline; gap: 12px; min-width: 0; white-space: nowrap; }
+.tsk-row-name { flex: 0 1 auto; max-width: 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.84rem !important; font-weight: 600; margin: 0 !important; }
+.tsk-row-meta { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 !important; font-size: 0.72rem !important; }
+.tsk-row-meta .badge { font-size: 0.66rem; padding: 1px 6px; }
+.tsk-row-sep { opacity: 0.5; }
+.tsk-row-dates { font-variant-numeric: tabular-nums; }
 .tsk-row-overdue { color: var(--trk-err); font-weight: 700; }
-.tsk-row .task-card-badge { display: inline-block; flex: 0 0 auto; padding: 1px 7px; border-radius: 10px; font-size: 0.64rem; font-weight: 700; white-space: nowrap; }
-.tsk-row .trk-prob-chips { margin-top: 2px; }
-.tsk-row .trk-prob-chip { font-size: 0.6rem; padding: 1px 7px; }
+.tsk-row .task-card-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 0.64rem; font-weight: 700; white-space: nowrap; }
+.tsk-row .trk-prob-chips { margin-top: 3px; gap: 4px; }
+.tsk-row .trk-prob-chip { font-size: 0.66rem; padding: 0 7px; line-height: 1.5; }
+.tsk-row .trk-prob-chip.trk-prob-chip--soft { font-weight: 600; }
 .tsk-row .dict-actions { flex: 0 0 auto; }
 .tsk-row .dict-action-btn { padding: 0 4px !important; min-height: 0 !important; height: 20px !important; }
+.trk-prob-chip.trk-prob-chip--soft { background: rgba(230, 168, 26, 0.16); color: #f0c060; font-weight: 700; }
+body.trk-theme-light .trk-prob-chip.trk-prob-chip--soft { background: #fbefd2; color: #7a4a00; }
+
+/* ===== Плитка: одинаковый размер всех ячеек ===== */
+.tasks-grid.tsk-auto-cols { grid-auto-rows: 1fr !important; align-items: stretch !important; }
+.tasks-grid.tsk-auto-cols .task-card { height: 100% !important; display: flex !important; flex-direction: column !important; overflow: hidden !important; }
+.tasks-grid.tsk-auto-cols .task-card-titles { min-width: 0; }
+.tasks-grid.tsk-auto-cols .task-card-title { min-height: 2.4em; display: -webkit-box !important; -webkit-box-orient: vertical !important; overflow: hidden !important; }
+.tasks-grid.tsk-auto-cols .task-card-sub { display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important; align-content: flex-start !important; gap: 3px !important; height: 33px !important; max-height: 33px !important; overflow: hidden !important; }
+.tasks-grid.tsk-auto-cols .task-card-sub .badge { white-space: nowrap; flex: 0 0 auto; }
+.tasks-grid.tsk-auto-cols .trk-prob-chips--clip { flex-wrap: nowrap !important; min-width: 0; overflow: hidden; }
+.tasks-grid.tsk-auto-cols .trk-prob-chips--clip .trk-prob-chip { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tasks-grid.tsk-auto-cols .trk-prob-chips--clip .trk-prob-more { flex: 0 0 auto; }
+.tasks-grid.tsk-auto-cols .task-card > .task-card-progress,
+.tasks-grid.tsk-auto-cols .task-card > .task-card-head + .task-card-mid,
+.tasks-grid.tsk-auto-cols .task-card > .trk-prob-chips + .task-card-mid { margin-top: auto !important; }
+.tasks-grid.tsk-auto-cols .task-card > .task-card-foot { margin-top: 0 !important; }

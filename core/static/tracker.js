@@ -66,14 +66,22 @@
         if (t.deadline && t.deadline < today) r.push('просрочена');
         return r.length ? r : null;
     };
-    window.trkTaskProblemsBadge = function(t){
+    /* opts.soft — приглушённые янтарные чипы (список); opts.max — показать не больше N чипов, остальные в «+N» (плитка) */
+    window.trkTaskProblemsBadge = function(t, opts){
+        opts = opts || {};
         var r = window.trkTaskProblems(t);
         if (!r) return '';
         var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
-        return '<div class="trk-prob-chips">' + r.map(function(p){
-            var txt = p.charAt(0).toUpperCase() + p.slice(1);
-            return '<span class="trk-prob-chip" title="' + esc(txt) + '">\ud83d\udea8 ' + esc(txt) + '</span>';
-        }).join('') + '</div>';
+        var cap = function(p){ return p.charAt(0).toUpperCase() + p.slice(1); };
+        var cls = 'trk-prob-chip' + (opts.soft ? ' trk-prob-chip--soft' : '');
+        var shown = r, rest = [];
+        if (opts.max && r.length > opts.max) { shown = r.slice(0, opts.max); rest = r.slice(opts.max); }
+        var html = shown.map(function(p){
+            var txt = cap(p);
+            return '<span class="' + cls + '" title="' + esc(txt) + '">\ud83d\udea8 ' + esc(txt) + '</span>';
+        }).join('');
+        if (rest.length) html += '<span class="' + cls + ' trk-prob-more" title="' + esc(rest.map(cap).join('\n')) + '">+' + rest.length + '</span>';
+        return '<div class="trk-prob-chips' + (opts.max ? ' trk-prob-chips--clip' : '') + '">' + html + '</div>';
     };
     /* Автоматическое число колонок плитки: 5 при масштабе 100%, меняется с масштабом браузера */
     function _zoom(){
@@ -1234,31 +1242,33 @@ function taskRowMin(t) {
     var stMap = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена' };
     var sv = t.status || 'active';
     var slbl = (state.taskStatusLabels && state.taskStatusLabels[sv]) || stMap[sv] || sv;
-    var status = '<span class="task-card-badge status-' + escapeHtml(sv) + '">' + escapeHtml(slbl) + '</span>';
+    var meta = ['<span class="task-card-badge status-' + escapeHtml(sv) + '">' + escapeHtml(slbl) + '</span>'];
     var banks = _deptBadgesForTask(t);
     if (!banks && t.assignees && t.assignees.length) {
         var names = t.assignees.map(function(aid) {
             var e = (state.employees || []).find(function(x) { return x.id === aid; });
             return e ? maskName(e.name) : '?';
         });
-        banks = '<span class="badge badge-dept" title="' + escapeHtml(names.join(', ')) + '">👥 '
-            + escapeHtml(names.slice(0, 2).join(', ')) + (names.length > 2 ? ' +' + (names.length - 2) : '') + '</span>';
+        banks = '<span title="' + escapeHtml(names.join(', ')) + '">👥 '
+            + escapeHtml(names.slice(0, 3).join(', ')) + (names.length > 3 ? ' +' + (names.length - 3) : '') + '</span>';
     }
-    var dates = '';
+    if (banks) meta.push(banks);
     if (t.start_date || t.deadline) {
-        dates = (t.start_date ? escapeHtml(formatDateShort(t.start_date)) : '…') + ' → '
-            + '<span class="' + (t.overdue ? 'tsk-row-overdue' : '') + '">' + (t.deadline ? escapeHtml(formatDateShort(t.deadline)) : '…') + '</span>';
+        meta.push('<span class="tsk-row-dates">'
+            + (t.start_date ? '🚀 ' + escapeHtml(formatDateShort(t.start_date)) : '')
+            + (t.start_date && t.deadline ? ' → ' : '')
+            + (t.deadline ? '<span class="' + (t.overdue ? 'tsk-row-overdue' : '') + '">⏰ ' + escapeHtml(formatDateShort(t.deadline)) + '</span>' : '')
+            + '</span>');
     }
+    var probs = window.trkTaskProblemsBadge(t, { soft: true });
     var canDel = hasPerm('action.task.delete');
-    return '<div class="dict-item tsk-row" data-id="' + escapeHtml(t.id) + '">'
+    return '<div class="dict-item tsk-row' + (probs ? ' tsk-row--prob' : '') + '" data-id="' + escapeHtml(t.id) + '">'
         + '<div class="dict-item-body">'
-        +   '<div class="tsk-row-main">'
+        +   '<div class="tsk-row-line">'
         +     '<span class="dict-item-name tsk-row-name' + (t.overdue ? ' overdue' : '') + '" title="' + escapeHtml(t.name || '') + '">' + escapeHtml(t.name || '') + '</span>'
-        +     status
-        +     (banks ? '<span class="tsk-row-banks">' + banks + '</span>' : '')
-        +     (dates ? '<span class="tsk-row-dates">' + dates + '</span>' : '')
+        +     '<span class="dict-item-meta tsk-row-meta">' + meta.join('<span class="tsk-row-sep"> · </span>') + '</span>'
         +   '</div>'
-        +   window.trkTaskProblemsBadge(t)
+        +   probs
         + '</div>'
         + '<div class="dict-actions">'
         +   (canDel ? '<button class="dict-action-btn danger" data-act="delete" title="Удалить">🗑</button>' : '')
@@ -1459,7 +1469,7 @@ function taskCardRowGrid(t) {
         +     (statusBadge || '')
         +   '</div>'
         + '</div>'
-        + window.trkTaskProblemsBadge(t)
+        + window.trkTaskProblemsBadge(t, { max: 2 })
         + progressHtml
         + '<div class="task-card-mid">'
         +   (datesHtml || '<div class="task-card-dates"></div>')
