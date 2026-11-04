@@ -1,3 +1,22 @@
+/* PATCH quarter-completion: поле «Завершение» (бывшая «Иконка») — квартал вида 4Q26 */
+(function(){
+    var RE = /^[1-4]Q\d{2}$/;
+    function esc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+    window.trkIsQuarter = function(v){ return RE.test(String(v || '').trim()); };
+    window.trkQuarterValue = function(v){ v = String(v || '').trim(); return RE.test(v) ? v : ''; };
+    window.trkEnsureQuarterOption = function(v){
+        if (!v) return;
+        var sel = document.getElementById('task_icon');
+        if (!sel || sel.tagName !== 'SELECT') return;
+        for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === v) return;
+        var o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o);
+    };
+    window.trkQuarterBadge = function(v, cls){
+        var q = window.trkQuarterValue(v);
+        if (q) return '<span class="' + (cls || '') + ' trk-quarter-badge" title="Завершение">' + esc(q) + '</span>';
+        return '<span class="' + (cls || '') + ' trk-quarter-empty" title="Завершение не указано">—</span>';
+    };
+})();
 /* PATCH 1.0.35 — B3: глушим старые перехватчики log/save */
 (function(){
     'use strict';
@@ -1110,7 +1129,7 @@ function taskCardRow(t) {
     var canEdit = hasPerm('action.task.edit');
     var canDel = hasPerm('action.task.delete');
     return '<div class="dict-item" data-id="' + escapeHtml(t.id) + '">'
-        + '<span class="dict-item-icon">' + escapeHtml(t.icon || '📋') + '</span>'
+        + window.trkQuarterBadge(t.icon, 'dict-item-icon')
         + '<div class="dict-item-body"><div class="dict-item-name' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         + (meta.length ? '<div class="dict-item-meta">' + meta.join(' · ') + '</div>' : '')
         + (tagsHtml ? '<div class="dict-item-meta" style="margin-top:3px;">' + tagsHtml + '</div>' : '')
@@ -1309,7 +1328,7 @@ function taskCardRowGrid(t) {
     return '<div class="' + cardCls + '" data-id="' + escapeHtml(t.id) + '">'
         + '<div class="task-card-accent"></div>'
         + '<div class="task-card-head">'
-        +   '<div class="task-card-icon-wrap"><span class="task-card-icon">' + escapeHtml(t.icon || '📋') + '</span></div>'
+        +   '<div class="task-card-icon-wrap">' + window.trkQuarterBadge(t.icon, 'task-card-icon') + '</div>'
         +   '<div class="task-card-titles">'
         +     '<div class="task-card-title' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         +     (deptBadges ? '<div class="task-card-sub">' + deptBadges + '</div>' : '')
@@ -1464,6 +1483,10 @@ function renderTasksFull() {
     else if (mode === 'active') tasks = tasks.filter(function(t) { return t.status === 'active'; });
     else if (mode === 'done') tasks = tasks.filter(function(t) { return t.status === 'done'; });
     else if (mode === 'cancelled') tasks = tasks.filter(function(t) { return t.status === 'cancelled'; });
+    else if (mode === 'attention') {
+        var _ac = (typeof window.__trkAttentionCount === 'function') ? window.__trkAttentionCount() : { byId: {} };
+        tasks = tasks.filter(function(t) { return !!_ac.byId[t.id]; });
+    }
 
     function statusRank(t) {
         if (t.status === 'cancelled') return 5;
@@ -3288,7 +3311,8 @@ function openTaskModal(task, forceKind) {
     g('task_id', task ? task.id : '');
     g('task_load_coef', (task && task.load_coef) ? task.load_coef : '');
     applyTaskKindUI(kind);
-    var iconVal = (task && task.icon) || '🚀';
+    var iconVal = window.trkQuarterValue(task && task.icon);
+    window.trkEnsureQuarterOption(iconVal);
     g('task_icon', iconVal);
     var prev = $('taskIconPreview'); if (prev) prev.textContent = iconVal;
     g('task_name', task ? task.name : '');
@@ -3400,7 +3424,7 @@ function saveTask() {
     var payload = {
         id: $('task_id') ? ($('task_id').value || '') : '',
         name: name,
-        icon: $('task_icon') ? ($('task_icon').value.trim() || '🚀') : '🚀',
+        icon: $('task_icon') ? $('task_icon').value.trim() : '',
         description: $('task_description') ? $('task_description').value.trim() : '',
         status: status,
         start_date: $('task_start_date') ? $('task_start_date').value.trim() : '',
@@ -8380,15 +8404,16 @@ loadState().then(function() {
     }
 
     function taskProblem(t, logsByTask) {
-        if (t.status === 'done' || t.status === 'archived') return null;
+        if (t.status === 'done' || t.status === 'cancelled' || t.status === 'archived') return null;
         var reasons = [];
-        if (!(t.assignees || []).length) reasons.push('нет исполнителей');
-        if (t.deadline) {
-            var dk = t.deadline;
-            var st = (window.__trkState && window.__trkState.today) || '';
-            if (st && dk < st) reasons.push('просрочена');
-        }
-        if (t.start_date) {
+        var isAudit = (t.task_kind || 'audit') !== 'other';
+        if (!(t.assignees || []).length) reasons.push('нет участников');
+        if (!t.curator || t.curator === 'нет') reasons.push('нет куратора');
+        if (isAudit && !String(t.pocket || '').trim()) reasons.push('нет кармана');
+        if (isAudit && (!t.lead_department || !t.lead_employee)) reasons.push('нет руководителя');
+        var today = (window.__trkState && window.__trkState.today) || '';
+        if (t.deadline && today && t.deadline < today) reasons.push('просрочена');
+        if (t.status === 'active' && t.start_date) {
             var ds = daysSince(t.start_date);
             if (ds !== null && ds >= STALE_DAYS && !(logsByTask[t.id] || 0)) reasons.push('нет отметок ' + ds + ' дн.');
         }
@@ -14002,7 +14027,8 @@ function _fillTaskModal(task){
 
     _s('task_id', task.id || '');
     _s('task_name', task.name || '');
-    var icon = task.icon || '🚀';
+    var icon = window.trkQuarterValue(task.icon);
+    window.trkEnsureQuarterOption(icon);
     _s('task_icon', icon);
     var prev = document.getElementById('taskIconPreview');
     if (prev) prev.textContent = icon;
@@ -14020,22 +14046,25 @@ function _fillTaskModal(task){
     var banner = document.getElementById('taskModeBanner');
     var bannerText = document.getElementById('taskModeText');
     var extendBtn = document.getElementById('taskExtendBtn');
+    var histBtn = document.getElementById('taskDatesHistoryBtn');
     if (banner && bannerText) {
         banner.style.display = 'flex';
         if (isPlanning) {
             bannerText.innerHTML = '<b>Режим планирования:</b> редактирование параметров открыто.';
-            extendBtn.style.display = 'none';
         } else {
             var txt = '<b>Прямое редактирование сроков закрыто.</b>';
-            if (task.status === 'active') {
-                txt += ' Используйте кнопку Продлить.';
-                extendBtn.style.display = 'block';
-            } else {
-                extendBtn.style.display = 'none';
-            }
+            if (task.status === 'active') txt += ' Используйте кнопку Продлить.';
             bannerText.innerHTML = txt;
         }
     }
+    if (extendBtn) {
+        var canExtend = !!task.id && task.status === 'active';
+        extendBtn.style.display = task.id ? 'inline-flex' : 'none';
+        extendBtn.disabled = !canExtend;
+        extendBtn.title = canExtend ? 'Продлить проверку' : 'Продлить можно только проверку в статусе «Активна»';
+        extendBtn.style.opacity = canExtend ? '' : '0.5';
+    }
+    if (histBtn) histBtn.style.display = task.id ? 'inline-flex' : 'none';
     
     var fieldsToLock = ['task_name', 'task_description', 'task_folder', 'task_curator', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'];
     fieldsToLock.forEach(function(fid) {
@@ -20130,6 +20159,7 @@ document.addEventListener('click', function(e) {
     if (!e.target || !e.target.closest) return;
     
     if (e.target.closest('#taskExtendBtn')) {
+        if (e.target.closest('#taskExtendBtn').disabled) return;
         var extM = document.getElementById('extendTaskModal');
         if (extM) extM.classList.add('active');
     }

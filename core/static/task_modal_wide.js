@@ -18,7 +18,7 @@
         var content = m.querySelector('.modal-content');
         if (!content) return;
 
-        var gIcon = byField('taskIconPickBtn');
+        var gIcon = byField('task_icon');
         var gDesc = byField('task_description');
         var gFolder = byField('task_folder');
         var gOrder = byField('task_order_ref');

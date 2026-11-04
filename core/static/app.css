@@ -10389,3 +10389,22 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
     gap: 12px !important;
     align-items: stretch !important;
 }
+
+/* ============================================================
+   PATCH quarter-completion — поле «Завершение» (квартал)
+   ============================================================ */
+.trk-quarter-badge {
+    font-size: 0.78rem !important;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    color: #e53935 !important;
+    line-height: 1;
+    white-space: nowrap;
+}
+.trk-quarter-empty { font-size: 0.9rem !important; color: var(--trk-text-muted, #888); opacity: 0.6; }
+.tasks-grid[data-compact="1"] .trk-quarter-badge { font-size: 0.68rem !important; }
+select.task-quarter-select { color: #e53935; font-weight: 700; }
+select.task-quarter-select option { color: initial; font-weight: 400; }
+select.task-quarter-select option[value=""] { color: #888; }
+#extendTaskModal, #taskDatesModal { z-index: 9000 !important; }
+#taskExtendBtn:disabled { cursor: not-allowed; }
