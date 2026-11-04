@@ -10409,5 +10409,30 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 select.task-quarter-select { color: #e53935; font-weight: 700; }
 select.task-quarter-select option { color: initial; font-weight: 400; }
 select.task-quarter-select option[value=""] { color: #888; }
-#extendTaskModal, #taskDatesModal { z-index: 9000 !important; }
+/* «Продлить»/«История»: правая боковая панель поверх карточки задачи.
+   Селектор с body + .modal перебивает правило #taskModal.modal.active ~ .modal.active (z-index:1000). */
+body #extendTaskModal.modal, body #taskDatesModal.modal,
+body #taskModal.modal.active ~ #extendTaskModal.modal,
+body #taskModal.modal.active ~ #taskDatesModal.modal {
+    z-index: 9000 !important;
+    left: auto !important; right: 0 !important; top: 0 !important; bottom: 0 !important;
+    width: min(460px, 34vw) !important; min-width: 340px;
+    padding: 0 !important;
+    background: transparent !important; backdrop-filter: none !important;
+    align-items: stretch !important; justify-content: flex-end !important;
+}
+body #extendTaskModal.modal > .modal-content, body #taskDatesModal.modal > .modal-content {
+    max-width: none !important; width: 100% !important; height: 100vh; max-height: 100vh !important;
+    border-radius: 16px 0 0 16px !important; margin: 0 !important;
+    box-shadow: -12px 0 40px rgba(0,0,0,0.45) !important;
+    animation: trkSidePanelIn 0.22s ease-out !important;
+}
+body #taskDatesModal .st-table { font-size: 0.8rem; width: 100%; }
+@keyframes trkSidePanelIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Пока панель открыта, карточка задачи сдвигается влево и не перекрывается */
+body.trk-side-panel-open #taskModal.modal.active {
+    justify-content: flex-start !important;
+    padding-right: calc(max(min(460px, 34vw), 340px) + 16px) !important;
+}
+body.trk-side-panel-open #taskModal.modal.active > .modal-content { max-width: 100% !important; width: 100% !important; }
 #taskExtendBtn:disabled { cursor: not-allowed; }

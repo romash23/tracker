@@ -1181,7 +1181,6 @@ function taskCardRow(t) {
     }
     var tagsHtml = '';
     var compBadge = _completionBadge(t);
-    var canCard = hasPerm('tab.summary') || hasPerm('tab.stats');
     var canEdit = hasPerm('action.task.edit');
     var canDel = hasPerm('action.task.delete');
     return '<div class="dict-item" data-id="' + escapeHtml(t.id) + '">'
@@ -1191,7 +1190,6 @@ function taskCardRow(t) {
         + (tagsHtml ? '<div class="dict-item-meta" style="margin-top:3px;">' + tagsHtml + '</div>' : '')
         + (compBadge ? '<div class="dict-item-meta" style="margin-top:3px;">' + compBadge + '</div>' : '')
         + '</div><div class="dict-actions">'
-        + (canCard ? '<button class="dict-action-btn" data-act="card" title="Карточка">📊</button>' : '')
         + (canEdit ? '<button class="dict-action-btn" data-act="edit" title="Редактировать">✏️</button>' : '')
         + (canDel ? '<button class="dict-action-btn danger" data-act="delete" title="Удалить">🗑</button>' : '')
         + '</div></div>';
@@ -1231,7 +1229,6 @@ function _taskProgressClient(t) {
 }
 
 function taskCardRowGrid(t) {
-    var canCard = hasPerm('tab.summary') || hasPerm('tab.stats');
     var canEdit = hasPerm('action.task.edit');
     var canDel = hasPerm('action.task.delete');
     var today = state.today || todayISO();
@@ -1377,7 +1374,6 @@ function taskCardRowGrid(t) {
     }
 
     var actionsHtml = '<div class="task-card-actions">'
-        + (canCard ? '<button class="dict-action-btn" data-act="card" title="Карточка (статистика)">📊</button>' : '')
         + (canDel ? '<button class="dict-action-btn danger" data-act="delete" title="Удалить">🗑</button>' : '')
         + '</div>';
 
@@ -1411,13 +1407,8 @@ function bindTaskCardActions(container, sel) {
     container.querySelectorAll(sel || '.dict-item').forEach(function(item) {
         var id = item.getAttribute('data-id');
         if (!id) return;
-        var cardBtn = item.querySelector('[data-act="card"]');
         var editBtn = item.querySelector('[data-act="edit"]');
         var delBtn = item.querySelector('[data-act="delete"]');
-        if (cardBtn) cardBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            openTaskCardModal(id);
-        });
         if (editBtn) editBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             var t = state.tasks.find(function(x) { return x.id === id; });
@@ -20246,3 +20237,26 @@ document.addEventListener('click', function(e) {
             });
     }
 }, true);
+
+
+/* PATCH 2026-11-04: «Продлить»/«История» — боковая панель справа поверх карточки задачи */
+(function(){
+    var IDS = ['extendTaskModal', 'taskDatesModal'];
+    function sync() {
+        var open = IDS.some(function(id){ var m = document.getElementById(id); return m && m.classList.contains('active'); });
+        document.body.classList.toggle('trk-side-panel-open', open);
+    }
+    function boot() {
+        IDS.forEach(function(id){
+            var m = document.getElementById(id);
+            if (m) new MutationObserver(sync).observe(m, { attributes: true, attributeFilter: ['class'] });
+        });
+        var tm = document.getElementById('taskModal');
+        if (tm) new MutationObserver(function(){
+            if (!tm.classList.contains('active')) IDS.forEach(function(id){ var m = document.getElementById(id); if (m) m.classList.remove('active'); });
+            sync();
+        }).observe(tm, { attributes: true, attributeFilter: ['class'] });
+        sync();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
