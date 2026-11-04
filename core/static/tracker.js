@@ -72,7 +72,7 @@
         var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
         return '<div class="trk-prob-chips">' + r.map(function(p){
             var txt = p.charAt(0).toUpperCase() + p.slice(1);
-            return '<span class="trk-prob-chip" title="' + esc(txt) + '">\u26a0 ' + esc(txt) + '</span>';
+            return '<span class="trk-prob-chip" title="' + esc(txt) + '">\ud83d\udea8 ' + esc(txt) + '</span>';
         }).join('') + '</div>';
     };
     /* Автоматическое число колонок плитки: 5 при масштабе 100%, меняется с масштабом браузера */
@@ -3415,6 +3415,13 @@ function applyTaskKindUI(kind) {
         }
     });
 }
+/* Открывает карточку проверки по id (сводка, колокольчик). Окно «Карточка (статистика)» больше не используется. */
+window.trkOpenTaskById = function(id) {
+    var t = (state.tasks || []).find(function(x) { return String(x.id) === String(id); });
+    if (!t) { notify('Задача не найдена', 'error'); return; }
+    if (!hasPerm('action.task.edit')) { notify('Нет прав на просмотр карточки проверки', 'error'); return; }
+    openTaskModal(t);
+};
 function openTaskModal(task, forceKind) {
     task = task || null;
     var kind = forceKind || (task && task.task_kind) || 'audit';
@@ -4024,7 +4031,7 @@ function renderSummaryGrid() {
     });
     wrap.querySelectorAll('td.task-cell[data-task]').forEach(function(td) {
         td.style.cursor = 'pointer';
-        td.addEventListener('click', function() { var _tid = this.getAttribute('data-task'); if (_tid === '__collapsed__') return; openTaskCardModal(_tid); });
+        td.addEventListener('click', function() { var _tid = this.getAttribute('data-task'); if (_tid === '__collapsed__') return; if (typeof window.trkOpenTaskById === 'function') window.trkOpenTaskById(_tid); });
     });
     wrap.querySelectorAll('td.emp-cell[data-emp]').forEach(function(td) {
         td.style.cursor = 'pointer';
@@ -8546,22 +8553,9 @@ loadState().then(function() {
             var id = el.getAttribute('data-id');
             if (!id) return;
             var badge = el.querySelector('.task-att-badge');
-            if (c.byId[id]) {
-                el.classList.add('task-card--attention');
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'task-att-badge';
-                    badge.textContent = '🚨 ' + c.byId[id].join(' · ');
-                    badge.title = c.byId[id].join(' · ');
-                    var head = el.querySelector('.task-card-titles') || el.querySelector('.task-card-head') || el.querySelector('.dict-item-body');
-                    if (head) head.appendChild(badge);
-                } else {
-                    badge.textContent = '🚨 ' + c.byId[id].join(' · ');
-                }
-            } else {
-                el.classList.remove('task-card--attention');
-                if (badge) badge.remove();
-            }
+            if (badge) badge.remove();
+            if (c.byId[id]) el.classList.add('task-card--attention');
+            else el.classList.remove('task-card--attention');
         });
     }
 
@@ -11940,8 +11934,8 @@ function _renderList(items) {
         var tid = el.getAttribute('data-tid');
         var nameEl = el.querySelector('.trk-bell-name');
         if (nameEl) nameEl.addEventListener('click', function() {
-            if (typeof window.__trkOpenTaskCardModal === 'function' && tid) {
-                window.__trkOpenTaskCardModal(tid);
+            if (typeof window.trkOpenTaskById === 'function' && tid) {
+                window.trkOpenTaskById(tid);
             }
         });
         el.querySelectorAll('.trk-bell-act').forEach(function(btn) {
