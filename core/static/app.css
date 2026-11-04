@@ -4912,6 +4912,9 @@ body.trk-theme-light .tsk-attention-btn.active {
 .task-att-badge {
     display: inline-block;
     margin-top: 6px;
+    max-width: 100%;
+    white-space: normal !important;
+    line-height: 1.35;
     padding: 2px 9px;
     border-radius: 10px;
     font-size: 0.66rem;

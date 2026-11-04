@@ -17,6 +17,66 @@
         return '<span class="' + (cls || '') + ' trk-quarter-empty" title="Завершение не указано">—</span>';
     };
 })();
+
+/* PATCH task-problems: признаки «Проблемных» — общий источник для фильтра и бейджа на карточке */
+(function(){
+    var STALE_DAYS = 3, PLAN_WARN_DAYS = 7;
+    function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+    function diffDays(a, b){ return Math.round((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000); }
+    function quarterEnd(q){
+        var m = /^([1-4])Q(\d{2})$/.exec(String(q || '').trim());
+        if (!m) return '';
+        var y = 2000 + parseInt(m[2], 10), qq = parseInt(m[1], 10);
+        return iso(new Date(y, qq * 3, 0));
+    }
+    var _logCache = { ref: null, len: -1, map: {} };
+    function logsByTask(){
+        var st = window.__trkState || {};
+        var log = st.log || [];
+        if (_logCache.ref === log && _logCache.len === log.length) return _logCache.map;
+        var map = {};
+        log.forEach(function(l){ map[l.task_id] = (map[l.task_id] || 0) + 1; });
+        _logCache = { ref: log, len: log.length, map: map };
+        return map;
+    }
+    window.trkQuarterEnd = quarterEnd;
+    window.trkTaskProblems = function(t){
+        if (!t) return null;
+        if (t.status === 'done' || t.status === 'cancelled' || t.status === 'archived') return null;
+        var st = window.__trkState || {};
+        var today = st.today || iso(new Date());
+        var isAudit = (t.task_kind || 'audit') !== 'other';
+        var r = [];
+        if (!(t.assignees || []).length) r.push('нет участников');
+        if (isAudit && !(t.department_ids || []).length) r.push('нет банков-участников');
+        if (!t.curator || t.curator === 'нет') r.push('нет куратора');
+        if (isAudit && !String(t.pocket || '').trim()) r.push('нет кармана');
+        if (isAudit && (!t.lead_department || !t.lead_employee)) r.push('нет руководителя');
+        var q = (window.trkQuarterValue ? window.trkQuarterValue(t.icon) : '');
+        if (!q) r.push('не указан квартал');
+        else {
+            var qe = quarterEnd(q);
+            if (t.deadline && qe && t.deadline > qe) r.push('дедлайн позже ' + q);
+        }
+        if (t.status === 'approved' && t.start_date && t.start_date <= today) r.push('не перешла в «Активна»');
+        if (t.status === 'planning' && t.start_date) {
+            var left = diffDays(t.start_date, today);
+            if (left < PLAN_WARN_DAYS) r.push(left < 0 ? 'не утверждена, старт прошёл' : 'не утверждена, до старта ' + left + ' дн.');
+        }
+        if (t.deadline && t.deadline < today) r.push('просрочена');
+        if (t.status === 'active' && t.start_date) {
+            var ds = diffDays(today, t.start_date);
+            if (ds >= STALE_DAYS && !(logsByTask()[t.id] || 0)) r.push('нет отметок ' + ds + ' дн.');
+        }
+        return r.length ? r : null;
+    };
+    window.trkTaskProblemsBadge = function(t){
+        var r = window.trkTaskProblems(t);
+        if (!r) return '';
+        var txt = r.join(' · ');
+        return '<span class="task-att-badge" title="' + txt.replace(/"/g, '&quot;') + '">🚨 ' + txt.replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) + '</span>';
+    };
+})();
 /* PATCH 1.0.35 — B3: глушим старые перехватчики log/save */
 (function(){
     'use strict';
@@ -1332,6 +1392,7 @@ function taskCardRowGrid(t) {
         +   '<div class="task-card-titles">'
         +     '<div class="task-card-title' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         +     (deptBadges ? '<div class="task-card-sub">' + deptBadges + '</div>' : '')
+        +     window.trkTaskProblemsBadge(t)
         +   '</div>'
         +   '<div class="task-card-topright">'
         +     (statusBadge || '')
@@ -3367,6 +3428,7 @@ function openTaskModal(task, forceKind) {
     syncTaskCompletedAt();
     var m = $('taskModal'); if (m) m.classList.add('active');
     setTimeout(function() { var n = $('task_name'); if (n) n.focus(); }, 50);
+    if (typeof window.trkApplyTaskLockState === 'function') window.trkApplyTaskLockState(task);
 }
 function saveTask() {
     var name = $('task_name') ? $('task_name').value.trim() : '';
@@ -8403,22 +8465,7 @@ loadState().then(function() {
         } catch (e) { return null; }
     }
 
-    function taskProblem(t, logsByTask) {
-        if (t.status === 'done' || t.status === 'cancelled' || t.status === 'archived') return null;
-        var reasons = [];
-        var isAudit = (t.task_kind || 'audit') !== 'other';
-        if (!(t.assignees || []).length) reasons.push('нет участников');
-        if (!t.curator || t.curator === 'нет') reasons.push('нет куратора');
-        if (isAudit && !String(t.pocket || '').trim()) reasons.push('нет кармана');
-        if (isAudit && (!t.lead_department || !t.lead_employee)) reasons.push('нет руководителя');
-        var today = (window.__trkState && window.__trkState.today) || '';
-        if (t.deadline && today && t.deadline < today) reasons.push('просрочена');
-        if (t.status === 'active' && t.start_date) {
-            var ds = daysSince(t.start_date);
-            if (ds !== null && ds >= STALE_DAYS && !(logsByTask[t.id] || 0)) reasons.push('нет отметок ' + ds + ' дн.');
-        }
-        return reasons.length ? reasons : null;
-    }
+    function taskProblem(t) { return window.trkTaskProblems(t); }
 
     function countProblems() {
         var st = window.__trkState;
@@ -8448,7 +8495,8 @@ loadState().then(function() {
                     badge = document.createElement('span');
                     badge.className = 'task-att-badge';
                     badge.textContent = '🚨 ' + c.byId[id].join(' · ');
-                    var head = el.querySelector('.task-card-head') || el.querySelector('.dict-item-body');
+                    badge.title = c.byId[id].join(' · ');
+                    var head = el.querySelector('.task-card-titles') || el.querySelector('.task-card-head') || el.querySelector('.dict-item-body');
                     if (head) head.appendChild(badge);
                 } else {
                     badge.textContent = '🚨 ' + c.byId[id].join(' · ');
@@ -14022,6 +14070,34 @@ function _renderLinks(items){
     });
 }
 
+/* PATCH task-lock: единая точка — блокировка полей и кнопки Продлить/История.
+   Вызывается и из openTaskModal (клик по карточке), и из _fillTaskModal. */
+window.trkApplyTaskLockState = function(task){
+    task = task || {};
+    var hasId = !!task.id;
+    var isPlanning = !hasId || !task.status || task.status === 'planning';
+    var canExtend = hasId && task.status === 'active';
+    var extendBtn = document.getElementById('taskExtendBtn');
+    var histBtn = document.getElementById('taskDatesHistoryBtn');
+    if (extendBtn) {
+        extendBtn.style.display = hasId ? 'inline-flex' : 'none';
+        extendBtn.disabled = !canExtend;
+        extendBtn.title = canExtend ? 'Продлить проверку' : 'Продлить можно только проверку в статусе «Активна»';
+        extendBtn.style.opacity = canExtend ? '' : '0.5';
+    }
+    if (histBtn) histBtn.style.display = hasId ? 'inline-flex' : 'none';
+    var lockHint = isPlanning ? '' : 'Редактирование закрыто: проверка не в статусе «Планирование»' + (canExtend ? '. Для сдвига сроков используйте «Продлить»' : '');
+    ['task_name', 'task_description', 'task_folder', 'task_curator', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'].forEach(function(fid){
+        var el = document.getElementById(fid);
+        if (!el) return;
+        el.disabled = !isPlanning;
+        if (lockHint) el.title = lockHint; else el.removeAttribute('title');
+    });
+    setTimeout(function(){
+        document.querySelectorAll('#taskStagesList input').forEach(function(el){ el.disabled = !isPlanning; });
+    }, 100);
+};
+
 function _fillTaskModal(task){
     if (!task) return;
 
@@ -14041,42 +14117,7 @@ function _fillTaskModal(task){
     
     _s('task_completed_at', task.completed_at || '');
     
-    // Блокировка полей если не Планирование
-    var isPlanning = !task.id || task.status === 'planning';
-    var banner = document.getElementById('taskModeBanner');
-    var bannerText = document.getElementById('taskModeText');
-    var extendBtn = document.getElementById('taskExtendBtn');
-    var histBtn = document.getElementById('taskDatesHistoryBtn');
-    if (banner && bannerText) {
-        banner.style.display = 'flex';
-        if (isPlanning) {
-            bannerText.innerHTML = '<b>Режим планирования:</b> редактирование параметров открыто.';
-        } else {
-            var txt = '<b>Прямое редактирование сроков закрыто.</b>';
-            if (task.status === 'active') txt += ' Используйте кнопку Продлить.';
-            bannerText.innerHTML = txt;
-        }
-    }
-    if (extendBtn) {
-        var canExtend = !!task.id && task.status === 'active';
-        extendBtn.style.display = task.id ? 'inline-flex' : 'none';
-        extendBtn.disabled = !canExtend;
-        extendBtn.title = canExtend ? 'Продлить проверку' : 'Продлить можно только проверку в статусе «Активна»';
-        extendBtn.style.opacity = canExtend ? '' : '0.5';
-    }
-    if (histBtn) histBtn.style.display = task.id ? 'inline-flex' : 'none';
-    
-    var fieldsToLock = ['task_name', 'task_description', 'task_folder', 'task_curator', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'];
-    fieldsToLock.forEach(function(fid) {
-        var el = document.getElementById(fid);
-        if (el) el.disabled = !isPlanning;
-    });
-    // Блокируем этапы
-    setTimeout(function() {
-        document.querySelectorAll('#taskStagesList input').forEach(function(el) {
-            el.disabled = !isPlanning;
-        });
-    }, 100);
+    window.trkApplyTaskLockState(task);
 
     var urg = document.getElementById('task_is_urgent');
     if (urg) urg.checked = !!task.is_urgent;

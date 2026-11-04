@@ -41,7 +41,7 @@
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 #taskModal .task-row-icon-name {
-    grid-template-columns: 130px 1fr !important;
+    grid-template-columns: 130px minmax(0, 1fr) auto !important;
 }
 #taskModal .icon-picker-wide {
     width: 100% !important;
@@ -215,3 +215,11 @@
     box-sizing: border-box !important;
     resize: vertical !important;
 }
+
+/* PATCH task-head-actions: Продлить / История в ряду с Названием */
+#taskModal .task-head-actions-btns { display: flex; gap: 8px; align-items: center; height: 100%; }
+#taskModal .task-head-actions-btns .btn {
+    padding: 0 14px !important; height: 35px; font-size: 0.82rem !important;
+    border-radius: 999px !important; white-space: nowrap; min-height: 0 !important;
+}
+#taskModal .task-head-actions-btns .btn:disabled { cursor: not-allowed; }
