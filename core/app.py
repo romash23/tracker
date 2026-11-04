@@ -591,6 +591,27 @@ def _audit(db, user, kind, entity='', entity_id='', details=None):
         print(f'[audit] failed: {e}')
 
 
+def _auto_activate_approved(db, today=None):
+    """Утверждена -> Активна, если дата начала наступила (start_date <= сегодня).
+    Вызывается при загрузке состояния. Возвращает список id переведённых задач."""
+    today = today or date.today().strftime('%Y-%m-%d')
+    moved = []
+    try:
+        rows = db.query(
+            "SELECT id, start_date FROM tasks WHERE status='approved' "
+            "AND COALESCE(start_date,'')<>'' AND start_date<=?", (today,))
+        for r in rows:
+            db.exec("UPDATE tasks SET status='active' WHERE id=? AND status='approved'", (r['id'],))
+            _audit(db, None, 'task_auto_activate', 'task', r['id'],
+                   {'from': 'approved', 'to': 'active', 'start_date': r.get('start_date'), 'date': today})
+            moved.append(r['id'])
+        if moved:
+            print(f'[auto_activate] approved -> active: {moved}')
+    except Exception as e:
+        print(f'[auto_activate] failed: {e}')
+    return moved
+
+
 # ============================================================
 # PATCH v1.0.4 — хелперы merge «отметка → задача»
 # ============================================================
@@ -1263,6 +1284,7 @@ def create_app():
     def api_state():
         u = current_user(db)
         perms = effective_permissions(db, u)
+        _auto_activate_approved(db)
         try:
             log_days = int(request.args.get('log_days', 365))
         except (ValueError, TypeError):

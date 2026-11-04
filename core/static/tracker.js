@@ -20,7 +20,7 @@
 
 /* PATCH task-problems: признаки «Проблемных» — общий источник для фильтра и бейджа на карточке */
 (function(){
-    var STALE_DAYS = 3, PLAN_WARN_DAYS = 7;
+    var PLAN_WARN_DAYS = 7;
     function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
     function diffDays(a, b){ return Math.round((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000); }
     function quarterEnd(q){
@@ -64,10 +64,6 @@
             if (left < PLAN_WARN_DAYS) r.push(left < 0 ? 'не утверждена, старт прошёл' : 'не утверждена, до старта ' + left + ' дн.');
         }
         if (t.deadline && t.deadline < today) r.push('просрочена');
-        if (t.status === 'active' && t.start_date) {
-            var ds = diffDays(today, t.start_date);
-            if (ds >= STALE_DAYS && !(logsByTask()[t.id] || 0)) r.push('нет отметок ' + ds + ' дн.');
-        }
         return r.length ? r : null;
     };
     window.trkTaskProblemsBadge = function(t){
