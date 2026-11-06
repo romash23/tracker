@@ -10591,3 +10591,22 @@ body:not(.trk-theme-light) .tsum-cbtn--no:hover { background:rgba(255,255,255,.0
 .tsum-stages { border-collapse:collapse; margin-top:4px; font-size:12.5px; color:#263238; }
 .tsum-stages td { padding:1px 10px 1px 0; white-space:nowrap; }
 .tsum-stage-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; box-shadow:0 0 0 1px rgba(0,0,0,.25); }
+
+/* ===== Цвет левой полосы по статусу: плитка и список =====
+   Планирование — фиолетовый, Утверждена — бирюзовый, Активна — синий,
+   Завершена — зелёный, Отменена — серый. Просрочка (только у незавершённых) — красный. */
+.tasks-grid .task-card.st-planning  .task-card-accent { background: linear-gradient(180deg, #b39ddb, #7e57c2); }
+.tasks-grid .task-card.st-approved  .task-card-accent { background: linear-gradient(180deg, #4dd0e1, #00838f); }
+.tasks-grid .task-card.st-active    .task-card-accent { background: linear-gradient(180deg, #5dade2, #2874a6); }
+.tasks-grid .task-card.st-done      .task-card-accent { background: linear-gradient(180deg, #58d68d, #239b56); }
+.tasks-grid .task-card.st-cancelled .task-card-accent { background: linear-gradient(180deg, #aab7b8, #7b8a8b); }
+.tasks-grid .task-card.overdue      .task-card-accent { background: linear-gradient(180deg, #ec7063, #b03a2e); }
+/* Отсутствие участников показывается чипом, отдельную красную рамку слева в плитке не рисуем */
+.tasks-grid .task-card.task-card--no-assignees { border-left: none !important; }
+/* Список: тонкая полоса 3px того же цвета, без заливки */
+#tasksFullList.tsk-rows .dict-item.tsk-row.st-planning  { border-left-color: #7e57c2 !important; }
+#tasksFullList.tsk-rows .dict-item.tsk-row.st-approved  { border-left-color: #00838f !important; }
+#tasksFullList.tsk-rows .dict-item.tsk-row.st-active    { border-left-color: #2874a6 !important; }
+#tasksFullList.tsk-rows .dict-item.tsk-row.st-done      { border-left-color: #239b56 !important; }
+#tasksFullList.tsk-rows .dict-item.tsk-row.st-cancelled { border-left-color: #95a5a6 !important; }
+#tasksFullList.tsk-rows .dict-item.tsk-row.tsk-row--overdue { border-left-color: #c0392b !important; }

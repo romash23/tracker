@@ -1262,7 +1262,7 @@ function taskRowMin(t) {
     }
     var probs = window.trkTaskProblemsBadge(t, { soft: true });
     var canDel = hasPerm('action.task.delete');
-    return '<div class="dict-item tsk-row' + (probs ? ' tsk-row--prob' : '') + '" data-id="' + escapeHtml(t.id) + '">'
+    return '<div class="dict-item tsk-row st-' + escapeHtml(sv) + (t.overdue ? ' tsk-row--overdue' : '') + (probs ? ' tsk-row--prob' : '') + '" data-id="' + escapeHtml(t.id) + '">'
         + '<div class="dict-item-body">'
         +   '<div class="tsk-row-line">'
         +     '<span class="dict-item-name tsk-row-name' + (t.overdue ? ' overdue' : '') + '" title="' + escapeHtml(t.name || '') + '">' + escapeHtml(t.name || '') + '</span>'
