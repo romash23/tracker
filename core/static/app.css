@@ -10610,3 +10610,36 @@ body:not(.trk-theme-light) .tsum-cbtn--no:hover { background:rgba(255,255,255,.0
 #tasksFullList.tsk-rows .dict-item.tsk-row.st-done      { border-left-color: #239b56 !important; }
 #tasksFullList.tsk-rows .dict-item.tsk-row.st-cancelled { border-left-color: #95a5a6 !important; }
 #tasksFullList.tsk-rows .dict-item.tsk-row.tsk-row--overdue { border-left-color: #c0392b !important; }
+
+/* ===== Единые цвета статусов (полоса = бейдж) ===== */
+/* Планирование — фиолетовый, Утверждена — янтарный, Активна — синий,
+   Завершена — зелёный, Отменена — серый, Просрочена — красный.
+   Срочность больше не перекрашивает полосу: её показывает бейдж «🚨 Срочно» и розовый фон. */
+.tasks-grid .task-card.st-planning  .task-card-accent { background: linear-gradient(180deg, #b39ddb, #7e57c2) !important; }
+.tasks-grid .task-card.st-approved  .task-card-accent { background: linear-gradient(180deg, #f8c471, #d68910) !important; }
+.tasks-grid .task-card.st-active    .task-card-accent { background: linear-gradient(180deg, #5dade2, #2874a6) !important; }
+.tasks-grid .task-card.st-done      .task-card-accent { background: linear-gradient(180deg, #58d68d, #239b56) !important; }
+.tasks-grid .task-card.st-cancelled .task-card-accent { background: linear-gradient(180deg, #aab7b8, #7b8a8b) !important; }
+.tasks-grid .task-card.overdue      .task-card-accent { background: linear-gradient(180deg, #ec7063, #b03a2e) !important; }
+.tasks-grid .task-card.task-card--urgent { border-left: none !important; }
+
+#tasksFullList.tsk-rows .dict-item.tsk-row.st-approved { border-left-color: #d68910 !important; }
+#tasksFullList.tsk-rows .dict-item.tsk-row.tsk-row--overdue { border-left-color: #c0392b !important; }
+
+.task-card-badge.status-planning  { background: rgba(126, 87, 194, 0.14) !important; color: #5e35b1 !important; border: 1px solid rgba(126, 87, 194, 0.35) !important; }
+.task-card-badge.status-approved  { background: rgba(214, 137, 16, 0.15) !important; color: #9a6207 !important; border: 1px solid rgba(214, 137, 16, 0.40) !important; }
+.task-card-badge.status-active    { background: rgba(40, 116, 166, 0.13) !important; color: #1f618d !important; border: 1px solid rgba(40, 116, 166, 0.35) !important; }
+.task-card-badge.status-done      { background: rgba(35, 155, 86, 0.14) !important; color: #1e8449 !important; border: 1px solid rgba(35, 155, 86, 0.35) !important; }
+.task-card-badge.status-cancelled { background: rgba(123, 138, 139, 0.16) !important; color: #566573 !important; border: 1px solid rgba(123, 138, 139, 0.35) !important; }
+body:not(.trk-theme-light) .task-card-badge.status-planning  { color: #c5b3e6 !important; background: rgba(126, 87, 194, 0.22) !important; }
+body:not(.trk-theme-light) .task-card-badge.status-approved  { color: #f8c471 !important; background: rgba(214, 137, 16, 0.20) !important; }
+body:not(.trk-theme-light) .task-card-badge.status-active    { color: #85c1e9 !important; background: rgba(40, 116, 166, 0.24) !important; }
+body:not(.trk-theme-light) .task-card-badge.status-done      { color: #7dcea0 !important; background: rgba(35, 155, 86, 0.22) !important; }
+body:not(.trk-theme-light) .task-card-badge.status-cancelled { color: #bfc9ca !important; background: rgba(123, 138, 139, 0.22) !important; }
+
+/* Статус в шапке краткой карточки — те же цвета */
+.tsum-status--planning  { background: #ede7f6; color: #4527a0; }
+.tsum-status--approved  { background: #fdf2e0; color: #8a5a06; }
+.tsum-status--active    { background: #e3f0f9; color: #1a5276; }
+.tsum-status--done      { background: #e8f5e9; color: #1b5e20; }
+.tsum-status--cancelled { background: #f2f3f4; color: #616a6b; }
