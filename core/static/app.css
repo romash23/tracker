@@ -10522,11 +10522,62 @@ body.trk-theme-light .trk-prob-chip.trk-prob-chip--soft { background: #fbefd2; c
 .tsum-status--cancelled { background:#f5f5f5; color:#757575; }
 .tsum-quarter { font-size:11.5px; font-weight:700; color:#c62828; padding:2px 6px; border:1px solid #f3c2c2; border-radius:10px; }
 .tsum-head-actions { display:flex; align-items:center; gap:6px; flex:0 0 auto; }
-.tsum-head-btn, .tsum-edit-btn, .tsum-close-btn { border:1px solid #d7dbe0; background:#fff; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:15px; line-height:1; flex:0 0 auto; }
-.tsum-head-btn:hover, .tsum-edit-btn:hover, .tsum-close-btn:hover { background:#f3f5f7; }
-.tsum-head-btn[disabled] { opacity:.45; cursor:not-allowed; }
-.tsum-confirm { background:#fff8e1; border:1px solid #f0d58a; border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:13px; color:#5d4300; }
-.tsum-confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
+/* Кнопки шапки краткой карточки */
+.tsum-head-btn, .tsum-edit-btn, .tsum-close-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:34px; height:34px; padding:0; flex:0 0 auto; cursor:pointer;
+    border:1px solid #cfe3d6; background:#f6fbf8; border-radius:10px;
+    font-size:16px; line-height:1; color:#2e7d4f;
+    box-shadow:0 1px 2px rgba(16,24,40,.06);
+    transition:background .15s, border-color .15s, box-shadow .15s, transform .1s;
+}
+.tsum-head-btn:hover:not([disabled]), .tsum-edit-btn:hover {
+    background:#e3f4ea; border-color:#2e9e5b; box-shadow:0 2px 6px rgba(46,158,91,.22);
+}
+.tsum-head-btn:active:not([disabled]), .tsum-edit-btn:active, .tsum-close-btn:active { transform:translateY(1px); }
+.tsum-head-btn:focus-visible, .tsum-edit-btn:focus-visible, .tsum-close-btn:focus-visible { outline:2px solid #2e9e5b; outline-offset:2px; }
+.tsum-head-btn[disabled] { background:#f3f4f6; border-color:#e3e5e8; box-shadow:none; filter:grayscale(1); opacity:.5; cursor:not-allowed; }
+.tsum-close-btn { margin-left:6px; background:#fff; border-color:#e3e5e8; color:#6b7280; font-size:14px; }
+.tsum-close-btn:hover { background:#fdecec; border-color:#e57373; color:#c62828; }
+/* Подтверждение редактирования: отдельное окно по центру поверх всех окон */
+.tsum-confirm-overlay {
+    display:none; position:fixed; inset:0; z-index:20000;
+    background:rgba(15,23,42,.45); align-items:center; justify-content:center; padding:16px;
+}
+.tsum-confirm-overlay.active { display:flex; }
+.tsum-confirm {
+    width:min(620px, 100%); background:#fff; color:#1f2937;
+    border:3px solid #2e9e5b; border-radius:14px; padding:22px 24px 18px;
+    box-shadow:0 18px 48px rgba(0,0,0,.28); font-size:15px; line-height:1.55;
+    animation:tsumConfirmIn .14s ease-out;
+}
+@keyframes tsumConfirmIn { from { opacity:0; transform:scale(.96); } to { opacity:1; transform:none; } }
+.tsum-confirm-text { margin:0; }
+.tsum-confirm-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+.tsum-cbtn {
+    min-width:96px; height:38px; padding:0 20px; border-radius:9px; cursor:pointer;
+    font-size:14px; font-weight:600; font-family:inherit; transition:background .15s, border-color .15s, box-shadow .15s;
+}
+.tsum-cbtn--no { background:#fff; color:#374151; border:1px solid #d1d5db; }
+.tsum-cbtn--no:hover { background:#f3f4f6; border-color:#9ca3af; }
+.tsum-cbtn--yes { background:#2e9e5b; color:#fff; border:1px solid #2e9e5b; box-shadow:0 1px 3px rgba(46,158,91,.35); }
+.tsum-cbtn--yes:hover { background:#25864c; border-color:#25864c; }
+.tsum-cbtn:focus-visible { outline:2px solid #2e9e5b; outline-offset:2px; }
+/* Тёмная тема: кнопки и окно подтверждения */
+body:not(.trk-theme-light) .tsum-head-btn, body:not(.trk-theme-light) .tsum-edit-btn {
+    background:rgba(46,158,91,.12); border-color:rgba(76,190,120,.45); box-shadow:none;
+}
+body:not(.trk-theme-light) .tsum-head-btn:hover:not([disabled]), body:not(.trk-theme-light) .tsum-edit-btn:hover {
+    background:rgba(46,158,91,.26); border-color:#4cbe78;
+}
+body:not(.trk-theme-light) .tsum-head-btn[disabled] { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); }
+body:not(.trk-theme-light) .tsum-close-btn { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.16); color:#cfd4da; }
+body:not(.trk-theme-light) .tsum-close-btn:hover { background:rgba(229,115,115,.18); border-color:#e57373; color:#ff8a80; }
+body:not(.trk-theme-light) .tsum-confirm { background:var(--trk-modal-bg, #1e1e1e); color:var(--trk-text, #e6e6e6); border-color:#4cbe78; }
+body:not(.trk-theme-light) .tsum-cbtn--no { background:transparent; color:var(--trk-text, #e6e6e6); border-color:rgba(255,255,255,.25); }
+body:not(.trk-theme-light) .tsum-cbtn--no:hover { background:rgba(255,255,255,.08); }
+.tsum-confirm-overlay { backdrop-filter:blur(2px); }
+.tsum-confirm-overlay.active ~ .modal.active, body.tsum-confirm-open #taskSummaryModal { filter:brightness(.55) blur(1px); }
 .tsum-row { display:grid; grid-template-columns:130px 1fr; gap:10px; padding:5px 0; border-bottom:1px dashed #eceff1; font-size:13px; }
 .tsum-row:last-child { border-bottom:0; }
 .tsum-lbl { color:#607d8b; white-space:nowrap; }

@@ -641,15 +641,17 @@
             <button type="button" class="tsum-close-btn" data-close="taskSummaryModal" title="Закрыть">✕</button>
         </div>
     </div>
-    <div class="tsum-confirm" id="tsumConfirm" style="display:none">
-        <div class="tsum-confirm-text">Рекомендуется редактировать только проверки в статусе «Планирование». Уверены, что хотите продолжить?</div>
-        <div class="tsum-confirm-actions">
-            <button type="button" class="btn btn-secondary" id="tsumConfirmNo">Нет</button>
-            <button type="button" class="btn btn-primary" id="tsumConfirmYes">Да</button>
-        </div>
-    </div>
     <div class="tsum-body" id="tsumBody"></div>
 </div></div>
+<div class="tsum-confirm-overlay" id="tsumConfirm" role="dialog" aria-modal="true">
+    <div class="tsum-confirm">
+        <div class="tsum-confirm-text">Рекомендуется редактировать только проверки в&nbsp;статусе&nbsp;«Планирование».<br>Уверены, что хотите продолжить?</div>
+        <div class="tsum-confirm-actions">
+            <button type="button" class="tsum-cbtn tsum-cbtn--no" id="tsumConfirmNo">Нет</button>
+            <button type="button" class="tsum-cbtn tsum-cbtn--yes" id="tsumConfirmYes">Да</button>
+        </div>
+    </div>
+</div>
 <div class="modal" id="emojiModal"><div class="modal-content">
     <h2>🎨 Выбор значка</h2>
     <div class="emoji-grid" id="emojiGrid"></div>

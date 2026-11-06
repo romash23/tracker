@@ -3564,7 +3564,7 @@ function openTaskSummary(task) {
     var m = $('taskSummaryModal'); if (!m || !task) return;
     m.setAttribute('data-task-id', task.id);
     _tsumSyncActions(task);
-    var cf = $('tsumConfirm'); if (cf) cf.style.display = 'none';
+    _tsumConfirmShow(false);
     $('tsumTitle').textContent = task.name || '—';
     var stLbl = (state.taskStatusLabels && state.taskStatusLabels[task.status]) || task.status || '';
     var q = window.trkQuarterValue ? window.trkQuarterValue(task.icon) : '';
@@ -3611,7 +3611,18 @@ function _tsumCurrentTask() {
     var m = $('taskSummaryModal'); var id = m && m.getAttribute('data-task-id');
     return (state.tasks || []).find(function(x) { return String(x.id) === String(id); }) || null;
 }
-on('tsumEditBtn', 'click', function() { if (!_tsumIsAdmin()) return; var cf = $('tsumConfirm'); if (cf) cf.style.display = ''; });
+function _tsumConfirmShow(on) {
+    var cf = $('tsumConfirm'); if (!cf) return;
+    cf.classList.toggle('active', !!on);
+    if (document.body) document.body.classList.toggle('tsum-confirm-open', !!on);
+    if (on) { var y = $('tsumConfirmYes'); if (y) setTimeout(function() { try { y.focus(); } catch (e) {} }, 0); }
+}
+on('tsumEditBtn', 'click', function() { if (!_tsumIsAdmin()) return; _tsumConfirmShow(true); });
+on('tsumConfirm', 'click', function(e) { if (e.target === this) _tsumConfirmShow(false); });
+document.addEventListener('keydown', function(e) {
+    var cf = $('tsumConfirm');
+    if (e.key === 'Escape' && cf && cf.classList.contains('active')) { e.stopPropagation(); _tsumConfirmShow(false); }
+}, true);
 on('tsumHistoryBtn', 'click', function() {
     var t = _tsumCurrentTask();
     if (!t || !t.id) return;
@@ -3628,9 +3639,10 @@ on('tsumExtendBtn', 'click', function() {
     else if (em) em.classList.add('active');
     if (document && document.body) document.body.classList.add('trk-side-panel-open');
 });
-on('tsumConfirmNo', 'click', function() { var cf = $('tsumConfirm'); if (cf) cf.style.display = 'none'; });
+on('tsumConfirmNo', 'click', function() { _tsumConfirmShow(false); });
 on('tsumConfirmYes', 'click', function() {
     var t = _tsumCurrentTask();
+    _tsumConfirmShow(false);
     var m = $('taskSummaryModal'); if (m) m.classList.remove('active');
     if (!t) return;
     if (_tsumIsAdmin()) {
