@@ -10521,8 +10521,10 @@ body.trk-theme-light .trk-prob-chip.trk-prob-chip--soft { background: #fbefd2; c
 .tsum-status--done { background:#e8f5e9; color:#1b5e20; }
 .tsum-status--cancelled { background:#f5f5f5; color:#757575; }
 .tsum-quarter { font-size:11.5px; font-weight:700; color:#c62828; padding:2px 6px; border:1px solid #f3c2c2; border-radius:10px; }
-.tsum-edit-btn, .tsum-close-btn { border:1px solid #d7dbe0; background:#fff; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:15px; line-height:1; flex:0 0 auto; }
-.tsum-edit-btn:hover, .tsum-close-btn:hover { background:#f3f5f7; }
+.tsum-head-actions { display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+.tsum-head-btn, .tsum-edit-btn, .tsum-close-btn { border:1px solid #d7dbe0; background:#fff; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:15px; line-height:1; flex:0 0 auto; }
+.tsum-head-btn:hover, .tsum-edit-btn:hover, .tsum-close-btn:hover { background:#f3f5f7; }
+.tsum-head-btn[disabled] { opacity:.45; cursor:not-allowed; }
 .tsum-confirm { background:#fff8e1; border:1px solid #f0d58a; border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:13px; color:#5d4300; }
 .tsum-confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; }
 .tsum-row { display:grid; grid-template-columns:130px 1fr; gap:10px; padding:5px 0; border-bottom:1px dashed #eceff1; font-size:13px; }

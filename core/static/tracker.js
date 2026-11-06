@@ -3542,16 +3542,34 @@ function _tsumStages(task) {
 function _tsumRow(label, valueHtml, empty) {
     return '<div class="tsum-row' + (empty ? ' tsum-row--empty' : '') + '"><div class="tsum-lbl">' + label + '</div><div class="tsum-val">' + valueHtml + '</div></div>';
 }
+function _tsumSyncActions(task) {
+    var hasId = !!(task && task.id);
+    var isAdmin = _tsumIsAdmin();
+    var isActive = !!(task && task.status === 'active');
+    var editBtn = $('tsumEditBtn');
+    var extBtn = $('tsumExtendBtn');
+    var histBtn = $('tsumHistoryBtn');
+    if (editBtn) editBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (extBtn) {
+        extBtn.style.display = hasId ? 'inline-flex' : 'none';
+        extBtn.disabled = !isActive;
+        extBtn.title = isActive ? 'Продлить проверку' : 'Продлить можно только проверку в статусе «Активна»';
+    }
+    if (histBtn) {
+        histBtn.style.display = hasId ? 'inline-flex' : 'none';
+        histBtn.disabled = !hasId;
+    }
+}
 function openTaskSummary(task) {
     var m = $('taskSummaryModal'); if (!m || !task) return;
     m.setAttribute('data-task-id', task.id);
+    _tsumSyncActions(task);
     var cf = $('tsumConfirm'); if (cf) cf.style.display = 'none';
     $('tsumTitle').textContent = task.name || '—';
     var stLbl = (state.taskStatusLabels && state.taskStatusLabels[task.status]) || task.status || '';
     var q = window.trkQuarterValue ? window.trkQuarterValue(task.icon) : '';
     $('tsumMeta').innerHTML = '<span class="tsum-status tsum-status--' + escapeHtml(task.status || '') + '">' + escapeHtml(stLbl) + '</span>'
         + (q ? '<span class="tsum-quarter">' + escapeHtml(q) + '</span>' : '');
-    var eb = $('tsumEditBtn'); if (eb) eb.style.display = hasPerm('action.task.edit') ? '' : 'none';
     var isAudit = (task.task_kind || 'audit') !== 'other';
     var h = '';
     // Руководитель и куратор — всегда, даже если не указаны
@@ -3593,7 +3611,23 @@ function _tsumCurrentTask() {
     var m = $('taskSummaryModal'); var id = m && m.getAttribute('data-task-id');
     return (state.tasks || []).find(function(x) { return String(x.id) === String(id); }) || null;
 }
-on('tsumEditBtn', 'click', function() { var cf = $('tsumConfirm'); if (cf) cf.style.display = ''; });
+on('tsumEditBtn', 'click', function() { if (!_tsumIsAdmin()) return; var cf = $('tsumConfirm'); if (cf) cf.style.display = ''; });
+on('tsumHistoryBtn', 'click', function() {
+    var t = _tsumCurrentTask();
+    if (!t || !t.id) return;
+    if (typeof loadTaskDateHistory === 'function') loadTaskDateHistory(t.id);
+});
+on('tsumExtendBtn', 'click', function() {
+    var t = _tsumCurrentTask();
+    if (!t || !t.id || t.status !== 'active') return;
+    var em = $('extendTaskModal');
+    if (em) em.setAttribute('data-task-id', t.id);
+    var days = $('extendDays'); if (days) days.value = 7;
+    var comment = $('extendComment'); if (comment) comment.value = '';
+    if (typeof openModal === 'function') openModal('extendTaskModal');
+    else if (em) em.classList.add('active');
+    if (document && document.body) document.body.classList.add('trk-side-panel-open');
+});
 on('tsumConfirmNo', 'click', function() { var cf = $('tsumConfirm'); if (cf) cf.style.display = 'none'; });
 on('tsumConfirmYes', 'click', function() {
     var t = _tsumCurrentTask();

@@ -634,8 +634,12 @@
             <div class="tsum-title" id="tsumTitle">—</div>
             <div class="tsum-head-meta" id="tsumMeta"></div>
         </div>
-        <button type="button" class="tsum-edit-btn" id="tsumEditBtn" title="Редактировать">✏️</button>
-        <button type="button" class="tsum-close-btn" data-close="taskSummaryModal" title="Закрыть">✕</button>
+        <div class="tsum-head-actions" id="tsumHeadActions">
+            <button type="button" class="tsum-head-btn" id="tsumExtendBtn" title="Продлить проверку">⏳</button>
+            <button type="button" class="tsum-head-btn" id="tsumHistoryBtn" title="История">📅</button>
+            <button type="button" class="tsum-head-btn tsum-edit-btn" id="tsumEditBtn" title="Редактировать">✏️</button>
+            <button type="button" class="tsum-close-btn" data-close="taskSummaryModal" title="Закрыть">✕</button>
+        </div>
     </div>
     <div class="tsum-confirm" id="tsumConfirm" style="display:none">
         <div class="tsum-confirm-text">Рекомендуется редактировать только проверки в статусе «Планирование». Уверены, что хотите продолжить?</div>
