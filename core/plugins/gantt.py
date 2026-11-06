@@ -831,7 +831,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
         </div>
         <div class="head-filters">
             <div class="ms-dd-group" id="fKindGroup">
-                <span class="ms-dd-label">Тип задачи</span>
+                <span class="ms-dd-label">Направление</span>
                 <div class="ms-dd" id="fKindDD">
                     <button type="button" class="ms-dd-btn" id="fKindBtn">Аудиторская проверка</button>
                     <div class="ms-dd-panel" id="fKindPanel"></div>
@@ -896,7 +896,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
             <div class="gg-form-grid">
                 <div class="gg-field gg-span-2"><label>Иконка</label><input type="text" id="ggFIcon" maxlength="8"></div>
                 <div class="gg-field gg-span-10"><label>Название</label><input type="text" id="ggFName" readonly></div>
-                <div class="gg-field gg-span-3"><label>Тип задачи</label><select id="ggFType"><option value="">Выберите тип</option><option value="розничная">Розничная</option><option value="корпоративная">Корпоративная</option></select></div>
+                <div class="gg-field gg-span-3"><label>Направление</label><select id="ggFType"><option value="">Выберите направление</option><option value="розничная">Розничная</option><option value="корпоративная">Корпоративная</option></select></div>
                 <div class="gg-field gg-span-3"><label>Карман</label><input type="text" id="ggFPocket" maxlength="200"></div>
             </div>
             <div class="gg-box">

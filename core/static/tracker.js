@@ -1492,7 +1492,7 @@ function bindTaskCardActions(container, sel) {
         if (editBtn) editBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             var t = state.tasks.find(function(x) { return x.id === id; });
-            if (t) openTaskModal(t);
+            if (t) trkOpenTaskSmart(t);
         });
         if (delBtn) delBtn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1507,7 +1507,7 @@ function bindTaskCardActions(container, sel) {
                 if (e.target.closest('.dict-action-btn')) return;
                 if (e.target.closest('a')) return;
                 var t = state.tasks.find(function(x) { return x.id === id; });
-                if (t) openTaskModal(t);
+                if (t) trkOpenTaskSmart(t);
             });
         }
     });
@@ -3430,7 +3430,7 @@ window.trkOpenTaskById = function(id) {
     var t = (state.tasks || []).find(function(x) { return String(x.id) === String(id); });
     if (!t) { notify('Задача не найдена', 'error'); return; }
     if (!hasPerm('action.task.edit')) { notify('Нет прав на просмотр карточки проверки', 'error'); return; }
-    openTaskModal(t);
+    trkOpenTaskSmart(t);
 };
 function openTaskModal(task, forceKind) {
     task = task || null;
@@ -3503,6 +3503,110 @@ function openTaskModal(task, forceKind) {
     setTimeout(function() { var n = $('task_name'); if (n) n.focus(); }, 50);
     if (typeof window.trkApplyTaskLockState === 'function') window.trkApplyTaskLockState(task);
 }
+/* PATCH task-summary: клик по проверке. «Планирование» (и новая) — сразу карточка редактирования,
+   иначе — краткая сводка с карандашом. Полное редактирование вне «Планирования» — только админ. */
+window.__trkTaskEditOverride = '';
+function _tsumIsAdmin() {
+    return !!(state.currentUser && state.currentUser.role === 'admin');
+}
+function trkOpenTaskSmart(task) {
+    window.__trkTaskEditOverride = '';
+    if (!task || !task.id || !task.status || task.status === 'planning') { openTaskModal(task); return; }
+    openTaskSummary(task);
+}
+window.trkOpenTaskSmart = trkOpenTaskSmart;
+function _tsumDate(iso) { return iso ? escapeHtml(formatDateHuman(iso)) : '—'; }
+function _tsumAddDays(iso, n) {
+    var p = (iso || '').split('-'); if (p.length !== 3) return '';
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + n));
+    return d.toISOString().slice(0, 10);
+}
+function _tsumEmpName(id) {
+    var e = (state.employees || []).find(function(x) { return x.id === id; });
+    return e ? escName(e.name) + (e.fired ? ' 🚪' : '') : escapeHtml(id || '');
+}
+function _tsumDepName(id) {
+    var d = (state.departments || []).find(function(x) { return x.id === id; });
+    return escapeHtml(d ? d.name : (id || ''));
+}
+function _tsumStages(task) {
+    var map = {};
+    if (Array.isArray(task.stages)) task.stages.forEach(function(s) { if (s && s.key && s.start) map[s.key] = s.start; });
+    else TASK_STAGE_ORDER.forEach(function(k) { var v = task['stage_' + k + '_start']; if (v) map[k] = v; });
+    var keys = TASK_STAGE_ORDER.filter(function(k) { return map[k]; });
+    return keys.map(function(k, i) {
+        var end = (i < keys.length - 1) ? _tsumAddDays(map[keys[i + 1]], -1) : (task.deadline || '');
+        return { key: k, start: map[k], end: end };
+    });
+}
+function _tsumRow(label, valueHtml, empty) {
+    return '<div class="tsum-row' + (empty ? ' tsum-row--empty' : '') + '"><div class="tsum-lbl">' + label + '</div><div class="tsum-val">' + valueHtml + '</div></div>';
+}
+function openTaskSummary(task) {
+    var m = $('taskSummaryModal'); if (!m || !task) return;
+    m.setAttribute('data-task-id', task.id);
+    var cf = $('tsumConfirm'); if (cf) cf.style.display = 'none';
+    $('tsumTitle').textContent = task.name || '—';
+    var stLbl = (state.taskStatusLabels && state.taskStatusLabels[task.status]) || task.status || '';
+    var q = window.trkQuarterValue ? window.trkQuarterValue(task.icon) : '';
+    $('tsumMeta').innerHTML = '<span class="tsum-status tsum-status--' + escapeHtml(task.status || '') + '">' + escapeHtml(stLbl) + '</span>'
+        + (q ? '<span class="tsum-quarter">' + escapeHtml(q) + '</span>' : '');
+    var eb = $('tsumEditBtn'); if (eb) eb.style.display = hasPerm('action.task.edit') ? '' : 'none';
+    var isAudit = (task.task_kind || 'audit') !== 'other';
+    var h = '';
+    // Руководитель и куратор — всегда, даже если не указаны
+    if (isAudit) {
+        var lead = task.lead_department
+            ? _tsumDepName(task.lead_department) + (task.lead_employee ? ' · ' + _tsumEmpName(task.lead_employee) : '')
+            : '<span class="tsum-missing">не указан</span>';
+        h += _tsumRow('👑 Руководитель', lead, !task.lead_department);
+    }
+    var cur = (task.curator && task.curator !== 'нет') ? escapeHtml(task.curator) : '<span class="tsum-missing">не указан</span>';
+    h += _tsumRow('👤 Куратор ЦА', cur, !(task.curator && task.curator !== 'нет'));
+    // Остальное — только непустое
+    if (task.task_type) h += _tsumRow('🧭 Направление', escapeHtml(task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1)));
+    if (task.pocket) h += _tsumRow('👝 Карман', escapeHtml(task.pocket));
+    var deps = task.department_ids || [];
+    if (deps.length) h += _tsumRow('🏦 Банки', '<ul class="tsum-list">' + deps.map(function(d) {
+        return '<li>' + _tsumDepName(d) + (d === task.lead_department ? ' <span class="tsum-lead-mark" title="Банк-руководитель">👑</span>' : '') + '</li>';
+    }).join('') + '</ul>');
+    var asg = task.assignees || [];
+    if (asg.length) h += _tsumRow('👥 Участники', '<ul class="tsum-list">' + asg.map(function(a) { return '<li>' + _tsumEmpName(a) + '</li>'; }).join('') + '</ul>');
+    // Сроки и этапы — внизу компактно
+    var dl = _tsumDate(task.deadline);
+    if (task.initial_deadline && task.initial_deadline !== task.deadline) dl += '<div class="tsum-initial">изначальный срок: ' + _tsumDate(task.initial_deadline) + '</div>';
+    var dates = '<div class="tsum-dates"><div class="tsum-dates-main">🚀 ' + _tsumDate(task.start_date) + ' → ⏰ ' + dl + '</div>';
+    var stg = isAudit ? _tsumStages(task) : [];
+    if (stg.length) {
+        dates += '<table class="tsum-stages">' + stg.map(function(s) {
+            return '<tr><td><span class="tsum-stage-dot" style="background:' + (TASK_STAGE_COLORS[s.key] || '#999') + '"></span>' + escapeHtml(TASK_STAGE_LABELS[s.key] || s.key)
+                + '</td><td>' + escapeHtml(formatDateShort(s.start)) + ' – ' + (s.end ? escapeHtml(formatDateShort(s.end)) : '—') + '</td></tr>';
+        }).join('') + '</table>';
+    }
+    dates += '</div>';
+    h += '<div class="tsum-section-sep"></div>' + _tsumRow('📅 Сроки', dates);
+    $('tsumBody').innerHTML = h;
+    m.classList.add('active');
+}
+window.openTaskSummary = openTaskSummary;
+function _tsumCurrentTask() {
+    var m = $('taskSummaryModal'); var id = m && m.getAttribute('data-task-id');
+    return (state.tasks || []).find(function(x) { return String(x.id) === String(id); }) || null;
+}
+on('tsumEditBtn', 'click', function() { var cf = $('tsumConfirm'); if (cf) cf.style.display = ''; });
+on('tsumConfirmNo', 'click', function() { var cf = $('tsumConfirm'); if (cf) cf.style.display = 'none'; });
+on('tsumConfirmYes', 'click', function() {
+    var t = _tsumCurrentTask();
+    var m = $('taskSummaryModal'); if (m) m.classList.remove('active');
+    if (!t) return;
+    if (_tsumIsAdmin()) {
+        window.__trkTaskEditOverride = String(t.id);
+    } else {
+        window.__trkTaskEditOverride = '';
+        notify('Редактировать проверку вне статуса «Планирование» может только администратор. Карточка открыта в режиме просмотра.', 'info');
+    }
+    openTaskModal(t);
+});
 function saveTask() {
     var name = $('task_name') ? $('task_name').value.trim() : '';
     if (!name) { notify('❌ Укажите название', 'error'); return; }
@@ -14136,7 +14240,8 @@ function _renderLinks(items){
 window.trkApplyTaskLockState = function(task){
     task = task || {};
     var hasId = !!task.id;
-    var isPlanning = !hasId || !task.status || task.status === 'planning';
+    var isOverride = hasId && window.__trkTaskEditOverride && String(window.__trkTaskEditOverride) === String(task.id);
+    var isPlanning = !hasId || !task.status || task.status === 'planning' || !!isOverride;
     var canExtend = hasId && task.status === 'active';
     var extendBtn = document.getElementById('taskExtendBtn');
     var histBtn = document.getElementById('taskDatesHistoryBtn');
