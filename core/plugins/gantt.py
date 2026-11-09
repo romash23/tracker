@@ -840,6 +840,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
             <select id="fType">
                 <option value="">Все типы проверок</option>
                 <option value="розничная">Розничная</option>
+                <option value="розничная_без_пвр">Розничная без ПВР</option>
                 <option value="корпоративная">Корпоративная</option>
             </select>
             <div class="ms-dd" id="fPocketDD">
@@ -1299,10 +1300,21 @@ function loadMeta() {
         });
 }
 
+/* Карман ПВР: сравнение без учёта регистра и пробелов («ПВР», «пвр », «Пвр»). */
+function ggIsPvrPocket(p) {
+    return String(p || '').replace(/\s+/g, '').toLowerCase() === 'пвр';
+}
+/* Фильтр «Розничная без ПВР»: карман ПВР в списке карманов недоступен. */
+var GG_TYPE_NO_PVR = 'розничная_без_пвр';
+var ggPocketsAll = [];
 function fillPocketFilter(pockets) {
+    ggPocketsAll = (pockets || []).slice();
+    var noPvr = document.getElementById('fType').value === GG_TYPE_NO_PVR;
     var opts = [];
-    (pockets || []).forEach(function(p) {
-        if (p) opts.push({ value: p, label: p });
+    ggPocketsAll.forEach(function(p) {
+        if (!p) return;
+        if (noPvr && ggIsPvrPocket(p)) return;
+        opts.push({ value: p, label: p });
     });
     msSetOptions('pocket', opts);
 }
@@ -1766,7 +1778,11 @@ document.getElementById('fApply').addEventListener('click', load);
 document.getElementById('fTeam').addEventListener('change', load);
 document.getElementById('fStatus').addEventListener('change', load);
 document.getElementById('fView').addEventListener('change', load);
-document.getElementById('fType').addEventListener('change', load);
+document.getElementById('fType').addEventListener('change', function() {
+    // пересобираем список карманов до запроса, чтобы выбранный ПВР не ушёл в фильтр
+    fillPocketFilter(ggPocketsAll);
+    load();
+});
 
 document.getElementById('ggTaskClose').addEventListener('click', ggTaskClose);
 document.getElementById('ggTaskCancel').addEventListener('click', ggTaskClose);
@@ -1900,6 +1916,13 @@ def register(app, db, hooks):
         team = request.args.get('team', '').strip()
         status = request.args.get('status', '').strip()
         f_type = request.args.get('task_type', '').strip()
+        # «Розничная без ПВР»: розничные проверки, кроме кармана ПВР
+        # (регистр и пробелы в названии кармана не важны).
+        def _is_pvr(pk):
+            return ''.join((pk or '').split()).lower() == 'пвр'
+        no_pvr = (f_type == 'розничная_без_пвр')
+        if no_pvr:
+            f_type = 'розничная'
         pocket_sel = _multi('pocket')        # список выбранных карманов (пусто = все)
         # Вид задачи: мультивыбор ('audit'|'other'). Если параметр не передан —
         # по умолчанию показываем только аудиторские проверки.
@@ -1954,6 +1977,8 @@ def register(app, db, hooks):
             if ((t.get('task_kind') or 'audit')) not in kind_set:
                 continue
             if f_type and (t.get('task_type') or '') != f_type:
+                continue
+            if no_pvr and _is_pvr(t.get('pocket')):
                 continue
             if pocket_sel and (t.get('pocket') or '') not in pocket_sel:
                 continue
