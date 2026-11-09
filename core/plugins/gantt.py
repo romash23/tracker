@@ -724,6 +724,34 @@ body.trk-theme-light .legend { background: #ffffff; border-top-color: rgba(0,0,0
 body.trk-theme-light .gg-slider-wrap { background:#fff; }
 body.trk-theme-light .gg-wk-week { color:#212121; }
 
+/* --- Колбаски: направление и отображение --- */
+.gg-seg-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.gg-seg {
+    display: inline-flex; gap: 2px; padding: 3px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid var(--pg-card-border-soft, rgba(245,215,110,0.12));
+}
+.gg-seg button {
+    border: none; background: transparent; cursor: pointer;
+    padding: 5px 14px; border-radius: 999px;
+    font-family: inherit; font-size: 0.8rem; font-weight: 600;
+    color: var(--pg-meta, #a0a0a0); white-space: nowrap;
+    transition: background .15s, color .15s;
+}
+.gg-seg button:hover { color: var(--pg-text, #e8e8e8); }
+.gg-seg button.active {
+    background: #f4f4f4; color: #111;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+body.trk-theme-light .gg-seg { background: #dfe3e8; border-color: rgba(0,0,0,0.08); }
+body.trk-theme-light .gg-seg button { color: #6b7280; }
+body.trk-theme-light .gg-seg button:hover { color: #111; }
+body.trk-theme-light .gg-seg button.active { background: #ffffff; color: #111; font-weight: 700; box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.16); }
+/* Отображение: «Проверки» прячет нагрузку, «Банки» прячет Гант */
+body.gg-show-tasks #banksTitle, body.gg-show-tasks #banksBox { display: none !important; }
+body.gg-show-banks #ganttBox, body.gg-show-banks #ggLegend { display: none !important; }
+
 /* --- Вторая таблица: нагрузка по тер банкам --- */
 .banks-title {
     font-size: 1.1rem; font-weight: 800;
@@ -837,7 +865,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
                     <div class="ms-dd-panel" id="fKindPanel"></div>
                 </div>
             </div>
-            <select id="fType">
+            <select id="fType" style="display:none;" aria-hidden="true">
                 <option value="">Все типы проверок</option>
                 <option value="розничная">Розничная</option>
                 <option value="розничная_без_пвр">Розничная без ПВР</option>
@@ -867,6 +895,19 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
             </select></label>
             <button class="apply" id="fApply">✓ Показать</button>
         </div>
+        <div class="gg-seg-row">
+            <div class="gg-seg" id="ggTypeSeg" role="group" aria-label="Направление">
+                <button type="button" data-v="">Всего ОАМ</button>
+                <button type="button" data-v="корпоративная">Корпоративное</button>
+                <button type="button" data-v="розничная">Розничное с ПВР</button>
+                <button type="button" data-v="розничная_без_пвр">Розничное без ПВР</button>
+            </div>
+            <div class="gg-seg" id="ggShowSeg" role="group" aria-label="Отображение">
+                <button type="button" data-v="tasks">Проверки</button>
+                <button type="button" data-v="banks">Банки</button>
+                <button type="button" data-v="all">Все</button>
+            </div>
+        </div>
     </div>
     <div class="gantt-box" id="ganttBox">
         <div class="loading">Загрузка…</div>
@@ -874,7 +915,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
     <div class="gg-slider-wrap" id="ggSliderWrap" style="display:none;">
         <input type="range" id="ggSlider" min="0" max="1000" value="0" step="1">
     </div>
-    <div class="legend">
+    <div class="legend" id="ggLegend">
         <div class="it"><span class="sw active"></span>В работе</div>
         <div class="it"><span class="sw done"></span>Готово</div>
         <div class="it"><span class="sw paused"></span>Приостановлено</div>
@@ -882,7 +923,7 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
         <div class="it"><span class="sw archived"></span>Архив</div>
         <div class="it" style="margin-left:auto;font-style:italic;">Сегодняшний день выделен зелёным</div>
     </div>
-    <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по тер банкам</div>
+    <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по ТБ</div>
     <div class="gantt-box" id="banksBox" style="display:none;">
         <div class="loading">Загрузка…</div>
     </div>
@@ -1366,25 +1407,29 @@ function setupSlider() {
     var wrap = document.getElementById('ggSliderWrap');
     var sl = document.getElementById('ggSlider');
     var banks = document.getElementById('banksBox');
-    var maxScroll = box.scrollWidth - box.clientWidth;
-    if (maxScroll <= 2) { wrap.style.display = 'none'; }
-    else {
-        wrap.style.display = 'block';
-        sl.max = String(Math.round(maxScroll));
-        sl.value = String(Math.round(box.scrollLeft));
-        sl.oninput = function() {
-            box.scrollLeft = parseInt(sl.value, 10);
-            if (banks) banks.scrollLeft = box.scrollLeft;
-        };
+    /* В режиме «Банки» Гант скрыт, ползунок управляет таблицей нагрузки */
+    var master = (ggShowMode === 'banks' && banks) ? banks : box;
+    function syncSl() {
+        sl.max = String(Math.round(Math.max(0, master.scrollWidth - master.clientWidth)));
+        sl.value = String(Math.round(master.scrollLeft));
     }
+    var maxScroll = master.scrollWidth - master.clientWidth;
+    if (master.offsetParent === null || maxScroll <= 2) { wrap.style.display = 'none'; }
+    else { wrap.style.display = 'block'; syncSl(); }
+    sl.oninput = function() {
+        var v = parseInt(sl.value, 10);
+        master.scrollLeft = v;
+        if (master === box) { if (banks) banks.scrollLeft = v; } else { box.scrollLeft = v; }
+    };
     box.onscroll = function() {
-        var ms = box.scrollWidth - box.clientWidth;
-        sl.max = String(Math.round(ms));
-        sl.value = String(Math.round(box.scrollLeft));
+        if (master === box) syncSl();
         if (banks && banks.style.display !== 'none') banks.scrollLeft = box.scrollLeft;
     };
     if (banks) {
-        banks.onscroll = function() { box.scrollLeft = banks.scrollLeft; };
+        banks.onscroll = function() {
+            if (master === banks) syncSl();
+            box.scrollLeft = banks.scrollLeft;
+        };
     }
 }
 
@@ -1796,6 +1841,54 @@ document.addEventListener('click', function(ev) {
     ev.preventDefault(); ev.stopPropagation();
     ggTaskOpen(ed.getAttribute('data-edit-tid'));
 });
+
+/* --- Колбаски «Направление» и «Отображение» (выбор хранится в браузере) --- */
+var ggShowMode = 'all';
+function ggLsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+function ggLsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
+function ggSegMark(segId, v) {
+    document.querySelectorAll('#' + segId + ' button').forEach(function(b) {
+        var on = b.getAttribute('data-v') === v;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+}
+function ggSetType(v, silent) {
+    var sel = document.getElementById('fType');
+    var ok = Array.from(sel.options).some(function(o) { return o.value === v; });
+    if (!ok) v = '';
+    sel.value = v;
+    ggSegMark('ggTypeSeg', v);
+    ggLsSet('gg.fType', v);
+    if (!silent) sel.dispatchEvent(new Event('change'));
+}
+function ggSetShow(v) {
+    if (['tasks', 'banks', 'all'].indexOf(v) < 0) v = 'all';
+    var box = document.getElementById('ganttBox');
+    var banks = document.getElementById('banksBox');
+    var prevMaster = (ggShowMode === 'banks') ? banks : box;
+    var pos = prevMaster ? prevMaster.scrollLeft : 0;
+    ggShowMode = v;
+    document.body.classList.toggle('gg-show-tasks', v === 'tasks');
+    document.body.classList.toggle('gg-show-banks', v === 'banks');
+    ggSegMark('ggShowSeg', v);
+    ggLsSet('gg.show', v);
+    /* скрытая таблица теряет прокрутку, возвращаем ту же позицию обеим */
+    if (box) box.scrollLeft = pos;
+    if (banks) banks.scrollLeft = pos;
+    setupSlider();
+}
+document.getElementById('ggTypeSeg').addEventListener('click', function(ev) {
+    var b = ev.target.closest('button[data-v]'); if (!b) return;
+    if (b.classList.contains('active')) return;
+    ggSetType(b.getAttribute('data-v'));
+});
+document.getElementById('ggShowSeg').addEventListener('click', function(ev) {
+    var b = ev.target.closest('button[data-v]'); if (!b) return;
+    ggSetShow(b.getAttribute('data-v'));
+});
+ggSetType(ggLsGet('gg.fType') || '', true);
+ggSetShow(ggLsGet('gg.show') || 'all');
 
 msInit();
 msRenderPanel('kind'); msUpdateBtn('kind');
