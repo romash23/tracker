@@ -1589,6 +1589,13 @@ function _highlightInCard(card, query) {
     if (nameEl.innerHTML !== out) nameEl.innerHTML = out;
 }
 
+function _tskDirMark() {
+    var seg = document.getElementById('tskDirSeg'); if (!seg) return;
+    Array.prototype.forEach.call(seg.querySelectorAll('button[data-v]'), function(b) {
+        var on = b.getAttribute('data-v') === (state.tskDir || '');
+        b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+}
 function renderTasksFull() {
     var list = $('tasksFullList'); if (!list) return;
     // PATCH v1.0.12: восстанавливаем колонки из localStorage до рендера
@@ -1609,6 +1616,11 @@ function renderTasksFull() {
             return tc === curator;
         });
     }
+
+    // Направление (розница / корпоратив), выбор хранится в браузере
+    if (state.tskDir == null) { try { state.tskDir = localStorage.getItem('tracker_tsk_dir') || ''; } catch (e) { state.tskDir = ''; } }
+    if (state.tskDir) tasks = tasks.filter(function(t) { return (t.task_type || '') === state.tskDir; });
+    _tskDirMark();
 
     if (mode === 'planning') tasks = tasks.filter(function(t) { return t.status === 'planning'; });
     else if (mode === 'approved') tasks = tasks.filter(function(t) { return t.status === 'approved'; });
@@ -5101,6 +5113,15 @@ function renderEmpDayModal(d) {
 on('tskDeptFilter', 'change', renderTasksFull);
 on('tskCuratorFilter', 'change', renderTasksFull);
 on('tskSortSelect', 'change', renderTasksFull);
+(function() {
+    var seg = $('tskDirSeg'); if (!seg) return;
+    seg.addEventListener('click', function(ev) {
+        var b = ev.target.closest('button[data-v]'); if (!b) return;
+        state.tskDir = b.getAttribute('data-v');
+        try { localStorage.setItem('tracker_tsk_dir', state.tskDir); } catch (e) {}
+        renderTasksFull();
+    });
+})();
 on('cmpDeptFilter', 'change', renderCompletedFull);
 on('cmpCuratorFilter', 'change', renderCompletedFull);
 on('cmpSearchInput', 'input', renderCompletedFull);

@@ -60,6 +60,7 @@ PERMISSION_GROUPS = [
         'title': 'Действия',
         'items': [
             ('action.log.create',            'Создавать отметки'),
+            ('action.load.override',         'Нагрузка по ТБ: ручная правка загрузки'),
             ('action.log.edit.own',          'Редактировать свои отметки'),
             ('action.log.edit.any',          'Редактировать любые отметки'),
             ('action.log.delete.own',        'Удалять свои отметки'),

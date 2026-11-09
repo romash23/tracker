@@ -3,6 +3,7 @@
 __version__ = '2.0'
 __description__ = 'Диаграмма Ганта: sticky-заголовок, sticky-колонка задач, крупные полосы, светлая/тёмная тема'
 
+import io
 from datetime import date, datetime, timedelta
 from flask import request, jsonify, Response, redirect
 
@@ -18,6 +19,9 @@ from flask import request, jsonify, Response, redirect
 #   (гибрид 0.5/0.5 даёт 0.5 в каждое). Нагрузка считается ОДИН раз и
 #   не зависит от фильтра направления (фильтр влияет только на показ строк).
 # ============================================================
+_OV_SCOPES = ('oam', 'корпоративная', 'розничная', 'розничная_без_пвр')
+
+
 def _heatmap_compute(data, d1, d2, mode):
     def _d(s):
         try:
@@ -934,6 +938,59 @@ body.trk-theme-light .gg-neg { color: #c62828; }
     .head { padding: 12px 14px; }
     .head h1 { font-size: 1.05rem; }
 }
+
+/* ===== Этап 3: панель управления нагрузкой, KPI, ручные правки ===== */
+.gg-load-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 4px 6px; }
+.gg-plan-tgl { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--pg-meta, #a0a0a0); cursor: pointer; user-select: none; }
+.gg-plan-tgl input { accent-color: #7e57c2; width: 15px; height: 15px; cursor: pointer; }
+.gg-xls-btn { margin-left: auto; border: 1px solid rgba(46,204,113,0.55); background: rgba(46,204,113,0.10); color: var(--pg-text, #e8e8e8); border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.gg-xls-btn:hover { background: rgba(46,204,113,0.22); }
+.gg-xls-btn:disabled { opacity: .6; cursor: wait; }
+body.trk-theme-light .gg-plan-tgl { color: #4b5563; }
+body.trk-theme-light .gg-xls-btn { color: #14532d; background: #ecfdf3; border-color: #86d6a6; }
+body.gg-show-tasks #ggLoadBar, body.gg-show-tasks #ggKpi { display: none !important; }
+.gg-kpi { margin: 0 4px 8px; }
+.gg-kpi-cards { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 8px; }
+.gg-kpi-card { border: 1px solid var(--pg-card-border-soft, rgba(255,255,255,0.10)); background: var(--pg-card-bg, #1a1a1a); border-radius: 10px; padding: 8px 12px; }
+.gg-kpi-card.bad { border-color: rgba(229,57,53,0.75); box-shadow: inset 3px 0 0 #e53935; }
+.gg-kpi-card.ok { box-shadow: inset 3px 0 0 #43a047; }
+.gg-kpi-lbl { font-size: 0.72rem; color: var(--pg-meta, #a0a0a0); font-weight: 600; }
+.gg-kpi-val { font-size: 1.25rem; font-weight: 800; margin: 2px 0; }
+.gg-kpi-sub { font-size: 0.72rem; color: var(--pg-meta, #a0a0a0); }
+.gg-kpi-warn { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; font-size: 0.78rem; }
+.gg-kpi-warn-t { font-weight: 700; color: #ef5350; }
+.gg-kpi-chip { border: 1px solid rgba(229,57,53,0.6); background: rgba(229,57,53,0.12); color: inherit; border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; cursor: pointer; }
+.gg-kpi-chip:hover { background: rgba(229,57,53,0.25); }
+.gg-kpi-okline { margin-top: 6px; font-size: 0.78rem; color: #43a047; font-weight: 600; }
+body.trk-theme-light .gg-kpi-card { background: #fff; border-color: #e5e7eb; }
+@media (max-width: 900px) { .gg-kpi-cards { grid-template-columns: repeat(2, 1fr); } }
+/* ячейки: предварительные (уголок), ручные (✎), протягивание */
+.gg-load-tbl .gg-load-cell.gg-has-plan::before { content: ''; position: absolute; left: 0; top: 0; border-style: solid; border-width: 10px 10px 0 0; border-color: #b388ff transparent transparent transparent; border-top-left-radius: 3px; filter: drop-shadow(0 0 1px rgba(0,0,0,0.6)); }
+.gg-load-tbl .gg-load-cell.gg-man { box-shadow: inset 0 0 0 2px #7986cb; }
+.gg-load-tbl .gg-load-cell.gg-man::after { content: '✎'; position: absolute; right: 2px; top: 1px; width: 12px; height: 12px; line-height: 12px; text-align: center; border-radius: 50%; background: #3949ab; color: #fff; font-size: 9px; font-style: normal; font-weight: 700; }
+.gg-load-tbl .gg-load-cell.gg-neg-free { color: #b71c1c; font-weight: 800; }
+.gg-load-tbl .gg-load-cell.gg-lp5.gg-neg-free { color: #fff; }
+.gg-fill-h { position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; background: #2e7d32; border: 1px solid #fff; border-radius: 2px; cursor: crosshair; display: none; z-index: 3; }
+.gg-load-tbl .gg-load-cell:hover .gg-fill-h { display: block; }
+.gg-load-tbl .gg-load-cell.gg-fill-sel { outline: 2px dashed #2e7d32 !important; outline-offset: -1px; }
+body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: none !important; }
+.gg-load-legend .sw.gg-plan-sw { position: relative; background: transparent; border: 1px solid rgba(160,160,160,0.6); overflow: hidden; }
+.gg-load-legend .sw.gg-plan-sw::before { content: ''; position: absolute; left: 0; top: 0; border-style: solid; border-width: 10px 10px 0 0; border-color: #b388ff transparent transparent transparent; }
+.gg-load-legend .sw.gg-man-sw { background: #3949ab; box-shadow: inset 0 0 0 2px #7986cb; font-size: 9px; line-height: 12px; text-align: center; color: #fff; font-weight: 700; }
+/* панель: ручная правка */
+.gg-lp-man { margin: 10px 0 4px; padding: 8px 10px; border: 1px dashed rgba(92,107,192,0.7); border-radius: 8px; }
+.gg-lp-man-h { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; }
+.gg-lp-man-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.gg-lp-man-row input { width: 80px; padding: 4px 6px; border-radius: 6px; border: 1px solid rgba(160,160,160,0.6); background: transparent; color: inherit; font: inherit; }
+.gg-lp-btn { border: 1px solid rgba(92,107,192,0.7); background: rgba(92,107,192,0.15); color: inherit; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.gg-lp-btn:hover { background: rgba(92,107,192,0.3); }
+.gg-lp-man-hint { font-size: 0.72rem; color: var(--pg-meta, #a0a0a0); margin-top: 5px; }
+.gg-flash { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30000; background: #fff; color: #14532d; border: 3px solid #2e7d32; border-radius: 12px; padding: 14px 24px; font-weight: 700; box-shadow: 0 10px 40px rgba(0,0,0,0.35); display: none; }
+.gg-flash.bad { color: #7f1d1d; border-color: #c62828; }
+/* шаг «Месяцы» */
+.gg-mode-week .gg-mo-cell { position: absolute; top: 4px; bottom: 4px; border-radius: 4px; overflow: hidden; display: flex; }
+.gg-mo-cell > i { flex: 1 1 0; height: 100%; display: block; }
+.gg-mo-cell > i[style] + i[style] { border-left: 1px solid rgba(0,0,0,0.35); }
 </style>
 </head>
 <body>
@@ -978,6 +1035,7 @@ body.trk-theme-light .gg-neg { color: #c62828; }
             <label>Вид <select id="fView">
                 <option value="week">Недели</option>
                 <option value="day">Дни</option>
+                <option value="month">Месяцы</option>
             </select></label>
             <button class="apply" id="fApply">✓ Показать</button>
         </div>
@@ -1010,6 +1068,20 @@ body.trk-theme-light .gg-neg { color: #c62828; }
         <div class="it" style="margin-left:auto;font-style:italic;">Сегодняшний день выделен зелёным</div>
     </div>
     <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по ТБ</div>
+    <div class="gg-load-bar" id="ggLoadBar" style="display:none;">
+        <div class="gg-seg" id="ggMetricSeg" role="group" aria-label="Показатель">
+            <button type="button" data-v="load">Загрузка</button>
+            <button type="button" data-v="free">Свободно</button>
+            <button type="button" data-v="pct">%</button>
+        </div>
+        <div class="gg-seg" id="ggHcSeg" role="group" aria-label="Численность">
+            <button type="button" data-v="norm" title="Ёмкость = экспертный коэффициент × нормативная численность">Нормативная</button>
+            <button type="button" data-v="fact" title="Ёмкость = экспертный коэффициент × фактическая численность (работающие сотрудники)">Фактическая</button>
+        </div>
+        <label class="gg-plan-tgl" title="Учитывать проверки в статусе «Планирование»"><input type="checkbox" id="ggPlanChk"> с предварительными</label>
+        <button type="button" class="gg-xls-btn" id="ggXlsBtn" title="Выгрузить таблицу в Excel">⬇ Excel</button>
+    </div>
+    <div class="gg-kpi" id="ggKpi" style="display:none;"></div>
     <div class="gantt-box" id="banksBox" style="display:none;">
         <div class="loading">Загрузка…</div>
     </div>
@@ -1022,6 +1094,8 @@ body.trk-theme-light .gg-neg { color: #c62828; }
         <span class="it"><span class="sw gg-lp5"></span>&gt;125%</span>
         <span class="it"><span class="sw gg-lpna"></span>ёмкость не задана</span>
         <span class="it"><span class="sw gg-offweek-sw"></span>нерабочая неделя</span>
+        <span class="it"><span class="sw gg-plan-sw"></span>есть предварительные</span>
+        <span class="it"><span class="sw gg-man-sw">✎</span>задано вручную</span>
         <span class="gg-ll-note">Ёмкость = экспертный коэффициент × нормативная численность. Наведите на ячейку — подробности, клик — список проверок.</span>
     </div>
     <div class="gg-modal-mask" id="ggTaskMask">
@@ -1474,6 +1548,7 @@ function load() {
     });
     var fty = document.getElementById('fType').value;
     if (fty) q += '&task_type=' + encodeURIComponent(fty);
+    if (document.getElementById('fView').value === 'month') q += '&view=month';
     msGetSelected('pocket').forEach(function(v) {
         q += '&pocket=' + encodeURIComponent(v);
     });
@@ -1495,7 +1570,14 @@ function render(d) {
     ggHolidays = d.holidays || {};
     var view = document.getElementById('fView').value;
     if (view === 'week') { renderWeek(d); }
+    else if (view === 'month') { renderMonth(d); }
     else { renderDay(d); }
+    if (ggKeepScroll) {
+        var _gb = document.getElementById('ganttBox'), _bb = document.getElementById('banksBox');
+        if (_gb) _gb.scrollLeft = ggKeepScroll.g;
+        if (_bb) _bb.scrollLeft = ggKeepScroll.b;
+        ggKeepScroll = null;
+    }
     setupSlider();
 }
 
@@ -1772,6 +1854,73 @@ function renderWeek(d) {
     renderBanks(d, weeks, 'week', WEEK_W, STAGE_COLORS, STAGE_LABELS);
 }
 
+/* Шаг «Месяцы»: колонка = календарный месяц; полоса проверки делится на недели месяца */
+function buildMonths(days) {
+    if (!days.length) return [];
+    var weeks = buildWeeks(days), out = [];
+    var y = +days[0].slice(0, 4), mi = +days[0].slice(5, 7) - 1;
+    var ly = +days[days.length - 1].slice(0, 4), lmi = +days[days.length - 1].slice(5, 7) - 1, guard = 0;
+    while ((y < ly || (y === ly && mi <= lmi)) && guard < 40) {
+        var mm = String(mi + 1).padStart(2, '0');
+        var start = y + '-' + mm + '-01';
+        var nd = new Date(y, mi + 1, 0);
+        var end = y + '-' + mm + '-' + String(nd.getDate()).padStart(2, '0');
+        var mons = weeks.filter(function(w) { return w.mon.slice(0, 7) === y + '-' + mm; }).map(function(w) { return w.mon; });
+        out.push({ start: start, end: end, mi: mi, yr: y, mons: mons, mon: start });
+        mi++; if (mi > 11) { mi = 0; y++; } guard++;
+    }
+    return out;
+}
+function renderMonth(d) {
+    var box = document.getElementById('ganttBox');
+    var tasks = d.tasks || [], days = d.days || [], today = d.today || '';
+    if (!tasks.length) { box.innerHTML = '<div class="empty">Нет задач за выбранный период</div>'; clearBanks(); return; }
+    var months = buildMonths(days);
+    if (!months.length) { box.innerHTML = '<div class="empty">Пустой диапазон дат</div>'; return; }
+    var STAGE_COLORS = {'подготовка':'#C9CDCC','проверка_нжя':'#DFD4BD','проверка_соглЦА':'#D4B64B','ос_проф':'#747677','реализация_возражения':'#9BB393','реализация_согласования':'#6E8F6A','запас':'#B0BEC5','оценка_тб':'#8FA9C9'};
+    var SL = GG_STAGE_LABELS;
+    var trackW = months.length * MONTH_W;
+    var ySpans = [];
+    months.forEach(function(p) { var l = ySpans[ySpans.length - 1]; if (l && l.yr === p.yr) l.count++; else ySpans.push({ yr: p.yr, count: 1 }); });
+    var html = '<div class="gantt-inner gg-mode-week">';
+    html += '<div class="gg-header" style="height:70px;"><div class="gg-corner">Задача</div><div class="gg-wk-head"><div class="gg-wk-months">';
+    ySpans.forEach(function(y, yi) { html += '<div class="gg-wk-month" style="width:' + (y.count * MONTH_W) + 'px;background:' + MONTH_COLORS[(yi * 5) % MONTH_COLORS.length] + '">' + y.yr + '</div>'; });
+    html += '</div><div class="gg-wk-weeks">';
+    months.forEach(function(p) {
+        var now = today && p.start <= today && today <= p.end;
+        html += '<div class="gg-wk-week' + (now ? ' today' : '') + '" style="width:' + MONTH_W + 'px" title="' + p.start + ' — ' + p.end + '">' + MONTH_NAMES[p.mi].slice(0, 3) + '</div>';
+    });
+    html += '</div></div></div><div class="gg-body"><div class="gg-bg" style="width:' + trackW + 'px">';
+    months.forEach(function(p, i) {
+        if (today && p.start <= today && today <= p.end) html += '<div class="gg-bg-cell gg-bg-today" style="left:' + (i * MONTH_W) + 'px;width:' + MONTH_W + 'px"></div>';
+    });
+    html += '</div>';
+    tasks.forEach(function(t) {
+        html += '<div class="gg-row gg-task-row" data-tid="' + esc(t.id) + '"><div class="gg-name">';
+        html += '<span class="gg-dot gg-dot-' + (t.overdue ? 'overdue' : (t.status || 'active')) + '"></span>';
+        html += '<span class="gg-ico">' + esc(t.icon || '📋') + '</span>';
+        html += '<span class="gg-task-name" title="' + esc(t.name) + '">' + esc(t.name) + '</span>';
+        html += '<button type="button" class="gg-edit" data-edit-tid="' + esc(t.id) + '" title="Редактировать" aria-label="Редактировать">✏️</button>';
+        html += '</div><div class="gg-track" style="width:' + trackW + 'px">';
+        months.forEach(function(p, i) {
+            var parts = [], any = false, ttl = [];
+            p.mons.forEach(function(mn) {
+                var st = stageAtMonday(t.stages, mn);
+                if (st) { any = true; parts.push('<i style="background:' + (STAGE_COLORS[st.key] || '#888') + '"></i>'); ttl.push(fmtD(mn) + ': ' + (SL[st.key] || st.key)); }
+                else parts.push('<i></i>');
+            });
+            if (!any) return;
+            html += '<div class="gg-mo-cell" style="left:' + (i * MONTH_W + 2) + 'px;width:' + (MONTH_W - 4) + 'px" title="' + esc(ttl.join('\n')) + '">' + parts.join('') + '</div>';
+        });
+        html += '</div></div>';
+    });
+    html += '</div></div>';
+    html += '<div class="gg-stage-legend">';
+    Object.keys(SL).forEach(function(k) { html += '<span class="lg-item"><span class="lg-chip" style="background:' + (STAGE_COLORS[k] || '#888') + '"></span>' + SL[k] + '</span>'; });
+    html += '</div>';
+    box.innerHTML = html;
+    renderBanks(d, months, 'month', MONTH_W, STAGE_COLORS, SL);
+}
 /* Строит таблицу "Нагрузка по тер банкам": строки — банки,
    столбцы — те же периоды (недели ИЛИ дни), значение = сумма весов
    этапов всех задач банка, активных в этом периоде, с коэффициентом
@@ -1785,11 +1934,17 @@ function clearBanks() {
     if (b) { b.style.display = 'none'; b.innerHTML = ''; }
     if (l) l.style.display = 'none';
     ggLoadPanelClose();
+    ggShowLoadBar(false);
 }
 
 /* ===== Нагрузка по ТБ: цвет по % к ёмкости, итог ОАМ, подсказка, панель ===== */
 var GG_STATUS_LBL = { planning:'Планирование', approved:'Утверждена', active:'Активна', done:'Завершена', cancelled:'Отменена', paused:'Приостановлена', archived:'Архив' };
 var GG_STATUS_COL = { planning:'#7e57c2', approved:'#d68910', active:'#2874a6', done:'#239b56', cancelled:'#7f8c8d', paused:'#7f8c8d', archived:'#7f8c8d' };
+var ggMetric = (function() { try { var v = localStorage.getItem('gg.metric'); return ['load', 'free', 'pct'].indexOf(v) >= 0 ? v : 'load'; } catch (e) { return 'load'; } })();
+var ggHcMode = (function() { try { return localStorage.getItem('gg.hc') === 'fact' ? 'fact' : 'norm'; } catch (e) { return 'norm'; } })();
+var ggIncPlan = (function() { try { return localStorage.getItem('gg.plan') !== '0'; } catch (e) { return true; } })();
+var ggFill = null, ggSuppressClick = false, ggKeepScroll = null;
+var MONTH_W = 64;
 var ggLoadModel = null;      /* данные последней отрисовки для подсказки и панели */
 var ggLoadSel = null;        /* выбранная ячейка {row, idx} */
 
@@ -1833,14 +1988,17 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
         box.style.display = 'none';
         box.innerHTML = '';
         if (legend) legend.style.display = 'none';
+        ggShowLoadBar(false);
         ggLoadModel = null;
         return;
     }
     titleEl.style.display = 'block';
     box.style.display = 'block';
     if (legend) legend.style.display = 'flex';
+    ggShowLoadBar(true);
 
     var isWeek = (mode === 'week');
+    var isMonth = (mode === 'month');
     var todayMon = d.today ? mondayOf(d.today) : '';
     var today = d.today || '';
     var trackW = periods.length * cellW;
@@ -1849,6 +2007,12 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
 
     /* Периоды: границы, «сейчас», нерабочие дни */
     var pinfo = periods.map(function(p) {
+        if (isMonth) {
+            var offM = 0;
+            p.mons.forEach(function(mn) { var o = 0; for (var k = 0; k < 5; k++) { if (isOffDay(ggAddDays(mn, k))) o++; } if (o >= 5) offM++; });
+            return { start: p.start, end: p.end, now: !!(today && p.start <= today && today <= p.end), offDays: 0, offWeek: false, offDay: false,
+                     label: MONTH_NAMES[p.mi] + ' ' + p.yr + ' (среднее по ' + p.mons.length + ' нед.)', mons: p.mons, short: MONTH_NAMES[p.mi].slice(0, 3) + ' ' + String(p.yr).slice(2) };
+        }
         if (isWeek) {
             var off = 0;
             for (var k = 0; k < 5; k++) { if (isOffDay(ggAddDays(p.mon, k))) off++; }
@@ -1859,61 +2023,115 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
     });
 
     /* load[bankId][i] и вклад каждой задачи contrib[bankId][i] */
-    var load = {}, contrib = {};
+    var load = {}, contrib = {}, plan = {}, manual = {}, calc = {};
+    var ovMap = {};
+    (d.overrides || []).forEach(function(o) { ovMap[o.bank + '|' + o.week] = +o.value || 0; });
     banks.forEach(function(b) {
-        load[b.id] = []; contrib[b.id] = [];
-        for (var i = 0; i < periods.length; i++) { load[b.id].push(0); contrib[b.id].push([]); }
+        load[b.id] = []; contrib[b.id] = []; plan[b.id] = []; manual[b.id] = []; calc[b.id] = [];
+        for (var i = 0; i < periods.length; i++) { load[b.id].push(0); contrib[b.id].push([]); plan[b.id].push(0); manual[b.id].push(false); calc[b.id].push(0); }
     });
-    tasks.forEach(function(t) {
+    /* вклад проверки в банк на дату day (понедельник недели / день) */
+    function ggContribAt(t, did, day) {
+        var isOther = (t.task_kind || 'audit') === 'other';
+        if (isOther) {
+            var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
+            if (lc <= 0) return null;
+            if (t.start_date && day < t.start_date) return null;
+            if (t.deadline && day > t.deadline) return null;
+            return { base: lc, k: 1, stLbl: 'Другое (коэф. нагрузки)' };
+        }
+        var st = stageAtMonday(t.stages, day);
+        if (!st) return null;
+        return { base: (st.weight != null ? +st.weight : 1), k: leadCoef(t, did), stLbl: SL[st.key] || st.key || 'Этап' };
+    }
+    var useTasks = tasks.filter(function(t) { return ggIncPlan || t.status !== 'planning'; });
+    useTasks.forEach(function(t) {
         var dids = t.dept_ids || [];
         if (!dids.length) return;
-        var isOther = (t.task_kind || 'audit') === 'other';
         periods.forEach(function(p, i) {
-            var day = pMon(p);
-            var base = 0, stLbl = '';
-            if (isOther) {
-                var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
-                if (lc <= 0) return;
-                if (t.start_date && day < t.start_date) return;
-                if (t.deadline && day > t.deadline) return;
-                base = lc; stLbl = 'Другое (коэф. нагрузки)';
-            } else {
-                var st = stageAtMonday(t.stages, day);
-                if (!st) return;
-                base = (st.weight != null ? +st.weight : 1);
-                stLbl = SL[st.key] || st.key || 'Этап';
-            }
+            var days = isMonth ? p.mons : [pMon(p)];
+            var div = isMonth ? (p.mons.length || 1) : 1;
             dids.forEach(function(did) {
                 if (!load[did]) return;
-                var k = isOther ? 1 : leadCoef(t, did);
-                var v = base * k;
-                if (!(v > 0)) return;
+                var sum = 0, first = null, wk = 0;
+                days.forEach(function(day) {
+                    var c = ggContribAt(t, did, day);
+                    if (!c) return;
+                    var v = c.base * c.k;
+                    if (!(v > 0)) return;
+                    sum += v; wk++;
+                    if (!first) first = c;
+                });
+                if (!(sum > 0)) return;
+                var v = sum / div;
                 load[did][i] += v;
-                contrib[did][i].push({ task: t, bank: did, stage: stLbl, weight: base, coef: k,
-                                       lead: (t.lead_department || '') === did, value: v });
+                if (t.status === 'planning') plan[did][i] += v;
+                contrib[did][i].push({ task: t, bank: did, stage: first.stLbl + (isMonth ? ' (' + wk + ' из ' + div + ' нед.)' : ''),
+                    weight: first.base, coef: first.k, lead: (t.lead_department || '') === did, value: v });
             });
+        });
+    });
+    /* ручные правки (только недельные; в «Месяцах» заменяют расчёт своих недель) */
+    function ggWeekCalc(did, mon) {
+        var s = 0;
+        useTasks.forEach(function(t) {
+            if ((t.dept_ids || []).indexOf(did) < 0) return;
+            var c = ggContribAt(t, did, mon); if (c) s += c.base * c.k;
+        });
+        return s;
+    }
+    banks.forEach(function(b) {
+        periods.forEach(function(p, i) {
+            calc[b.id][i] = load[b.id][i];
+            if (isWeek) {
+                var k = b.id + '|' + p.mon;
+                if (ovMap.hasOwnProperty(k)) { load[b.id][i] = ovMap[k]; manual[b.id][i] = true; }
+            } else if (isMonth) {
+                var adj = 0, hit = false;
+                p.mons.forEach(function(mn) {
+                    var k2 = b.id + '|' + mn;
+                    if (ovMap.hasOwnProperty(k2)) { hit = true; adj += ovMap[k2] - ggWeekCalc(b.id, mn); }
+                });
+                if (hit) { load[b.id][i] = Math.max(0, load[b.id][i] + adj / (p.mons.length || 1)); manual[b.id][i] = true; }
+            }
         });
     });
 
     /* Итог: сумма по показанным банкам, ёмкость — по всем банкам ОАМ (или выбранным) */
-    var totLoad = [], totContrib = [];
+    var totLoad = [], totContrib = [], totPlan = [], totMan = [], totCalc = [];
     for (var i = 0; i < periods.length; i++) {
-        var s = 0, c = [];
-        banks.forEach(function(b) { s += load[b.id][i]; c = c.concat(contrib[b.id][i]); });
-        totLoad.push(s); totContrib.push(c);
+        var s = 0, c = [], pl = 0, mn = false, cc = 0;
+        banks.forEach(function(b) { s += load[b.id][i]; c = c.concat(contrib[b.id][i]); pl += plan[b.id][i]; cc += calc[b.id][i]; if (manual[b.id][i]) mn = true; });
+        totLoad.push(s); totContrib.push(c); totPlan.push(pl); totMan.push(mn); totCalc.push(cc);
     }
+    var isFact = (ggHcMode === 'fact');
+    function capOf(v) { return (v == null ? null : +v); }
     var dirs = d.capacity_dirs || ['retail', 'corp'];
     var totName = 'Итого ОАМ' + (dirs.length === 1 ? (dirs[0] === 'retail' ? ' · розница' : ' · корпоратив') : '');
     var rows = banks.map(function(b) {
-        return { id: b.id, name: b.name, cap: (b.capacity == null ? null : +b.capacity), load: load[b.id], contrib: contrib[b.id], total: false };
+        return { id: b.id, name: b.name, cap: capOf(isFact ? b.capacity_fact : b.capacity), load: load[b.id], contrib: contrib[b.id], plan: plan[b.id], manual: manual[b.id], calc: calc[b.id], total: false };
     });
-    var totRow = { id: '__total', name: totName, cap: (d.total_capacity == null ? null : +d.total_capacity), load: totLoad, contrib: totContrib, total: true };
+    var totRow = { id: '__total', name: totName, cap: capOf(isFact ? d.total_capacity_fact : d.total_capacity), load: totLoad, contrib: totContrib, plan: totPlan, manual: totMan, calc: totCalc, total: true };
     rows.push(totRow);
-    ggLoadModel = { rows: rows, pinfo: pinfo, tasks: tasks, isWeek: isWeek, dirs: dirs };
+    ggLoadModel = { rows: rows, pinfo: pinfo, tasks: tasks, isWeek: isWeek, isMonth: isMonth, mode: mode, dirs: dirs,
+                    canOv: !!d.can_override && isWeek, scope: d.ov_scope || 'oam', today: today };
 
-    var html = '<div class="gantt-inner gg-mode-' + (isWeek ? 'week' : 'day') + ' gg-load-tbl">';
-    html += '<div class="gg-header"' + (isWeek ? ' style="height:70px;"' : '') + '>';
-    html += '<div class="gg-corner">Тер банк · ёмкость</div>';
+    var html = '<div class="gantt-inner gg-mode-' + ((isWeek || isMonth) ? 'week' : 'day') + ' gg-load-tbl">';
+    html += '<div class="gg-header"' + ((isWeek || isMonth) ? ' style="height:70px;"' : '') + '>';
+    html += '<div class="gg-corner">Тер банк · ёмкость' + (isFact ? ' (факт)' : '') + '</div>';
+    if (isMonth) {
+        var ySpans = [];
+        periods.forEach(function(p) { var l = ySpans[ySpans.length - 1]; if (l && l.yr === p.yr) l.count++; else ySpans.push({ yr: p.yr, count: 1 }); });
+        html += '<div class="gg-wk-head"><div class="gg-wk-months">';
+        ySpans.forEach(function(y, yi) { html += '<div class="gg-wk-month" style="width:' + (y.count * cellW) + 'px;background:' + MONTH_COLORS[(yi * 5) % MONTH_COLORS.length] + '">' + y.yr + '</div>'; });
+        html += '</div><div class="gg-wk-weeks">';
+        periods.forEach(function(p, i) {
+            var pi = pinfo[i];
+            html += '<div class="gg-wk-week' + (pi.now ? ' today' : '') + '" style="width:' + cellW + 'px" title="' + p.start + ' — ' + p.end + '">'
+                + (pi.now ? '<span class="gg-now-tag">сейчас</span>' : '') + MONTH_NAMES[p.mi].slice(0, 3) + '</div>';
+        });
+        html += '</div></div></div>';
+    } else
     if (isWeek) {
         var monthSpans = [];
         periods.forEach(function(w) {
@@ -1969,16 +2187,209 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
             var cls = 'gg-bank-cell gg-load-cell ' + (pi.offDay ? 'gg-lp0' : ggPctLevel(v, r.cap));
             if (pi.offDay) cls += ' gg-offday';
             if (pi.offWeek) cls += ' gg-offweek';
-            var txt = (!pi.offDay && v > 0) ? ggNum(v) : '';
-            html += '<div class="' + cls + '" data-lrow="' + ri + '" data-lidx="' + i + '" style="left:' + (i * cellW + 2) + 'px;width:' + (cellW - 4) + 'px">' + txt + '</div>';
+            if (!pi.offDay && r.plan && r.plan[i] > 0) cls += ' gg-has-plan';
+            if (r.manual && r.manual[i] && !r.total) cls += ' gg-man';
+            var txt = pi.offDay ? '' : ggCellText(v, r.cap);
+            if (ggMetric === 'free' && r.cap != null && r.cap - v < 0 && !pi.offDay) cls += ' gg-neg-free';
+            var fh = (ggLoadModel.canOv && !r.total && !pi.offDay) ? '<span class="gg-fill-h" title="Протяните, чтобы скопировать значение на соседние недели"></span>' : '';
+            html += '<div class="' + cls + '" data-lrow="' + ri + '" data-lidx="' + i + '" style="left:' + (i * cellW + 2) + 'px;width:' + (cellW - 4) + 'px">' + txt + fh + '</div>';
         });
         html +=   '</div>';
         html += '</div>';
     });
     html += '</div></div>';
     box.innerHTML = html;
+    ggRenderKpi();
 }
 
+function ggCellText(v, cap) {
+    if (ggMetric === 'free') {
+        if (cap == null) return v > 0 ? ggNum(v) : '';
+        var f = cap - v;
+        return (v > 0 || f !== cap) ? ggNum(f) : ggNum(cap);
+    }
+    if (ggMetric === 'pct') {
+        if (!(v > 0)) return '';
+        if (cap == null || !(cap > 0)) return ggNum(v);
+        return Math.round(v / cap * 100) + '%';
+    }
+    return v > 0 ? ggNum(v) : '';
+}
+function ggShowLoadBar(on) {
+    var bar = document.getElementById('ggLoadBar'), k = document.getElementById('ggKpi');
+    if (bar) bar.style.display = on ? 'flex' : 'none';
+    if (k && !on) { k.style.display = 'none'; k.innerHTML = ''; }
+    if (on) { ggLoadBarSync(); ggRenderKpi(); }
+}
+function ggLoadBarSync() {
+    ggSegMark('ggMetricSeg', ggMetric);
+    ggSegMark('ggHcSeg', ggHcMode);
+    var ch = document.getElementById('ggPlanChk'); if (ch) ch.checked = ggIncPlan;
+}
+/* KPI: горизонт 12 недель (или 3 месяца / 30 дней) от текущего периода */
+function ggRenderKpi() {
+    var box = document.getElementById('ggKpi'), m = ggLoadModel;
+    if (!box) return;
+    if (!m) { box.style.display = 'none'; return; }
+    var H = m.isMonth ? 3 : (m.isWeek ? 12 : 30);
+    var startI = 0;
+    for (var i = 0; i < m.pinfo.length; i++) { if (m.pinfo[i].end >= m.today) { startI = i; break; } }
+    var endI = Math.min(m.pinfo.length, startI + H);
+    var unit = m.isMonth ? 'мес.' : (m.isWeek ? 'нед.' : 'дн.');
+    var overCells = 0, overBanks = [], capBanks = 0;
+    m.rows.forEach(function(r, ri) {
+        if (r.total) return;
+        if (r.cap != null && r.cap > 0) capBanks++;
+        var cnt = 0, peak = 0, peakI = -1;
+        for (var i = startI; i < endI; i++) {
+            if (m.pinfo[i].offDay || m.pinfo[i].offWeek || r.cap == null || !(r.cap > 0)) continue;
+            var pc = r.load[i] / r.cap;
+            if (pc > 1.0001) cnt++;
+            if (pc > peak) { peak = pc; peakI = i; }
+        }
+        if (cnt) { overCells += cnt; overBanks.push({ ri: ri, name: r.name, cnt: cnt, peak: peak, peakI: peakI, v: r.load[peakI], cap: r.cap }); }
+    });
+    var tot = m.rows[m.rows.length - 1], tPeak = 0, tPeakI = -1, tSum = 0, tN = 0;
+    for (var j = startI; j < endI; j++) {
+        if (m.pinfo[j].offDay || m.pinfo[j].offWeek || tot.cap == null || !(tot.cap > 0)) continue;
+        var p2 = tot.load[j] / tot.cap; tSum += p2; tN++;
+        if (p2 > tPeak) { tPeak = p2; tPeakI = j; }
+    }
+    var audits = m.tasks.filter(function(t) { return (t.task_kind || 'audit') === 'audit'; });
+    var planN = audits.filter(function(t) { return t.status === 'planning'; }).length;
+    var hz = 'ближайшие ' + (endI - startI) + ' ' + unit;
+    function card(lbl, val, sub, st) {
+        return '<div class="gg-kpi-card' + (st ? ' ' + st : '') + '"><div class="gg-kpi-lbl">' + lbl + '</div><div class="gg-kpi-val">' + val + '</div><div class="gg-kpi-sub">' + sub + '</div></div>';
+    }
+    var h = '<div class="gg-kpi-cards">';
+    var cellWord = m.isMonth ? 'банко-месяцев' : (m.isWeek ? 'банко-недель' : 'банко-дней');
+    h += card('Перегруз, ' + hz, overCells ? String(overCells) : 'нет', cellWord + ' с загрузкой > 100%', overCells ? 'bad' : 'ok');
+    h += card('ТБ с перегрузом', overBanks.length + ' из ' + capBanks, 'банков с заданной ёмкостью', overBanks.length ? 'bad' : 'ok');
+    h += card('Пик ОАМ', tPeakI >= 0 ? Math.round(tPeak * 100) + '%' : '—', tPeakI >= 0 ? esc(m.pinfo[tPeakI].short || m.pinfo[tPeakI].label) + ' · ' + ggNum(tot.load[tPeakI]) + ' из ' + ggNum(tot.cap) : 'ёмкость не задана', tPeak > 1.0001 ? 'bad' : '');
+    h += card('Средняя загрузка ОАМ', tN ? Math.round(tSum / tN * 100) + '%' : '—', 'проверок: ' + audits.length + (planN ? ' · в планировании: ' + planN + (ggIncPlan ? '' : ' (не учтены)') : ''), '');
+    h += '</div>';
+    if (overBanks.length) {
+        overBanks.sort(function(a, b) { return b.peak - a.peak; });
+        h += '<div class="gg-kpi-warn"><span class="gg-kpi-warn-t">⚠ Перегруз:</span>';
+        overBanks.forEach(function(o) {
+            h += '<button type="button" class="gg-kpi-chip" data-kri="' + o.ri + '" data-kpi="' + o.peakI + '" title="Открыть расшифровку пиковой ячейки">'
+               + esc(o.name) + ' — ' + o.cnt + ' ' + unit + ', пик ' + Math.round(o.peak * 100) + '% (' + ggNum(o.v) + ' из ' + ggNum(o.cap) + ')</button>';
+        });
+        h += '</div>';
+    } else {
+        h += '<div class="gg-kpi-okline">✓ На горизонте ' + (endI - startI) + ' ' + unit + ' перегруза нет</div>';
+    }
+    box.innerHTML = h;
+    box.style.display = 'block';
+}
+document.addEventListener('click', function(ev) {
+    var ch = ev.target.closest ? ev.target.closest('.gg-kpi-chip[data-kri]') : null;
+    if (!ch) return;
+    var ri = +ch.getAttribute('data-kri'), pi = +ch.getAttribute('data-kpi');
+    var cell = document.querySelector('.gg-load-cell[data-lrow="' + ri + '"][data-lidx="' + pi + '"]');
+    if (cell) cell.scrollIntoView({ block: 'nearest', inline: 'center' });
+    ggLoadPanelOpen(ri, pi);
+});
+function ggFlash(msg, bad) {
+    var el = document.getElementById('ggFlash');
+    if (!el) { el = document.createElement('div'); el.id = 'ggFlash'; document.body.appendChild(el); }
+    el.className = 'gg-flash' + (bad ? ' bad' : '');
+    el.textContent = msg; el.style.display = 'block';
+    clearTimeout(ggFlash._t); ggFlash._t = setTimeout(function() { el.style.display = 'none'; }, 2200);
+}
+function ggSaveScroll() {
+    var g = document.getElementById('ganttBox'), b = document.getElementById('banksBox');
+    ggKeepScroll = { g: g ? g.scrollLeft : 0, b: b ? b.scrollLeft : 0 };
+}
+function ggReload() { ggSaveScroll(); load(); }
+function ggRerender() { if (!window.__ggLastData) return; ggSaveScroll(); ggLoadPanelClose(); render(window.__ggLastData); }
+function ggOvSave(bankId, weeks, value) {
+    var m = ggLoadModel; if (!m) return;
+    var h = { 'Content-Type': 'application/json' };
+    if (window.__ggCsrf) h['X-CSRF-Token'] = window.__ggCsrf;
+    fetch('/api/plugins/gantt/override', { method: 'POST', credentials: 'same-origin', headers: h,
+        body: JSON.stringify({ scope: m.scope, bank_id: bankId, weeks: weeks, value: value }) })
+        .then(function(r) { return r.json().catch(function() { return { success: false, error: 'HTTP ' + r.status }; }); })
+        .then(function(d) {
+            if (!d || !d.success) { ggFlash('❌ Не сохранено: ' + ((d && d.error) || 'ошибка'), true); return; }
+            ggLoadPanelClose();
+            ggFlash(value == null ? '✅ Возвращён расчёт (' + weeks.length + ' нед.)' : '✅ Загрузка задана вручную (' + weeks.length + ' нед.)');
+            ggReload();
+        })
+        .catch(function() { ggFlash('❌ Ошибка соединения', true); });
+}
+/* Протягивание за уголок: копирует значение ячейки на соседние недели строки */
+document.addEventListener('mousedown', function(ev) {
+    var hnd = ev.target.closest ? ev.target.closest('.gg-fill-h') : null;
+    if (!hnd || !ggLoadModel || !ggLoadModel.canOv) return;
+    var cell = hnd.closest('.gg-load-cell'); if (!cell) return;
+    ev.preventDefault(); ev.stopPropagation();
+    var ri = +cell.getAttribute('data-lrow'), i = +cell.getAttribute('data-lidx');
+    var r = ggLoadModel.rows[ri]; if (!r || r.total) return;
+    ggFill = { ri: ri, from: i, to: i, value: Math.round((r.load[i] || 0) * 100) / 100 };
+    document.body.classList.add('gg-filling');
+    ggTipHide();
+});
+function ggFillMark() {
+    Array.prototype.forEach.call(document.querySelectorAll('.gg-load-cell.gg-fill-sel'), function(c) { c.classList.remove('gg-fill-sel'); });
+    if (!ggFill) return;
+    var a = Math.min(ggFill.from, ggFill.to), b = Math.max(ggFill.from, ggFill.to);
+    for (var k = a; k <= b; k++) {
+        var c = document.querySelector('.gg-load-cell[data-lrow="' + ggFill.ri + '"][data-lidx="' + k + '"]');
+        if (c) c.classList.add('gg-fill-sel');
+    }
+}
+document.addEventListener('mousemove', function(ev) {
+    if (!ggFill) return;
+    var el = document.elementFromPoint(ev.clientX, ev.clientY);
+    var c = el && el.closest ? el.closest('.gg-load-cell') : null;
+    if (c && +c.getAttribute('data-lrow') === ggFill.ri) { ggFill.to = +c.getAttribute('data-lidx'); ggFillMark(); }
+});
+document.addEventListener('mouseup', function() {
+    if (!ggFill) return;
+    var f = ggFill; ggFill = null;
+    document.body.classList.remove('gg-filling');
+    ggFillMark();
+    ggSuppressClick = true; setTimeout(function() { ggSuppressClick = false; }, 0);
+    if (f.to === f.from) return;
+    var m = ggLoadModel, r = m.rows[f.ri];
+    var a = Math.min(f.from, f.to), b = Math.max(f.from, f.to), weeks = [];
+    for (var k = a; k <= b; k++) { if (k !== f.from) weeks.push(m.pinfo[k].start); }
+    ggOvSave(r.id, weeks, f.value);
+});
+/* Выгрузка в Excel */
+function ggExportXls() {
+    var m = ggLoadModel; if (!m) return;
+    var btn = document.getElementById('ggXlsBtn');
+    var segTxt = function(id) { var b = document.querySelector('#' + id + ' button.active'); return b ? b.textContent.trim() : ''; };
+    var payload = {
+        title: 'Нагрузка по ТБ · ' + segTxt('ggTypeSeg') + ' · численность: ' + segTxt('ggHcSeg').toLowerCase()
+            + (ggIncPlan ? ' · с предварительными' : ' · без предварительных') + ' · ' + document.getElementById('fFrom').value + ' — ' + document.getElementById('fTo').value,
+        periods: m.pinfo.map(function(p) { return p.short || p.label.replace(/^неделя /, ''); }),
+        rows: m.rows.map(function(r) {
+            return { name: r.name, cap: r.cap, total: r.total,
+                     values: r.load.map(function(v, i) { return m.pinfo[i].offDay ? null : Math.round(v * 100) / 100; }),
+                     manual: r.manual || [], plan: (r.plan || []).map(function(v) { return Math.round(v * 100) / 100; }) };
+        })
+    };
+    var h = { 'Content-Type': 'application/json' };
+    if (window.__ggCsrf) h['X-CSRF-Token'] = window.__ggCsrf;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Excel'; }
+    fetch('/api/plugins/gantt/export', { method: 'POST', credentials: 'same-origin', headers: h, body: JSON.stringify(payload) })
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.blob();
+        })
+        .then(function(blob) {
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'Нагрузка_по_ТБ_' + (m.today || '').replace(/-/g, '') + '.xlsx';
+            document.body.appendChild(a); a.click();
+            setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        })
+        .catch(function(e) { ggFlash('❌ Выгрузка не удалась: ' + e.message, true); })
+        .then(function() { if (btn) { btn.disabled = false; btn.textContent = '⬇ Excel'; } });
+}
 function ggCellInfo(ri, i) {
     var m = ggLoadModel; if (!m) return null;
     var r = m.rows[ri], pi = m.pinfo[i];
@@ -1989,7 +2400,8 @@ function ggCellInfo(ri, i) {
         allN[c.task.id] = 1;
         if (c.task.status === 'planning') { plan += c.value; planN[c.task.id] = 1; }
     });
-    return { r: r, pi: pi, v: v, cap: r.cap, plan: plan, planCnt: Object.keys(planN).length, cnt: Object.keys(allN).length };
+    return { r: r, pi: pi, v: v, cap: r.cap, plan: plan, planCnt: Object.keys(planN).length, cnt: Object.keys(allN).length,
+             man: !!(r.manual && r.manual[i]), calc: (r.calc ? r.calc[i] : v) };
 }
 function ggDiffLine(x) {
     if (x.cap == null) return '';
@@ -2011,6 +2423,8 @@ function ggTipShow(cell, ev) {
         if (x.pi.offDays) h += '<div class="gg-tip-off">Нерабочих будних дней: ' + x.pi.offDays + '</div>';
         h += '<div>Загрузка: <b>' + ggNum(x.v) + '</b>' + (x.cap != null ? ' из ' + ggNum(x.cap) : '') + ' · ' + ggPctText(x.v, x.cap) + '</div>';
         var dl = ggDiffLine(x); if (dl) h += '<div>' + dl + '</div>';
+        if (x.man) h += '<div class="gg-tip-off">✎ ' + (x.r.total ? 'Есть ручные правки банков' : 'Задано вручную') + ' · расчёт: ' + ggNum(x.calc) + '</div>';
+        if (!ggIncPlan) h += '<div class="gg-tip-off">Проверки в «Планировании» не учтены</div>';
         h += '<div>Проверок: ' + x.cnt + (x.plan > 0 ? ' · в т. ч. предварительно: ' + ggNum(x.plan) + ' (' + x.planCnt + ')' : '') + '</div>';
         h += '<div class="gg-tip-hint">Клик — расшифровка по проверкам</div>';
     }
@@ -2102,7 +2516,31 @@ function ggLoadPanelOpen(ri, i) {
             });
         }
     }
+    if (!r.total && m.isMonth && x.man) h += '<div class="gg-lp-note">✎ В месяце есть недели с загрузкой, заданной вручную. Править можно в шаге «Недели».</div>';
+    if (!r.total && m.canOv && !pi.offDay) {
+        h += '<div class="gg-lp-man"><div class="gg-lp-man-h">✎ Загрузка вручную' + (x.man ? ' · расчёт: ' + ggNum(x.calc) : '') + '</div>'
+           + '<div class="gg-lp-man-row"><input type="number" min="0" step="0.25" id="ggOvVal" value="' + (Math.round(x.v * 100) / 100) + '">'
+           + '<button type="button" class="gg-lp-btn" id="ggOvSaveBtn">Задать</button>'
+           + (x.man ? '<button type="button" class="gg-lp-btn" id="ggOvResetBtn">Вернуть расчёт</button>' : '') + '</div>';
+        var manW = [];
+        m.rows[ri].manual.forEach(function(f, k) { if (f) manW.push(m.pinfo[k].start); });
+        if (manW.length > 1 || (manW.length === 1 && !x.man)) h += '<div class="gg-lp-man-row" style="margin-top:6px"><button type="button" class="gg-lp-btn" id="ggOvResetAll">Вернуть расчёт для всех правок банка в окне (' + manW.length + ')</button></div>';
+        h += '<div class="gg-lp-man-hint">Чтобы скопировать значение на соседние недели, протяните за зелёный уголок ячейки.</div></div>';
+    }
     el.querySelector('#ggLpBody').innerHTML = h;
+    var _sv = el.querySelector('#ggOvSaveBtn');
+    if (_sv) _sv.addEventListener('click', function() {
+        var inp = el.querySelector('#ggOvVal'), val = parseFloat(String(inp.value).replace(',', '.'));
+        if (!(val >= 0) || val > 1000) { inp.style.borderColor = '#e53935'; inp.focus(); return; }
+        ggOvSave(r.id, [pi.start], val);
+    });
+    var _rs = el.querySelector('#ggOvResetBtn');
+    if (_rs) _rs.addEventListener('click', function() { ggOvSave(r.id, [pi.start], null); });
+    var _ra = el.querySelector('#ggOvResetAll');
+    if (_ra) _ra.addEventListener('click', function() {
+        var ws = []; m.rows[ri].manual.forEach(function(f, k) { if (f) ws.push(m.pinfo[k].start); });
+        if (ws.length) ggOvSave(r.id, ws, null);
+    });
     el.classList.add('open');
     ggLoadSel = { row: ri, idx: i };
     Array.prototype.forEach.call(document.querySelectorAll('.gg-load-cell.gg-sel'), function(c) { c.classList.remove('gg-sel'); });
@@ -2111,7 +2549,7 @@ function ggLoadPanelOpen(ri, i) {
 }
 document.addEventListener('mouseover', function(ev) {
     var c = ev.target.closest ? ev.target.closest('.gg-load-cell') : null;
-    if (c) ggTipShow(c, ev);
+    if (c && !ggFill) ggTipShow(c, ev);
 });
 document.addEventListener('mousemove', function(ev) {
     if (ev.target.closest && ev.target.closest('.gg-load-cell')) ggTipMove(ev);
@@ -2123,6 +2561,7 @@ document.addEventListener('mouseout', function(ev) {
 document.addEventListener('click', function(ev) {
     var c = ev.target.closest ? ev.target.closest('.gg-load-cell') : null;
     if (!c) return;
+    if (ggSuppressClick || (ev.target.closest && ev.target.closest('.gg-fill-h'))) return;
     var ri = +c.getAttribute('data-lrow'), i = +c.getAttribute('data-lidx');
     ggTipHide();
     if (ggLoadSel && ggLoadSel.row === ri && ggLoadSel.idx === i) { ggLoadPanelClose(); return; }
@@ -2201,6 +2640,18 @@ document.getElementById('ggShowSeg').addEventListener('click', function(ev) {
     var b = ev.target.closest('button[data-v]'); if (!b) return;
     ggSetShow(b.getAttribute('data-v'));
 });
+document.getElementById('ggMetricSeg').addEventListener('click', function(ev) {
+    var b = ev.target.closest('button[data-v]'); if (!b) return;
+    ggMetric = b.getAttribute('data-v'); ggLsSet('gg.metric', ggMetric); ggRerender();
+});
+document.getElementById('ggHcSeg').addEventListener('click', function(ev) {
+    var b = ev.target.closest('button[data-v]'); if (!b) return;
+    ggHcMode = b.getAttribute('data-v'); ggLsSet('gg.hc', ggHcMode); ggRerender();
+});
+document.getElementById('ggPlanChk').addEventListener('change', function() {
+    ggIncPlan = this.checked; ggLsSet('gg.plan', ggIncPlan ? '1' : '0'); ggRerender();
+});
+document.getElementById('ggXlsBtn').addEventListener('click', ggExportXls);
 ggSetType(ggLsGet('gg.fType') || '', true);
 ggSetShow(ggLsGet('gg.show') || 'all');
 
@@ -2305,8 +2756,10 @@ def register(app, db, hooks):
             return jsonify({'success': False, 'error': 'bad dates'}), 400
         if d2 < d1:
             d1, d2 = d2, d1
-        if (d2 - d1).days > 190:
-            d2 = d1 + timedelta(days=190)
+        # Шаг «Месяцы» охватывает год: до 400 дней, остальные виды — до 190.
+        _max_span = 400 if request.args.get('view', '') == 'month' else 190
+        if (d2 - d1).days > _max_span:
+            d2 = d1 + timedelta(days=_max_span)
 
         # Мультивыбор: department/pocket приходят либо повторами параметра
         # (?department=a&department=b), либо одним CSV (?department=a,b).
@@ -2323,6 +2776,7 @@ def register(app, db, hooks):
         team = request.args.get('team', '').strip()
         status = request.args.get('status', '').strip()
         f_type = request.args.get('task_type', '').strip()
+        ov_scope = f_type if f_type in _OV_SCOPES else 'oam'
         # «Розничная без ПВР»: розничные проверки, кроме кармана ПВР
         # (регистр и пробелы в названии кармана не важны).
         def _is_pvr(pk):
@@ -2473,25 +2927,55 @@ def register(app, db, hooks):
         cap_dirs = (['retail'] if f_type == 'розничная'
                     else ['corp'] if f_type == 'корпоративная'
                     else ['retail', 'corp'])
-        def _cap(dep):
+        # Фактическая численность = сумма долей направлений у работающих сотрудников.
+        fact_hc = {}
+        for _e in data.get('employees', []):
+            if _e.get('fired'):
+                continue
+            _fd = fact_hc.setdefault(_e.get('department_id') or '', {'retail': 0.0, 'corp': 0.0})
+            _fd['retail'] += float(_e.get('dir_retail') or 0)
+            _fd['corp'] += float(_e.get('dir_corp') or 0)
+        def _cap(dep, fact=False):
             if not dep:
                 return None
             tot, has = 0.0, False
             for dr in cap_dirs:
-                hc = _num(dep.get('headcount_' + dr))
                 kf = _num(dep.get('expert_coef_' + dr))
+                if fact:
+                    hc = (fact_hc.get(dep.get('id')) or {}).get(dr, 0.0)
+                else:
+                    hc = _num(dep.get('headcount_' + dr))
                 if hc is None or kf is None:
                     continue
                 tot += hc * kf
                 has = True
             return round(tot, 2) if has else None
         banks = [{'id': bid, 'name': dept_name.get(bid, bid),
-                  'capacity': _cap(dep_by_id.get(bid))} for bid in bank_ids]
+                  'capacity': _cap(dep_by_id.get(bid)),
+                  'capacity_fact': _cap(dep_by_id.get(bid), True)} for bid in bank_ids]
         # Итог ОАМ: ёмкость всех банков (или выбранных в фильтре).
         scope_ids = dept_sel_set if dept_sel_set else set(dep_by_id.keys())
-        caps_all = [_cap(dep_by_id.get(i)) for i in scope_ids]
-        caps_all = [c for c in caps_all if c is not None]
-        total_capacity = round(sum(caps_all), 2) if caps_all else None
+        def _sum_caps(fact):
+            cs = [_cap(dep_by_id.get(i), fact) for i in scope_ids]
+            cs = [c for c in cs if c is not None]
+            return round(sum(cs), 2) if cs else None
+        total_capacity = _sum_caps(False)
+        total_capacity_fact = _sum_caps(True)
+        # Ручные правки загрузки (неделя × банк × срез направления).
+        overrides = []
+        try:
+            _w1 = (d1 - timedelta(days=d1.weekday())).strftime('%Y-%m-%d')
+            for _r in db.query('SELECT bank_id, week, value FROM gantt_load_overrides '
+                               'WHERE scope = ? AND week >= ? AND week <= ?',
+                               (ov_scope, _w1, d2.strftime('%Y-%m-%d'))):
+                overrides.append({'bank': _r['bank_id'], 'week': _r['week'],
+                                  'value': float(_r['value'] or 0)})
+        except Exception:
+            overrides = []
+        try:
+            can_override = bool(user_has(db, u, 'action.load.override'))
+        except Exception:
+            can_override = False
         return jsonify({
             'success': True,
             'days': days,
@@ -2500,6 +2984,10 @@ def register(app, db, hooks):
             'pockets': pockets,
             'banks': banks,
             'total_capacity': total_capacity,
+            'total_capacity_fact': total_capacity_fact,
+            'overrides': overrides,
+            'can_override': can_override,
+            'ov_scope': ov_scope,
             'capacity_dirs': cap_dirs,
             'dept_names': dept_name,
             'holidays': data.get('holidays') or {},
@@ -2551,6 +3039,182 @@ def register(app, db, hooks):
         res['from'] = d1.strftime('%Y-%m-%d')
         res['to'] = d2.strftime('%Y-%m-%d')
         return jsonify(res)
+
+    # ---------- Ручные правки загрузки по ТБ ----------
+    try:
+        db.exec('CREATE TABLE IF NOT EXISTS gantt_load_overrides ('
+                'bank_id TEXT NOT NULL, week TEXT NOT NULL, scope TEXT NOT NULL, '
+                'value REAL NOT NULL, updated_by TEXT DEFAULT \'\', updated_at TEXT DEFAULT \'\', '
+                'PRIMARY KEY (bank_id, week, scope))')
+    except Exception as _e:
+        print('[gantt] не удалось создать gantt_load_overrides:', _e)
+
+    def _auth_post(perm):
+        try:
+            from auth import current_user, user_has, check_csrf
+            u = current_user(db)
+            if not u:
+                return None, (jsonify({'success': False, 'error': 'auth'}), 401)
+            if not check_csrf():
+                return None, (jsonify({'success': False, 'error': 'csrf'}), 403)
+            if not user_has(db, u, perm):
+                return None, (jsonify({'success': False, 'error': 'forbidden'}), 403)
+            return u, None
+        except Exception:
+            return None, (jsonify({'success': False, 'error': 'auth'}), 401)
+
+    @app.route('/api/plugins/gantt/override', methods=['POST'])
+    def _g_override():
+        u, err = _auth_post('action.load.override')
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        scope = (body.get('scope') or 'oam').strip() or 'oam'
+        if scope not in _OV_SCOPES:
+            return jsonify({'success': False, 'error': 'bad scope'}), 400
+        bank_id = (body.get('bank_id') or '').strip()
+        if not bank_id or not db.query_one('SELECT id FROM departments WHERE id = ?', (bank_id,)):
+            return jsonify({'success': False, 'error': 'bad bank'}), 400
+        weeks = body.get('weeks') or []
+        if not isinstance(weeks, list) or not weeks or len(weeks) > 120:
+            return jsonify({'success': False, 'error': 'bad weeks'}), 400
+        clean = []
+        for w in weeks:
+            try:
+                dw = datetime.strptime(str(w), '%Y-%m-%d').date()
+            except Exception:
+                return jsonify({'success': False, 'error': 'bad week'}), 400
+            if dw.weekday() != 0:
+                return jsonify({'success': False, 'error': 'week must be Monday'}), 400
+            clean.append(dw.strftime('%Y-%m-%d'))
+        val = body.get('value', None)
+        if val is not None:
+            try:
+                val = round(float(val), 2)
+            except Exception:
+                return jsonify({'success': False, 'error': 'bad value'}), 400
+            if val < 0 or val > 1000:
+                return jsonify({'success': False, 'error': 'bad value'}), 400
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        who = str(u.get('name') or u.get('login') or u.get('id') or '')
+        for w in clean:
+            if val is None:
+                db.exec('DELETE FROM gantt_load_overrides WHERE bank_id = ? AND week = ? AND scope = ?',
+                        (bank_id, w, scope))
+            else:
+                db.exec('INSERT OR REPLACE INTO gantt_load_overrides '
+                        '(bank_id, week, scope, value, updated_by, updated_at) VALUES (?,?,?,?,?,?)',
+                        (bank_id, w, scope, val, who, now))
+        return jsonify({'success': True, 'count': len(clean)})
+
+    @app.route('/api/plugins/gantt/export', methods=['POST'])
+    def _g_export():
+        u, err = _auth_post('plugin.gantt.use')
+        if err:
+            return err
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.comments import Comment
+            from openpyxl.utils import get_column_letter
+        except Exception:
+            return jsonify({'success': False, 'error': 'openpyxl не установлен'}), 500
+        body = request.get_json(silent=True) or {}
+        periods = [str(p)[:40] for p in (body.get('periods') or [])][:400]
+        rows = (body.get('rows') or [])[:200]
+        title = str(body.get('title') or 'Нагрузка по ТБ')[:200]
+
+        def _f(v):
+            try:
+                return float(v)
+            except Exception:
+                return None
+        FILLS = {
+            1: PatternFill('solid', fgColor='C8E6C9'),
+            2: PatternFill('solid', fgColor='81C784'),
+            3: PatternFill('solid', fgColor='FFE082'),
+            4: PatternFill('solid', fgColor='EF9A9A'),
+            5: PatternFill('solid', fgColor='C62828'),
+        }
+        red_side = Side(style='medium', color='B71C1C')
+        thin = Side(style='thin', color='D0D0D0')
+
+        def _lvl(load, cap):
+            if load is None or load <= 0 or cap is None:
+                return 0
+            if cap <= 0:
+                return 5
+            pc = round(load / cap * 100)
+            return 1 if pc < 50 else 2 if pc < 75 else 3 if pc <= 100 else 4 if pc <= 125 else 5
+
+        wb = Workbook()
+        sheets = [('Загрузка', 'load'), ('% ёмкости', 'pct')]
+        for si, (sname, kind) in enumerate(sheets):
+            ws = wb.active if si == 0 else wb.create_sheet()
+            ws.title = sname
+            ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=12)
+            hdr = ['Тер банк', 'Ёмкость'] + periods
+            for ci, h in enumerate(hdr, 1):
+                c = ws.cell(row=3, column=ci, value=h)
+                c.font = Font(bold=True)
+                c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                c.border = Border(top=thin, bottom=thin, left=thin, right=thin)
+            for ri, r in enumerate(rows, 4):
+                cap = _f(r.get('cap'))
+                nc = ws.cell(row=ri, column=1, value=str(r.get('name') or '')[:120])
+                if r.get('total'):
+                    nc.font = Font(bold=True)
+                ws.cell(row=ri, column=2, value=cap)
+                vals = r.get('values') or []
+                man = r.get('manual') or []
+                pln = r.get('plan') or []
+                for pi in range(len(periods)):
+                    v = _f(vals[pi]) if pi < len(vals) else None
+                    c = ws.cell(row=ri, column=3 + pi)
+                    if v is not None and v > 0:
+                        if kind == 'pct':
+                            if cap and cap > 0:
+                                c.value = round(v / cap, 4)
+                                c.number_format = '0%'
+                        else:
+                            c.value = round(v, 2)
+                    lv = _lvl(v, cap)
+                    if lv:
+                        c.fill = FILLS[lv]
+                        if lv == 5:
+                            c.font = Font(color='FFFFFF', bold=True)
+                            c.border = Border(top=red_side, bottom=red_side, left=red_side, right=red_side)
+                    notes = []
+                    if pi < len(man) and man[pi]:
+                        notes.append('Задано вручную')
+                        c.font = Font(italic=True, bold=(lv == 5), color=('FFFFFF' if lv == 5 else '1A237E'))
+                    if pi < len(pln) and _f(pln[pi]):
+                        notes.append('В т. ч. предварительно: ' + str(round(_f(pln[pi]), 2)))
+                    if notes:
+                        c.comment = Comment('\n'.join(notes), 'Трекер')
+                    c.alignment = Alignment(horizontal='center')
+            ws.column_dimensions['A'].width = 30
+            ws.column_dimensions['B'].width = 10
+            for ci in range(3, 3 + len(periods)):
+                ws.column_dimensions[get_column_letter(ci)].width = 11
+            ws.row_dimensions[3].height = 32
+            ws.freeze_panes = 'C4'
+            lr = 5 + len(rows)
+            ws.cell(row=lr, column=1, value='Легенда (% к ёмкости):').font = Font(bold=True)
+            for k, (lbl, lv) in enumerate([('0–50%', 1), ('50–75%', 2), ('75–100%', 3), ('100–125%', 4), ('>125%', 5)]):
+                c = ws.cell(row=lr + 1 + k, column=1, value=lbl)
+                c.fill = FILLS[lv]
+                if lv == 5:
+                    c.font = Font(color='FFFFFF', bold=True)
+            ws.cell(row=lr + 7, column=1, value='Ёмкость = экспертный коэффициент × численность. Курсив — значение задано вручную.')
+        bio = io.BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+        fname = 'nagruzka_tb_' + date.today().strftime('%Y%m%d') + '.xlsx'
+        resp = Response(bio.getvalue(),
+                        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        resp.headers['Content-Disposition'] = 'attachment; filename=' + fname
+        return resp
 
     def on_startup(**ctx):
         print('[gantt] готов — «📅 План проверок» в шапке')
