@@ -20124,7 +20124,19 @@ function renderBankStatsPanel(bank){
         var drafts = dashDraftsForLoad();
         var depMap = {};
         drafts.forEach(function(d){ ((d && d.department_ids) || []).forEach(function(id){ depMap[id] = 1; }); });
-        var shownDeps = allDeps.slice();
+        // Раскрыты автоматически банки, которые стоят на осях слева.
+        // Ручной выбор (dashBankOpen) сохраняется, пока банк не добавят на ось заново.
+        stateDash.dashBankOpen = stateDash.dashBankOpen || {};
+        var prevDepMap = stateDash.dashPrevDepMap || {};
+        Object.keys(depMap).forEach(function(id){ if (!prevDepMap[id]) delete stateDash.dashBankOpen[id]; });
+        stateDash.dashPrevDepMap = depMap;
+        function isBankOpen(id){
+            var m = stateDash.dashBankOpen[id];
+            return (m === true || m === false) ? m : !!depMap[id];
+        }
+        var shownDeps = allDeps.filter(function(d){ return depMap[d.id]; })
+            .concat(allDeps.filter(function(d){ return !depMap[d.id]; }));
+        var CH = 103; // высота гистограммы (108 − 5%)
         var offsets = dashLoadOffsets();
         var slotGroups = offsets.map(function(off){ return { offset: off, slots: dashSlots(off) }; });
 
@@ -20133,13 +20145,19 @@ function renderBankStatsPanel(bank){
             var calcDir = (stateDash.dir === 'corp' || stateDash.dir === 'retail') ? stateDash.dir : 'retail';
             var poss = calcPossible(dep, calcDir);
             var inDraft = !!depMap[depId];
-            var share = null;
+            var open = isBankOpen(depId);
             var lead = false;
             drafts.forEach(function(d){
-                if (!d || (d.department_ids || []).indexOf(depId) < 0) return;
-                if (share === null && d.department_shares && d.department_shares[depId] != null) share = d.department_shares[depId];
-                if (d.lead_department === depId) lead = true;
+                if (d && d.lead_department === depId && (d.department_ids || []).indexOf(depId) >= 0) lead = true;
             });
+            var head = '<div class="dash-bank-head" data-bank-toggle="' + escapeHtml(depId) + '">'
+                + '<button class="dash-bank-toggle" type="button" title="' + (open ? 'Скрыть' : 'Показать') + '" aria-expanded="' + (open ? 'true' : 'false') + '">' + (open ? '▾' : '▸') + '</button>'
+                + '<div class="dash-bank-name">' + escapeHtml(dep.name || dep.id) + '</div>'
+                + (lead ? '<span class="dash-badge lead">Руководитель</span>' : '')
+                + '</div>';
+            if (!open) {
+                return '<div class="dash-bank-card is-collapsed' + (inDraft ? ' active' : '') + '">' + head + '</div>';
+            }
             var vals = [];
             slotGroups.forEach(function(group){
                 group.slots.forEach(function(slot){
@@ -20148,11 +20166,12 @@ function renderBankStatsPanel(bank){
                     vals.push({ slot: slot, total: Math.round((base + draft) * 100) / 100, base: base, draft: draft });
                 });
             });
-            var maxVal = vals.reduce(function(m, v){ return Math.max(m, v.total, (poss || 0) * 1.15, 1); }, 1);
-            var peakVal = vals.reduce(function(m, v){ return Math.max(m, v.total); }, 0);
+            // Верх шкалы = самый высокий столбик или лимит, без запаса сверху.
+            var maxVal = vals.reduce(function(m, v){ return Math.max(m, v.total); }, poss || 0);
+            if (!(maxVal > 0)) maxVal = 1;
             var today = todayISO();
             var bars = vals.map(function(v){
-                var h = v.total > 0 ? Math.max(8, Math.round((v.total / maxVal) * 108)) : 3;
+                var h = v.total > 0 ? Math.min(CH, Math.max(8, Math.round((v.total / maxVal) * CH))) : 3;
                 var cls = '';
                 if (poss !== null) {
                     if (v.total > poss) cls = ' over';
@@ -20167,37 +20186,23 @@ function renderBankStatsPanel(bank){
                     + '<div class="dash-mini-bar" style="height:' + h + 'px"></div>'
                     + '</div>';
             }).join('');
-
+            var grid = '';
+            for (var i = 1; i <= 4; i++) {
+                grid += '<div class="dash-grid-line" style="bottom:' + Math.round((i / 5) * CH) + 'px;"></div>';
+            }
+            if (poss !== null && poss > 0) {
+                var possY = Math.round((poss / maxVal) * CH);
+                // если над лимитом нет места, подпись ставим под линией
+                var lblPos = (possY + 14 > CH) ? ('top:' + (CH - possY + 2) + 'px;') : ('bottom:' + (possY + 2) + 'px;');
+                grid += '<div class="dash-limit-zone" style="bottom:' + possY + 'px;"></div>';
+                grid += '<div class="dash-limit-line" style="bottom:' + possY + 'px;"></div>';
+                grid += '<div class="dash-limit-label" style="' + lblPos + ' right:2px; position:absolute; color:rgba(239, 68, 68, 0.8); font-size:0.65rem; font-weight:600; line-height:1; z-index:3;">' + fmtNum(poss) + '</div>';
+            }
             return '<div class="dash-bank-card' + (inDraft ? ' active' : '') + '">'
-                + '<div class="dash-bank-head">'
-                + '<div>'
-                + '<div class="dash-bank-name">' + escapeHtml(dep.name || dep.id) + '</div>'
-                + (lead ? '<div class="dash-bank-meta"><span class="dash-badge lead">Руководитель</span></div>' : '')
-                + '</div>'
-                + '<div class="dash-bank-actions">'
-                + ''
-                + ''
-                + ''
-                + '</div>'
-                + '</div>'
-                + '<div class="dash-mini-chart-wrap" style="position:relative; margin-top:12px;">'
-                + (function(){
-                      var grid = '';
-                      // Сетка: 4 линии
-                      for(var i=1; i<=4; i++){
-                          var y = Math.round((i/5) * 108);
-                          grid += '<div class="dash-grid-line" style="bottom:' + y + 'px;"></div>';
-                      }
-                      // Лимит и красная зона
-                      if (poss !== null && maxVal > 0) {
-                          var possY = Math.round((poss / maxVal) * 108);
-                          grid += '<div class="dash-limit-zone" style="bottom:' + possY + 'px;"></div>';
-                          grid += '<div class="dash-limit-line" style="bottom:' + possY + 'px;"></div>';
-                          grid += '<div class="dash-limit-label" style="bottom:' + (possY + 2) + 'px; right: 2px; position: absolute; color: rgba(239, 68, 68, 0.8); font-size: 0.65rem; font-weight: 600; line-height: 1; z-index: 3;">' + fmtNum(poss) + '</div>';
-                      }
-                      return grid;
-                  })()
-                + '<div class="dash-mini-chart" style="position:relative; z-index:2;">' + bars + '</div>'
+                + head
+                + '<div class="dash-mini-chart-wrap" style="height:' + CH + 'px;">'
+                + grid
+                + '<div class="dash-mini-chart" style="position:relative; z-index:2; height:' + CH + 'px;">' + bars + '</div>'
                 + '</div>'
                 + '</div>';
         }).join('');
@@ -20207,6 +20212,15 @@ function renderBankStatsPanel(bank){
                 + '<div class="dash-load-title">Нагрузка на ТБ</div>'
             + '</div>'
             + '<div class="dash-bank-grid">' + cards + '</div>';
+
+        box.querySelectorAll('[data-bank-toggle]').forEach(function(el){
+            el.onclick = function(ev){
+                if (ev) ev.stopPropagation();
+                var id = this.getAttribute('data-bank-toggle');
+                stateDash.dashBankOpen[id] = !isBankOpen(id);
+                renderLoad();
+            };
+        });
 
         box.querySelectorAll('[data-act]').forEach(function(btn){
             btn.onclick = function(){
