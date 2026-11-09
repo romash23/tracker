@@ -1595,8 +1595,6 @@ def create_app():
             headcount = int(round(_total))
         if not name:
             return jsonify({'success': False, 'error': 'Название обязательно'}), 400
-        if curator not in ('Куратор1', 'Куратор2', 'Куратор3', 'нет'):
-            return jsonify({'success': False, 'error': 'Укажите ответственного (куратора ЦА)'}), 400
         u = current_user(db)
         need = 'action.department.edit' if dep_id else 'action.department.create'
         if not user_has(db, u, need):
@@ -1620,7 +1618,25 @@ def create_app():
                 created = db.upsert_department(dep_id, name, color, head_employee_id)
             except TypeError:
                 created = db.upsert_department(dep_id, name, color)
-        # PATCH — сохраняем штатную численность по направлениям и экспертные коэффициенты
+        # PATCH — сохраняем штатную численность по направлениям и экспертные коэффициенты.
+        # Поля, которых нет в запросе (например, форма «Редактировать банк» не шлёт
+        # экспертные коэффициенты), берём из БД, чтобы не затереть их NULL.
+        try:
+            _prev = db.query_one('SELECT headcount_retail, headcount_corp, expert_coef_retail, '
+                                 'expert_coef_corp FROM departments WHERE id=?', (dep_id,)) or {}
+        except Exception:
+            _prev = {}
+        def _keep(key, val):
+            if key in body:
+                return val
+            try:
+                return _prev[key]
+            except Exception:
+                return val
+        headcount_retail = _keep('headcount_retail', headcount_retail)
+        headcount_corp = _keep('headcount_corp', headcount_corp)
+        expert_coef_retail = _keep('expert_coef_retail', expert_coef_retail)
+        expert_coef_corp = _keep('expert_coef_corp', expert_coef_corp)
         try:
             db.exec('UPDATE departments SET headcount_retail=?, headcount_corp=?, '
                     'expert_coef_retail=?, expert_coef_corp=? WHERE id=?',
