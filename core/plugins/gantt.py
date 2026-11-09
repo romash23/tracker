@@ -842,6 +842,92 @@ body.trk-theme-light .gg-bank-cell.lvl1 { background:#d7efd8; color:#1b5e20; }
 body.trk-theme-light .gg-bank-cell.lvl2 { background:#fff3c4; color:#7a5c00; }
 body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
 
+/* ===== Нагрузка по ТБ: % к ёмкости ===== */
+body.gg-show-tasks #banksLegend { display: none !important; }
+.gg-load-tbl .gg-load-cell { cursor: pointer; background-image: none; }
+.gg-load-tbl .gg-load-cell.gg-lp0 { background-color: transparent; border-color: transparent; color: var(--pg-meta,#888); }
+.gg-load-tbl .gg-load-cell.gg-lp1, .gg-load-legend .sw.gg-lp1 { background-color: rgba(165,214,167,0.30); border-color: rgba(165,214,167,0.45); color: #dff2df; }
+.gg-load-tbl .gg-load-cell.gg-lp2, .gg-load-legend .sw.gg-lp2 { background-color: rgba(67,160,71,0.55); border-color: rgba(67,160,71,0.8); color: #fff; }
+.gg-load-tbl .gg-load-cell.gg-lp3, .gg-load-legend .sw.gg-lp3 { background-color: rgba(251,192,45,0.65); border-color: rgba(251,192,45,0.9); color: #2a2000; }
+.gg-load-tbl .gg-load-cell.gg-lp4, .gg-load-legend .sw.gg-lp4 { background-color: rgba(239,154,154,0.55); border-color: rgba(239,154,154,0.8); color: #2a0606; }
+.gg-load-tbl .gg-load-cell.gg-lp5, .gg-load-legend .sw.gg-lp5 { background-color: #c62828; border: 2px solid #ff5252; color: #fff; box-shadow: 0 0 0 1px #7f0000; }
+.gg-load-tbl .gg-load-cell.gg-lpna, .gg-load-legend .sw.gg-lpna { background-color: transparent; border: 1px dashed rgba(160,160,160,0.7); color: var(--pg-text,#e8e8e8); }
+.gg-load-tbl .gg-load-cell.gg-offweek, .gg-load-legend .sw.gg-offweek-sw {
+    background-image: repeating-linear-gradient(-45deg, rgba(140,140,140,0.16) 0 3px, transparent 3px 10px);
+}
+.gg-load-legend .sw.gg-offweek-sw { border: 1px solid rgba(160,160,160,0.5); }
+.gg-load-tbl .gg-load-cell:hover { outline: 2px solid rgba(46,204,113,0.7); outline-offset: 1px; }
+.gg-load-tbl .gg-load-cell.gg-sel { outline: 3px solid #ffffff; outline-offset: 1px; z-index: 4; box-shadow: 0 0 0 5px #1e88e5; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-sel { outline-color: #0d2a5c; box-shadow: 0 0 0 5px #64b5f6; }
+.gg-load-tbl .gg-now-col { position: absolute; top: 0; bottom: 0; background: transparent; border-left: 2px solid #2ecc71; border-right: 2px solid #2ecc71; z-index: 2; pointer-events: none; }
+.gg-wk-week { position: relative; }
+.gg-load-tbl .gg-wk-week.today { justify-content: flex-end; padding-bottom: 3px; }
+.gg-wk-week .gg-now-tag { position: absolute; top: 1px; left: 50%; transform: translateX(-50%); font-size: 0.56rem; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: #fff; background: #1e9e55; border-radius: 5px; padding: 0 4px; line-height: 1.25; white-space: nowrap; }
+.gg-wk-week.gg-wk-off { background-image: repeating-linear-gradient(-45deg, rgba(140,140,140,0.22) 0 4px, transparent 4px 9px); }
+.gg-load-tbl .gg-cap-chip { margin-left: auto; flex-shrink: 0; font-size: 0.72rem; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: rgba(46,204,113,0.14); color: #7fdc9f; border: 1px solid rgba(46,204,113,0.35); }
+.gg-load-tbl .gg-cap-chip.na { background: transparent; color: var(--pg-meta,#999); border-style: dashed; border-color: rgba(160,160,160,0.6); }
+.gg-load-tbl .gg-load-total { border-top: 2px solid rgba(46,204,113,0.55); background: rgba(46,204,113,0.05); }
+.gg-load-tbl .gg-load-total .gg-task-name { font-weight: 800; }
+.gg-load-tbl .gg-load-total .gg-ico { font-weight: 800; color: #2ecc71; width: 18px; text-align: center; }
+.gg-load-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 4px 2px; font-size: 0.8rem; color: var(--pg-text,#e8e8e8); }
+.gg-load-legend .it { display: inline-flex; align-items: center; gap: 6px; }
+.gg-load-legend .sw { display: inline-block; width: 22px; height: 14px; border-radius: 3px; border: 1px solid transparent; box-sizing: border-box; }
+.gg-load-legend .gg-ll-t { font-weight: 700; }
+.gg-load-legend .gg-ll-note { flex-basis: 100%; font-size: 0.78rem; color: var(--pg-meta,#b0b0b0); font-style: italic; }
+.gg-load-tip { position: fixed; z-index: 2600; display: none; max-width: 320px; padding: 8px 10px; border-radius: 8px; font-size: 0.8rem; line-height: 1.4; pointer-events: none;
+    background: #1d2a21; color: #eef6ef; border: 1px solid #2ecc71; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+.gg-load-tip .gg-tip-h { font-weight: 800; }
+.gg-load-tip .gg-tip-sub, .gg-load-tip .gg-tip-hint { color: #a9c3ae; font-size: 0.74rem; }
+.gg-load-tip .gg-tip-off { color: #c9b27a; }
+.gg-neg { color: #ff6b6b; }
+.gg-load-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 400px; max-width: 92vw; z-index: 1900; display: flex; flex-direction: column;
+    background: var(--pg-card-bg,#1a1a1a); color: var(--pg-text,#e8e8e8); border-left: 3px solid #2ecc71; box-shadow: -8px 0 24px rgba(0,0,0,0.35);
+    transform: translateX(105%); transition: transform .18s ease; }
+.gg-load-panel.open { transform: translateX(0); }
+.gg-lp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 14px 16px 10px; border-bottom: 1px solid rgba(46,204,113,0.3); }
+.gg-lp-title { font-size: 1.05rem; font-weight: 800; }
+.gg-lp-sub { font-size: 0.8rem; color: var(--pg-meta,#a0a0a0); margin-top: 2px; }
+.gg-lp-close { width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; border: 1px solid rgba(46,204,113,0.45); background: transparent; color: inherit; cursor: pointer; font-size: 0.95rem; }
+.gg-lp-close:hover { background: rgba(229,57,53,0.15); border-color: #e53935; color: #e53935; }
+.gg-lp-body { overflow-y: auto; padding: 12px 16px 18px; }
+.gg-lp-sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+.gg-lp-sum > div { background: var(--pg-inner-bg,#232323); border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+.gg-lp-sum span { font-size: 0.7rem; color: var(--pg-meta,#a0a0a0); }
+.gg-lp-sum b { font-size: 1rem; }
+.gg-lp-pct { border-radius: 5px; padding: 0 4px; align-self: flex-start; }
+.gg-lp-pct.gg-lp1 { background: rgba(165,214,167,0.35); } .gg-lp-pct.gg-lp2 { background: rgba(67,160,71,0.55); color:#fff; }
+.gg-lp-pct.gg-lp3 { background: rgba(251,192,45,0.7); color:#2a2000; } .gg-lp-pct.gg-lp4 { background: rgba(229,57,53,0.6); color:#fff; }
+.gg-lp-pct.gg-lp5 { background: rgba(229,57,53,0.85); color:#fff; outline: 2px solid #b71c1c; }
+.gg-lp-note { font-size: 0.78rem; color: #c9b27a; margin: 4px 0; }
+.gg-lp-sec { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: var(--pg-meta,#a0a0a0); margin: 12px 0 6px; }
+.gg-lp-empty { font-size: 0.82rem; color: var(--pg-meta,#a0a0a0); }
+.gg-lp-item { background: var(--pg-inner-bg,#232323); border-radius: 8px; padding: 7px 9px; margin-bottom: 6px; border-left: 3px solid #2ecc71; }
+.gg-lp-item.idle { opacity: 0.88; border-left-color: #7f8c8d; }
+.gg-lp-row1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.gg-lp-name { font-weight: 700; font-size: 0.86rem; word-break: break-word; }
+.gg-lp-val { font-size: 0.95rem; }
+.gg-lp-row2 { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.gg-lp-st { color: #fff; border-radius: 9px; padding: 0 7px; font-size: 0.7rem; font-weight: 700; }
+.gg-lp-tag { border-radius: 9px; padding: 0 7px; font-size: 0.72rem; background: rgba(255,255,255,0.16); color: #ffffff; font-weight: 600; }
+body.trk-theme-light .gg-lp-tag { background: #dde7dd; color: #13351a; }
+.gg-lp-part { font-size: 0.76rem; color: var(--pg-meta,#b0b0b0); }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lp0 { background-color: transparent; border-color: transparent; color: #999; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lp1, body.trk-theme-light .gg-load-legend .sw.gg-lp1 { background-color: #dcf1dd; border-color: #b9e0bb; color: #1b5e20; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lp2, body.trk-theme-light .gg-load-legend .sw.gg-lp2 { background-color: #81c784; border-color: #5fb563; color: #0d3b12; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lp3, body.trk-theme-light .gg-load-legend .sw.gg-lp3 { background-color: #ffe082; border-color: #f4c430; color: #5c4300; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lp4, body.trk-theme-light .gg-load-legend .sw.gg-lp4 { background-color: #f8bbbb; border-color: #ef9a9a; color: #7f0000; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lp5, body.trk-theme-light .gg-load-legend .sw.gg-lp5 { background-color: #d32f2f; border: 2px solid #7f0000; color: #fff; box-shadow: 0 0 0 1px #ffcdd2; }
+body.trk-theme-light .gg-load-tbl .gg-load-cell.gg-lpna, body.trk-theme-light .gg-load-legend .sw.gg-lpna { background-color: transparent; border: 1px dashed #9e9e9e; color: #333; }
+body.trk-theme-light .gg-load-tbl .gg-cap-chip { background: #e8f5e9; color: #1b5e20; border-color: #a5d6a7; }
+body.trk-theme-light .gg-load-legend { color: #213a25; }
+body.trk-theme-light .gg-load-tip { background: #ffffff; color: #13351a; box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
+body.trk-theme-light .gg-load-tip .gg-tip-sub, body.trk-theme-light .gg-load-tip .gg-tip-hint { color: #5d7a63; }
+body.trk-theme-light .gg-load-panel { background: #fbfcfb; color: #13351a; }
+body.trk-theme-light .gg-lp-sum > div, body.trk-theme-light .gg-lp-item { background: #eef5ee; }
+body.trk-theme-light .gg-lp-part { color: #4d6b52; }
+body.trk-theme-light .gg-lp-note { color: #8a6d1f; }
+body.trk-theme-light .gg-neg { color: #c62828; }
+
 @media (max-width: 700px) {
     .gg-corner, .gg-name { flex-basis: 220px; width: 220px; }
     .gg-bg { left: 220px; }
@@ -926,6 +1012,17 @@ body.trk-theme-light .gg-bank-cell.lvl3 { background:#fcdada; color:#9b1c1c; }
     <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по ТБ</div>
     <div class="gantt-box" id="banksBox" style="display:none;">
         <div class="loading">Загрузка…</div>
+    </div>
+    <div class="gg-load-legend" id="banksLegend" style="display:none;">
+        <span class="gg-ll-t">% к ёмкости:</span>
+        <span class="it"><span class="sw gg-lp1"></span>0–50%</span>
+        <span class="it"><span class="sw gg-lp2"></span>50–75%</span>
+        <span class="it"><span class="sw gg-lp3"></span>75–100%</span>
+        <span class="it"><span class="sw gg-lp4"></span>100–125%</span>
+        <span class="it"><span class="sw gg-lp5"></span>&gt;125%</span>
+        <span class="it"><span class="sw gg-lpna"></span>ёмкость не задана</span>
+        <span class="it"><span class="sw gg-offweek-sw"></span>нерабочая неделя</span>
+        <span class="gg-ll-note">Ёмкость = экспертный коэффициент × нормативная численность. Наведите на ячейку — подробности, клик — список проверок.</span>
     </div>
     <div class="gg-modal-mask" id="ggTaskMask">
     <div class="gg-modal" role="dialog" aria-modal="true" aria-labelledby="ggTaskTitle">
@@ -1683,75 +1780,141 @@ function renderWeek(d) {
 function clearBanks() {
     var t = document.getElementById('banksTitle');
     var b = document.getElementById('banksBox');
+    var l = document.getElementById('banksLegend');
     if (t) t.style.display = 'none';
     if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+    if (l) l.style.display = 'none';
+    ggLoadPanelClose();
 }
+
+/* ===== Нагрузка по ТБ: цвет по % к ёмкости, итог ОАМ, подсказка, панель ===== */
+var GG_STATUS_LBL = { planning:'Планирование', approved:'Утверждена', active:'Активна', done:'Завершена', cancelled:'Отменена', paused:'Приостановлена', archived:'Архив' };
+var GG_STATUS_COL = { planning:'#7e57c2', approved:'#d68910', active:'#2874a6', done:'#239b56', cancelled:'#7f8c8d', paused:'#7f8c8d', archived:'#7f8c8d' };
+var ggLoadModel = null;      /* данные последней отрисовки для подсказки и панели */
+var ggLoadSel = null;        /* выбранная ячейка {row, idx} */
+
+function ggNum(v) {
+    var r = Math.round((+v || 0) * 100) / 100;
+    return String(r).replace('.', ',');
+}
+function ggPctLevel(load, cap) {
+    if (!(load > 0)) return 'gg-lp0';
+    if (cap == null) return 'gg-lpna';
+    if (!(cap > 0)) return 'gg-lp5';
+    var pc = Math.round(load / cap * 100);  /* как в подписи: 49,7% -> 50% */
+    if (pc < 50) return 'gg-lp1';
+    if (pc < 75) return 'gg-lp2';
+    if (pc <= 100) return 'gg-lp3';
+    if (pc <= 125) return 'gg-lp4';
+    return 'gg-lp5';
+}
+function ggPctText(load, cap) {
+    if (cap == null) return 'ёмкость не задана';
+    if (!(cap > 0)) return (load > 0 ? 'ёмкость 0' : '0%');
+    return Math.round(load / cap * 100) + '%';
+}
+function ggAddDays(iso, n) {
+    var dt = new Date(iso + 'T00:00:00');
+    dt.setDate(dt.getDate() + n);
+    var m = dt.getMonth() + 1, d = dt.getDate();
+    return dt.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+}
+
 function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
     var titleEl = document.getElementById('banksTitle');
     var box = document.getElementById('banksBox');
+    var legend = document.getElementById('banksLegend');
     var banks = d.banks || [];
     var tasks = d.tasks || [];
+    ggLoadPanelClose();
 
     if (!banks.length || !periods.length) {
         titleEl.style.display = 'none';
         box.style.display = 'none';
         box.innerHTML = '';
+        if (legend) legend.style.display = 'none';
+        ggLoadModel = null;
         return;
     }
     titleEl.style.display = 'block';
     box.style.display = 'block';
+    if (legend) legend.style.display = 'flex';
 
     var isWeek = (mode === 'week');
     var todayMon = d.today ? mondayOf(d.today) : '';
     var today = d.today || '';
     var trackW = periods.length * cellW;
-
-    /* ключ периода -> дата для расчёта активного этапа (пн недели / сам день) */
+    var SL = STAGE_LABELS || GG_STAGE_LABELS;
     function pMon(p) { return isWeek ? p.mon : p; }
 
-    /* Матрица: load[bankId][idx] = сумма весов с коэффициентом */
-    var load = {};
+    /* Периоды: границы, «сейчас», нерабочие дни */
+    var pinfo = periods.map(function(p) {
+        if (isWeek) {
+            var off = 0;
+            for (var k = 0; k < 5; k++) { if (isOffDay(ggAddDays(p.mon, k))) off++; }
+            return { start: p.mon, end: p.sun, now: p.mon === todayMon, offDays: off, offWeek: off >= 5, offDay: false,
+                     label: 'неделя ' + fmtD(p.mon) + '–' + fmtD(p.sun) };
+        }
+        return { start: p, end: p, now: p === today, offDays: 0, offWeek: false, offDay: isOffDay(p), label: fmtD(p) };
+    });
+
+    /* load[bankId][i] и вклад каждой задачи contrib[bankId][i] */
+    var load = {}, contrib = {};
     banks.forEach(function(b) {
-        load[b.id] = [];
-        for (var i = 0; i < periods.length; i++) load[b.id].push(0);
+        load[b.id] = []; contrib[b.id] = [];
+        for (var i = 0; i < periods.length; i++) { load[b.id].push(0); contrib[b.id].push([]); }
     });
     tasks.forEach(function(t) {
         var dids = t.dept_ids || [];
         if (!dids.length) return;
-        /* Задача типа «Другое»: нет этапов, вместо веса этапа — коэффициент
-           нагрузки, действующий на всём интервале [start_date; deadline]. */
-        if ((t.task_kind || 'audit') === 'other') {
-            var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
-            if (lc <= 0) return;
-            var sd = t.start_date || '';
-            var dl = t.deadline || '';
-            periods.forEach(function(p, i) {
-                var day = pMon(p);
-                if (sd && day < sd) return;
-                if (dl && day > dl) return;
-                dids.forEach(function(did) {
-                    if (load[did]) load[did][i] += lc;
-                });
-            });
-            return;
-        }
+        var isOther = (t.task_kind || 'audit') === 'other';
         periods.forEach(function(p, i) {
-            var mon = pMon(p);
-            var st = stageAtMonday(t.stages, mon);
-            if (!st) return;
-            var wt = (st.weight != null ? st.weight : 1);
+            var day = pMon(p);
+            var base = 0, stLbl = '';
+            if (isOther) {
+                var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
+                if (lc <= 0) return;
+                if (t.start_date && day < t.start_date) return;
+                if (t.deadline && day > t.deadline) return;
+                base = lc; stLbl = 'Другое (коэф. нагрузки)';
+            } else {
+                var st = stageAtMonday(t.stages, day);
+                if (!st) return;
+                base = (st.weight != null ? +st.weight : 1);
+                stLbl = SL[st.key] || st.key || 'Этап';
+            }
             dids.forEach(function(did) {
-                if (load[did]) load[did][i] += wt * leadCoef(t, did);
+                if (!load[did]) return;
+                var k = isOther ? 1 : leadCoef(t, did);
+                var v = base * k;
+                if (!(v > 0)) return;
+                load[did][i] += v;
+                contrib[did][i].push({ task: t, bank: did, stage: stLbl, weight: base, coef: k,
+                                       lead: (t.lead_department || '') === did, value: v });
             });
         });
     });
 
-    var html = '<div class="gantt-inner gg-mode-' + (isWeek ? 'week' : 'day') + '">';
-    html += '<div class="gg-header"' + (isWeek ? ' style="height:70px;"' : '') + '>';
-    html += '<div class="gg-corner">Тер банк</div>';
+    /* Итог: сумма по показанным банкам, ёмкость — по всем банкам ОАМ (или выбранным) */
+    var totLoad = [], totContrib = [];
+    for (var i = 0; i < periods.length; i++) {
+        var s = 0, c = [];
+        banks.forEach(function(b) { s += load[b.id][i]; c = c.concat(contrib[b.id][i]); });
+        totLoad.push(s); totContrib.push(c);
+    }
+    var dirs = d.capacity_dirs || ['retail', 'corp'];
+    var totName = 'Итого ОАМ' + (dirs.length === 1 ? (dirs[0] === 'retail' ? ' · розница' : ' · корпоратив') : '');
+    var rows = banks.map(function(b) {
+        return { id: b.id, name: b.name, cap: (b.capacity == null ? null : +b.capacity), load: load[b.id], contrib: contrib[b.id], total: false };
+    });
+    var totRow = { id: '__total', name: totName, cap: (d.total_capacity == null ? null : +d.total_capacity), load: totLoad, contrib: totContrib, total: true };
+    rows.push(totRow);
+    ggLoadModel = { rows: rows, pinfo: pinfo, tasks: tasks, isWeek: isWeek, dirs: dirs };
 
+    var html = '<div class="gantt-inner gg-mode-' + (isWeek ? 'week' : 'day') + ' gg-load-tbl">';
+    html += '<div class="gg-header"' + (isWeek ? ' style="height:70px;"' : '') + '>';
+    html += '<div class="gg-corner">Тер банк · ёмкость</div>';
     if (isWeek) {
-        /* двухслойная шапка: месяцы + недели */
         var monthSpans = [];
         periods.forEach(function(w) {
             var mi = parseInt(w.mon.split('-')[1], 10) - 1;
@@ -1761,21 +1924,21 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
             if (last && last.key === key) { last.count++; }
             else { monthSpans.push({ key: key, mi: mi, yr: yr, count: 1 }); }
         });
-        html += '<div class="gg-wk-head">';
-        html += '<div class="gg-wk-months">';
+        html += '<div class="gg-wk-head"><div class="gg-wk-months">';
         monthSpans.forEach(function(m) {
             var col = MONTH_COLORS[m.mi % MONTH_COLORS.length];
             html += '<div class="gg-wk-month" style="width:' + (m.count * cellW) + 'px;background:' + col + '">' + MONTH_NAMES[m.mi] + '</div>';
         });
-        html += '</div>';
-        html += '<div class="gg-wk-weeks">';
-        periods.forEach(function(w) {
-            var cls = 'gg-wk-week' + (w.mon === todayMon ? ' today' : '');
-            html += '<div class="' + cls + '" style="width:' + cellW + 'px" title="' + w.mon + ' — ' + w.sun + '">' + fmtD(w.mon) + '–<br>' + fmtD(w.sun) + '</div>';
+        html += '</div><div class="gg-wk-weeks">';
+        periods.forEach(function(w, i) {
+            var pi = pinfo[i];
+            var cls = 'gg-wk-week' + (pi.now ? ' today' : '') + (pi.offWeek ? ' gg-wk-off' : '');
+            html += '<div class="' + cls + '" style="width:' + cellW + 'px" title="' + w.mon + ' — ' + w.sun + (pi.offDays ? ' · нерабочих будних дней: ' + pi.offDays : '') + '">'
+                 + (pi.now ? '<span class="gg-now-tag">сейчас</span>' : '')
+                 + fmtD(w.mon) + '–<br>' + fmtD(w.sun) + '</div>';
         });
         html += '</div></div></div>';
     } else {
-        /* однослойная шапка по дням */
         html += '<div class="gg-days">';
         periods.forEach(function(dk) {
             var dt = new Date(dk + 'T00:00:00');
@@ -1791,32 +1954,183 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
         html += '</div></div>';
     }
 
-    /* Тело — строки банков */
     html += '<div class="gg-body">';
-    banks.forEach(function(b) {
-        html += '<div class="gg-row">';
+    rows.forEach(function(r, ri) {
+        html += '<div class="gg-row' + (r.total ? ' gg-load-total' : '') + '">';
         html +=   '<div class="gg-name">';
-        html +=     '<span class="gg-ico">🏦</span>';
-        html +=     '<span class="gg-task-name" title="' + esc(b.name) + '">' + esc(b.name) + '</span>';
+        html +=     '<span class="gg-ico">' + (r.total ? 'Σ' : '🏦') + '</span>';
+        html +=     '<span class="gg-task-name" title="' + esc(r.name) + '">' + esc(r.name) + '</span>';
+        html +=     '<span class="gg-cap-chip' + (r.cap == null ? ' na' : '') + '" title="Ёмкость = экспертный коэффициент × нормативная численность">' + (r.cap == null ? 'нет ёмк.' : ggNum(r.cap)) + '</span>';
         html +=   '</div>';
         html +=   '<div class="gg-track" style="width:' + trackW + 'px">';
-        periods.forEach(function(p, i) {
-            var key = pMon(p);
-            var off = (!isWeek && isOffDay(key));
-            var v = load[b.id][i];
-            var txt = round2(v).toString();
-            var lvl = 0;
-            if (!off && v > 0) { lvl = v >= 3 ? 3 : (v < 2 ? 1 : 2); }
-            var lbl = isWeek ? ('неделя ' + fmtD(p.mon) + '–' + fmtD(p.sun)) : fmtD(p);
-            html += '<div class="gg-bank-cell lvl' + lvl + (off ? ' gg-offday' : '') + '" style="left:' + (i * cellW + 2) + 'px;width:' + (cellW - 4) + 'px" title="' + esc(b.name) + ' · ' + lbl + (off ? ' · выходной/праздник' : (' · нагрузка ' + txt)) + '">' + (!off && v > 0 ? txt : '') + '</div>';
+        pinfo.forEach(function(pi, i) {
+            if (pi.now) html += '<div class="gg-now-col" style="left:' + (i * cellW) + 'px;width:' + cellW + 'px"></div>';
+            var v = r.load[i];
+            var cls = 'gg-bank-cell gg-load-cell ' + (pi.offDay ? 'gg-lp0' : ggPctLevel(v, r.cap));
+            if (pi.offDay) cls += ' gg-offday';
+            if (pi.offWeek) cls += ' gg-offweek';
+            var txt = (!pi.offDay && v > 0) ? ggNum(v) : '';
+            html += '<div class="' + cls + '" data-lrow="' + ri + '" data-lidx="' + i + '" style="left:' + (i * cellW + 2) + 'px;width:' + (cellW - 4) + 'px">' + txt + '</div>';
         });
         html +=   '</div>';
         html += '</div>';
     });
     html += '</div></div>';
-
     box.innerHTML = html;
 }
+
+function ggCellInfo(ri, i) {
+    var m = ggLoadModel; if (!m) return null;
+    var r = m.rows[ri], pi = m.pinfo[i];
+    if (!r || !pi) return null;
+    var v = r.load[i] || 0;
+    var plan = 0, planN = {}, allN = {};
+    (r.contrib[i] || []).forEach(function(c) {
+        allN[c.task.id] = 1;
+        if (c.task.status === 'planning') { plan += c.value; planN[c.task.id] = 1; }
+    });
+    return { r: r, pi: pi, v: v, cap: r.cap, plan: plan, planCnt: Object.keys(planN).length, cnt: Object.keys(allN).length };
+}
+function ggDiffLine(x) {
+    if (x.cap == null) return '';
+    var diff = x.cap - x.v;
+    return diff < 0 ? '<b class="gg-neg">не хватает ' + ggNum(-diff) + '</b>' : 'свободно ' + ggNum(diff);
+}
+function ggTipEl() {
+    var el = document.getElementById('ggLoadTip');
+    if (!el) { el = document.createElement('div'); el.id = 'ggLoadTip'; el.className = 'gg-load-tip'; document.body.appendChild(el); }
+    return el;
+}
+function ggTipShow(cell, ev) {
+    var x = ggCellInfo(+cell.getAttribute('data-lrow'), +cell.getAttribute('data-lidx'));
+    if (!x) return;
+    var h = '<div class="gg-tip-h">' + esc(x.r.name) + '</div>';
+    h += '<div class="gg-tip-sub">' + esc(x.pi.label) + (x.pi.now ? ' · сейчас' : '') + '</div>';
+    if (x.pi.offDay) h += '<div>Выходной / праздник</div>';
+    else {
+        if (x.pi.offDays) h += '<div class="gg-tip-off">Нерабочих будних дней: ' + x.pi.offDays + '</div>';
+        h += '<div>Загрузка: <b>' + ggNum(x.v) + '</b>' + (x.cap != null ? ' из ' + ggNum(x.cap) : '') + ' · ' + ggPctText(x.v, x.cap) + '</div>';
+        var dl = ggDiffLine(x); if (dl) h += '<div>' + dl + '</div>';
+        h += '<div>Проверок: ' + x.cnt + (x.plan > 0 ? ' · в т. ч. предварительно: ' + ggNum(x.plan) + ' (' + x.planCnt + ')' : '') + '</div>';
+        h += '<div class="gg-tip-hint">Клик — расшифровка по проверкам</div>';
+    }
+    var el = ggTipEl(); el.innerHTML = h; el.style.display = 'block';
+    ggTipMove(ev);
+}
+function ggTipMove(ev) {
+    var el = document.getElementById('ggLoadTip'); if (!el || el.style.display !== 'block') return;
+    var w = el.offsetWidth, hh = el.offsetHeight;
+    var x = ev.clientX + 14, y = ev.clientY + 14;
+    if (x + w > window.innerWidth - 8) x = ev.clientX - w - 14;
+    if (y + hh > window.innerHeight - 8) y = ev.clientY - hh - 14;
+    el.style.left = Math.max(4, x) + 'px'; el.style.top = Math.max(4, y) + 'px';
+}
+function ggTipHide() { var el = document.getElementById('ggLoadTip'); if (el) el.style.display = 'none'; }
+
+function ggLoadPanelEl() {
+    var el = document.getElementById('ggLoadPanel');
+    if (!el) {
+        el = document.createElement('aside');
+        el.id = 'ggLoadPanel'; el.className = 'gg-load-panel';
+        el.innerHTML = '<div class="gg-lp-head"><div><div class="gg-lp-title" id="ggLpTitle"></div><div class="gg-lp-sub" id="ggLpSub"></div></div>'
+            + '<button type="button" class="gg-lp-close" id="ggLpClose" title="Закрыть (Esc)">✕</button></div>'
+            + '<div class="gg-lp-body" id="ggLpBody"></div>';
+        document.body.appendChild(el);
+        el.querySelector('#ggLpClose').addEventListener('click', ggLoadPanelClose);
+    }
+    return el;
+}
+function ggLoadPanelClose() {
+    var el = document.getElementById('ggLoadPanel');
+    if (el) el.classList.remove('open');
+    ggLoadSel = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.gg-load-cell.gg-sel'), function(c) { c.classList.remove('gg-sel'); });
+}
+function ggStatusBadge(st) {
+    var col = GG_STATUS_COL[st] || '#7f8c8d';
+    return '<span class="gg-lp-st" style="background:' + col + '">' + esc(GG_STATUS_LBL[st] || st || '—') + '</span>';
+}
+function ggLoadPanelOpen(ri, i) {
+    var x = ggCellInfo(ri, i); if (!x) return;
+    var m = ggLoadModel, r = x.r, pi = x.pi;
+    var el = ggLoadPanelEl();
+    el.querySelector('#ggLpTitle').textContent = r.name;
+    el.querySelector('#ggLpSub').textContent = pi.label + (pi.now ? ' · сейчас' : '') + (pi.offDays ? ' · нерабочих будних дней: ' + pi.offDays : '');
+    var lvl = ggPctLevel(x.v, x.cap);
+    var h = '<div class="gg-lp-sum">'
+        + '<div><span>Загрузка</span><b>' + ggNum(x.v) + '</b></div>'
+        + '<div><span>Ёмкость</span><b>' + (x.cap == null ? '—' : ggNum(x.cap)) + '</b></div>'
+        + '<div><span>% ёмкости</span><b class="gg-lp-pct ' + lvl + '">' + ggPctText(x.v, x.cap) + '</b></div>'
+        + '<div><span>' + (x.cap != null && x.cap - x.v < 0 ? 'Не хватает' : 'Свободно') + '</span><b>' + (x.cap == null ? '—' : ggNum(Math.abs(x.cap - x.v))) + '</b></div>'
+        + '</div>';
+    if (x.plan > 0) h += '<div class="gg-lp-note">В т. ч. предварительно (Планирование): ' + ggNum(x.plan) + '</div>';
+    if (pi.offDay) h += '<div class="gg-lp-note">Выходной / праздничный день, нагрузка не считается.</div>';
+
+    /* Группировка вкладов по проверке */
+    var byTask = {}, order = [];
+    (r.contrib[i] || []).forEach(function(c) {
+        var g = byTask[c.task.id];
+        if (!g) { g = byTask[c.task.id] = { task: c.task, value: 0, parts: [] }; order.push(g); }
+        g.value += c.value; g.parts.push(c);
+    });
+    order.sort(function(a, b) { return b.value - a.value; });
+    h += '<div class="gg-lp-sec">Проверки с нагрузкой в этом периоде (' + order.length + ')</div>';
+    if (!order.length) h += '<div class="gg-lp-empty">Нет активных этапов.</div>';
+    order.forEach(function(g) {
+        var t = g.task;
+        h += '<div class="gg-lp-item"><div class="gg-lp-row1"><span class="gg-lp-name">' + esc((t.icon ? t.icon + ' ' : '') + t.name) + '</span><b class="gg-lp-val">' + ggNum(g.value) + '</b></div>';
+        h += '<div class="gg-lp-row2">' + ggStatusBadge(t.status) + (t.task_type ? '<span class="gg-lp-tag">' + esc(t.task_type) + '</span>' : '') + (t.pocket ? '<span class="gg-lp-tag">' + esc(t.pocket) + '</span>' : '') + '</div>';
+        g.parts.forEach(function(c) {
+            var who = r.total ? esc(ggDeptNames[c.bank] || c.bank) + ': ' : '';
+            var role = c.lead ? '👑 руководитель ×' + ggNum(c.coef) : 'участник ×1';
+            h += '<div class="gg-lp-part">' + who + esc(c.stage) + ' · вес ' + ggNum(c.weight) + ' · ' + role + ' = <b>' + ggNum(c.value) + '</b></div>';
+        });
+        h += '</div>';
+    });
+
+    /* Проверки банка, которые идут в этом периоде, но без активного этапа */
+    if (!r.total) {
+        var idle = (m.tasks || []).filter(function(t) {
+            if ((t.dept_ids || []).indexOf(r.id) < 0 || byTask[t.id]) return false;
+            return (t.start_date || '') <= pi.end && (t.deadline || '9999') >= pi.start;
+        });
+        if (idle.length) {
+            h += '<div class="gg-lp-sec">Также идут, без нагрузки в этом периоде (' + idle.length + ')</div>';
+            idle.forEach(function(t) {
+                h += '<div class="gg-lp-item idle"><div class="gg-lp-row1"><span class="gg-lp-name">' + esc((t.icon ? t.icon + ' ' : '') + t.name) + '</span><b class="gg-lp-val">0</b></div>'
+                  + '<div class="gg-lp-row2">' + ggStatusBadge(t.status) + '<span class="gg-lp-tag">' + esc(fmtD(t.start_date) + '–' + fmtD(t.deadline)) + '</span></div></div>';
+            });
+        }
+    }
+    el.querySelector('#ggLpBody').innerHTML = h;
+    el.classList.add('open');
+    ggLoadSel = { row: ri, idx: i };
+    Array.prototype.forEach.call(document.querySelectorAll('.gg-load-cell.gg-sel'), function(c) { c.classList.remove('gg-sel'); });
+    var cell = document.querySelector('.gg-load-cell[data-lrow="' + ri + '"][data-lidx="' + i + '"]');
+    if (cell) cell.classList.add('gg-sel');
+}
+document.addEventListener('mouseover', function(ev) {
+    var c = ev.target.closest ? ev.target.closest('.gg-load-cell') : null;
+    if (c) ggTipShow(c, ev);
+});
+document.addEventListener('mousemove', function(ev) {
+    if (ev.target.closest && ev.target.closest('.gg-load-cell')) ggTipMove(ev);
+});
+document.addEventListener('mouseout', function(ev) {
+    var c = ev.target.closest ? ev.target.closest('.gg-load-cell') : null;
+    if (c && !(ev.relatedTarget && c.contains(ev.relatedTarget))) ggTipHide();
+});
+document.addEventListener('click', function(ev) {
+    var c = ev.target.closest ? ev.target.closest('.gg-load-cell') : null;
+    if (!c) return;
+    var ri = +c.getAttribute('data-lrow'), i = +c.getAttribute('data-lidx');
+    ggTipHide();
+    if (ggLoadSel && ggLoadSel.row === ri && ggLoadSel.idx === i) { ggLoadPanelClose(); return; }
+    ggLoadPanelOpen(ri, i);
+});
+document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape' && ggLoadSel) ggLoadPanelClose();
+});
 
 /* --- Запуск --- */
 document.getElementById('fApply').addEventListener('click', load);
@@ -2147,7 +2461,37 @@ def register(app, db, hooks):
         if dept_sel_set:
             present = present & dept_sel_set
         bank_ids = sorted(present)
-        banks = [{'id': bid, 'name': dept_name.get(bid, bid)} for bid in bank_ids]
+
+        # Ёмкость банка = экспертный коэффициент × нормативная численность
+        # по направлению. «Всего ОАМ» = розничная + корпоративная.
+        def _num(v):
+            try:
+                return float(v) if v not in (None, '') else None
+            except Exception:
+                return None
+        dep_by_id = {d['id']: d for d in data.get('departments', [])}
+        cap_dirs = (['retail'] if f_type == 'розничная'
+                    else ['corp'] if f_type == 'корпоративная'
+                    else ['retail', 'corp'])
+        def _cap(dep):
+            if not dep:
+                return None
+            tot, has = 0.0, False
+            for dr in cap_dirs:
+                hc = _num(dep.get('headcount_' + dr))
+                kf = _num(dep.get('expert_coef_' + dr))
+                if hc is None or kf is None:
+                    continue
+                tot += hc * kf
+                has = True
+            return round(tot, 2) if has else None
+        banks = [{'id': bid, 'name': dept_name.get(bid, bid),
+                  'capacity': _cap(dep_by_id.get(bid))} for bid in bank_ids]
+        # Итог ОАМ: ёмкость всех банков (или выбранных в фильтре).
+        scope_ids = dept_sel_set if dept_sel_set else set(dep_by_id.keys())
+        caps_all = [_cap(dep_by_id.get(i)) for i in scope_ids]
+        caps_all = [c for c in caps_all if c is not None]
+        total_capacity = round(sum(caps_all), 2) if caps_all else None
         return jsonify({
             'success': True,
             'days': days,
@@ -2155,6 +2499,8 @@ def register(app, db, hooks):
             'today': today,
             'pockets': pockets,
             'banks': banks,
+            'total_capacity': total_capacity,
+            'capacity_dirs': cap_dirs,
             'dept_names': dept_name,
             'holidays': data.get('holidays') or {},
         })
