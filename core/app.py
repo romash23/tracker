@@ -576,6 +576,67 @@ def _notify_task_created(db, task_id, from_user):
         print(f'[notify] task_created failed: {e}')
 
 
+def _audit_details_json(details):
+    """JSON деталей аудита без обрезки посередине (иначе он не парсится)."""
+    s = json.dumps(details or {}, ensure_ascii=False)
+    if len(s) > 8000:
+        d = dict(details or {})
+        ch = d.get('changes')
+        if isinstance(ch, list):
+            d['changes'] = [{k: (v[:60] if isinstance(v, str) else v) for k, v in c.items()} for c in ch][:40]
+        s = json.dumps(d, ensure_ascii=False)
+        if len(s) > 8000:
+            s = json.dumps({'truncated': True, 'name': (details or {}).get('name', '')}, ensure_ascii=False)
+    return s
+
+
+# PATCH task-history: снимок и дифф карточки проверки для хронологии
+_TASK_HIST_FIELDS = ['name', 'status', 'curator', 'lead_department', 'lead_employee', 'task_type',
+                     'pocket', 'task_kind', 'icon', 'start_date', 'deadline', 'is_urgent',
+                     'load_coef', 'description']
+
+
+def _task_snapshot(db, task_id):
+    if not task_id:
+        return None
+    try:
+        row = db.query_one('SELECT * FROM tasks WHERE id=?', (task_id,))
+        if not row:
+            return None
+        snap = {k: ('' if row.get(k) is None else row.get(k)) for k in _TASK_HIST_FIELDS}
+        snap['stages'] = {k[6:-6]: (row.get(k) or '') for k in list(row.keys())
+                          if k.startswith('stage_') and k.endswith('_start')}
+        snap['department_ids'] = sorted(r['department_id'] for r in db.query(
+            'SELECT department_id FROM task_departments WHERE task_id=?', (task_id,)))
+        snap['assignees'] = sorted(r['employee_id'] for r in db.query(
+            'SELECT employee_id FROM task_assignees WHERE task_id=?', (task_id,)))
+        return snap
+    except Exception as e:
+        print(f'[task_history] snapshot failed: {e}')
+        return None
+
+
+def _task_diff(old, new):
+    if not old or not new:
+        return []
+    ch = []
+    for k in _TASK_HIST_FIELDS:
+        a, b = str(old.get(k, '') or ''), str(new.get(k, '') or '')
+        if a != b:
+            if k == 'description':
+                a, b = a[:120], b[:120]
+            ch.append({'field': k, 'from': a, 'to': b})
+    for k in ('department_ids', 'assignees'):
+        a, b = set(old.get(k) or []), set(new.get(k) or [])
+        if a != b:
+            ch.append({'field': k, 'added': sorted(b - a), 'removed': sorted(a - b)})
+    sa, sb = old.get('stages') or {}, new.get('stages') or {}
+    for k in sorted(set(sa) | set(sb)):
+        if (sa.get(k) or '') != (sb.get(k) or ''):
+            ch.append({'field': 'stage', 'stage': k, 'from': sa.get(k) or '', 'to': sb.get(k) or ''})
+    return ch
+
+
 def _audit(db, user, kind, entity='', entity_id='', details=None):
     try:
         db.exec(
@@ -585,7 +646,7 @@ def _audit(db, user, kind, entity='', entity_id='', details=None):
              (user or {}).get('id'),
              (user or {}).get('username', ''),
              kind, entity, str(entity_id or ''),
-             json.dumps(details or {}, ensure_ascii=False)[:2000]),
+             _audit_details_json(details)),
         )
     except Exception as e:
         print(f'[audit] failed: {e}')
@@ -1889,6 +1950,7 @@ def create_app():
                     print(f'[task_save] auto-assign {_u_emp} to new task')
             except Exception as _e:
                 print(f'[task_save] auto-assign failed: {_e}')
+        _hist_old = _task_snapshot(db, task_id) if task_id else None
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if not task_id:
             base = _slugify(name)
@@ -1937,8 +1999,15 @@ def create_app():
                 db.exec("UPDATE tasks SET auto_closed_at='' WHERE id=?", (task_id,))
         except Exception as _e:
             print(f'[task_save] reset auto_closed_at failed: {_e}')
-        _audit(db, u, 'create' if created else 'update', 'task', task_id,
-               {'name': name, 'tags': tags})
+        _hist_details = {'name': name, 'tags': tags}
+        try:
+            if created:
+                _hist_details['status'] = status
+            else:
+                _hist_details['changes'] = _task_diff(_hist_old, _task_snapshot(db, task_id))
+        except Exception as _e:
+            print(f'[task_history] diff failed: {_e}')
+        _audit(db, u, 'create' if created else 'update', 'task', task_id, _hist_details)
         try:
             app.config['PLUGIN_REGISTRY'].emit('on_task_save', user=u,
                                                 task_id=task_id, created=created)
@@ -2033,6 +2102,47 @@ def create_app():
         if not task: return jsonify({'success': False})
         history = db.query("SELECT * FROM task_extensions WHERE task_id=? ORDER BY extended_at DESC", (task_id,))
         return jsonify({'success': True, 'task': task, 'history': history})
+
+    @app.route('/api/tracker/task/history', methods=['GET'])
+    @login_required
+    def api_task_history():
+        """Хронология проверки: создание, смены статусов, продления, изменения полей."""
+        task_id = (request.args.get('id', '') or '').strip()
+        if not task_id:
+            return jsonify({'success': False, 'error': 'Не указан id'}), 400
+        task = db.query_one('SELECT * FROM tasks WHERE id=?', (task_id,))
+        if not task:
+            return jsonify({'success': False, 'error': 'Задача не найдена'}), 404
+        names = {}
+        try:
+            for r in db.query('SELECT username, display_name FROM users'):
+                names[r.get('username') or ''] = r.get('display_name') or r.get('username') or ''
+        except Exception:
+            pass
+        events = []
+        for r in db.query("SELECT ts, username, kind, details FROM audit_log "
+                          "WHERE entity='task' AND entity_id=? ORDER BY ts, id", (task_id,)):
+            try:
+                det = json.loads(r.get('details') or '{}')
+            except Exception:
+                det = {}
+            un = r.get('username') or ''
+            who = 'система' if (not un or un.startswith('system')) else names.get(un, un)
+            events.append({'ts': r.get('ts') or '', 'kind': r.get('kind') or '', 'who': who,
+                           'details': det if isinstance(det, dict) else {}})
+        for x in db.query('SELECT * FROM task_extensions WHERE task_id=? ORDER BY extended_at', (task_id,)):
+            events.append({'ts': x.get('extended_at') or '', 'kind': 'extend', 'who': x.get('created_by') or '',
+                           'details': {'days': x.get('days_added'),
+                                       'prev_deadline': x.get('prev_deadline') or '',
+                                       'new_deadline': x.get('new_deadline') or '',
+                                       'comment': x.get('comment') or ''}})
+        if not any(e['kind'] == 'create' for e in events) and task.get('created_at'):
+            events.append({'ts': task.get('created_at'), 'kind': 'create', 'who': '',
+                           'details': {'inferred': True}})
+        events.sort(key=lambda e: e['ts'] or '')
+        return jsonify({'success': True, 'events': events, 'task': {
+            k: task.get(k) or '' for k in ('id', 'name', 'status', 'start_date', 'deadline',
+                                            'initial_start_date', 'initial_deadline')}})
 
     @app.route('/api/tracker/task/delete', methods=['POST'])
     @login_required

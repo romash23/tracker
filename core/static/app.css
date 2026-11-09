@@ -10643,3 +10643,53 @@ body:not(.trk-theme-light) .task-card-badge.status-cancelled { color: #bfc9ca !i
 .tsum-status--active    { background: #e3f0f9; color: #1a5276; }
 .tsum-status--done      { background: #e8f5e9; color: #1b5e20; }
 .tsum-status--cancelled { background: #f2f3f4; color: #616a6b; }
+
+
+/* ===== PATCH 2026-11-09: куратор, чекбокс объединения, история, сообщение по центру ===== */
+/* Куратор ЦА — всегда отдельной строкой в плитке */
+.tasks-grid .task-card-curator { font-size: 0.7rem; font-weight: 600; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }
+.task-card-curator--none, .tsk-row-cur--none { color: #b26a00 !important; opacity: 1 !important; }
+body:not(.trk-theme-light) .task-card-curator--none, body:not(.trk-theme-light) .tsk-row-cur--none { color: #f0b85a !important; }
+/* Список: статус и куратор не обрезаются, обрезаются только банки */
+#tasksFullList.tsk-rows .tsk-row-meta { display: flex !important; align-items: baseline; min-width: 0; }
+#tasksFullList.tsk-rows .tsk-row-meta > * { flex: 0 0 auto; }
+#tasksFullList.tsk-rows .tsk-row-meta > .tsk-row-banks { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tasksFullList.tsk-rows .tsk-row-sep { white-space: pre; }
+#tasksFullList.tsk-rows .tsk-row-cur { font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Чекбокс «Выбрать для объединения» — в блоке действий, а не поверх текста */
+#tasksFullList .task-card-actions, #tasksFullList .tsk-row .dict-actions { display: flex; align-items: center; gap: 8px; }
+#tasksFullList .task-merge-cb.task-merge-cb--slot {
+    position: static !important; top: auto !important; right: auto !important; left: auto !important;
+    width: 14px !important; height: 14px !important; margin: 0 !important; flex: 0 0 auto;
+    opacity: 0.35 !important; cursor: pointer;
+}
+#tasksFullList .task-card:hover .task-merge-cb--slot,
+#tasksFullList .dict-item:hover .task-merge-cb--slot,
+#tasksFullList .task-merge-cb--slot:checked { opacity: 1 !important; }
+#tasksFullList.tasks-grid .task-card:has(.task-merge-cb:checked) .task-card-actions { opacity: 1 !important; }
+#tasksFullList.tasks-list-view .dict-item.tsk-row { padding-left: 10px !important; }
+
+/* История проверки */
+#taskDatesModal .th-summary { padding: 8px 10px; margin-bottom: 12px; border-radius: 8px; background: rgba(46, 158, 91, 0.09); font-size: 0.82rem; line-height: 1.55; }
+#taskDatesModal .th-list { list-style: none; margin: 0; padding: 0; position: relative; }
+#taskDatesModal .th-list::before { content: ''; position: absolute; left: 12px; top: 8px; bottom: 8px; width: 2px; background: rgba(127, 127, 127, 0.25); }
+#taskDatesModal .th-item { display: flex; gap: 10px; position: relative; padding: 2px 0 12px; }
+#taskDatesModal .th-dot { flex: 0 0 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; background: #fff; border: 2px solid rgba(127, 127, 127, 0.4); position: relative; z-index: 1; }
+body:not(.trk-theme-light) #taskDatesModal .th-dot { background: #22262b; }
+#taskDatesModal .th-create .th-dot { border-color: #239b56; }
+#taskDatesModal .th-status .th-dot { border-color: #2874a6; }
+#taskDatesModal .th-extend .th-dot { border-color: #d68910; }
+#taskDatesModal .th-main { flex: 1 1 auto; min-width: 0; padding-top: 3px; }
+#taskDatesModal .th-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; }
+#taskDatesModal .th-title { font-weight: 700; font-size: 0.85rem; }
+#taskDatesModal .th-ts { font-size: 0.72rem; opacity: 0.7; white-space: nowrap; }
+#taskDatesModal .th-lines { margin: 3px 0 0; padding-left: 16px; font-size: 0.78rem; line-height: 1.45; }
+#taskDatesModal .th-empty { opacity: 0.6; }
+
+/* Сообщение по центру экрана */
+.trk-center-msg { position: fixed; inset: 0; z-index: 21000; display: none; align-items: center; justify-content: center; pointer-events: none; }
+.trk-center-msg.active { display: flex; }
+.trk-center-msg-box { pointer-events: auto; cursor: pointer; background: #fff; color: #1b5e20; border: 3px solid #2e9e5b; border-radius: 14px; padding: 18px 30px; font-size: 17px; font-weight: 700; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); animation: trkCenterMsgIn 0.18s ease-out; }
+body:not(.trk-theme-light) .trk-center-msg-box { background: #1f2a24; color: #b9f0cc; }
+@keyframes trkCenterMsgIn { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }

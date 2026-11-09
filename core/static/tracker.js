@@ -1252,7 +1252,9 @@ function taskRowMin(t) {
         banks = '<span title="' + escapeHtml(names.join(', ')) + '">👥 '
             + escapeHtml(names.slice(0, 3).join(', ')) + (names.length > 3 ? ' +' + (names.length - 3) : '') + '</span>';
     }
-    if (banks) meta.push(banks);
+    var _curOk = !!(t.curator && t.curator !== 'нет');
+    meta.push('<span class="tsk-row-cur' + (_curOk ? '' : ' tsk-row-cur--none') + '" title="Куратор ЦА: ' + escapeHtml(_curOk ? t.curator : 'не указан') + '">👤 ' + escapeHtml(_curOk ? t.curator : 'не указан') + '</span>');
+    if (banks) meta.push('<span class="tsk-row-banks">' + banks + '</span>');
     if (t.start_date || t.deadline) {
         meta.push('<span class="tsk-row-dates">'
             + (t.start_date ? '🚀 ' + escapeHtml(formatDateShort(t.start_date)) : '')
@@ -1402,9 +1404,9 @@ function taskCardRowGrid(t) {
     if (_urgBadge) statusBadge += _urgBadge;
 
     var deptBadges = _deptBadgesForTask(t);
-    if (t.curator) {
-        deptBadges = (deptBadges ? deptBadges + ' ' : '') + '<span class="badge badge-curator">👤 ' + escapeHtml(t.curator) + '</span>';
-    }
+    var _curOk = !!(t.curator && t.curator !== 'нет');
+    var _curTxt = _curOk ? t.curator : 'не указан';
+    var curatorHtml = '<div class="task-card-curator' + (_curOk ? '' : ' task-card-curator--none') + '" title="Куратор ЦА: ' + escapeHtml(_curTxt) + '">👤 ' + escapeHtml(_curTxt) + '</div>';
 
     var pct = progress();
     var progressHtml = '';
@@ -1464,6 +1466,7 @@ function taskCardRowGrid(t) {
         +   '<div class="task-card-titles">'
         +     '<div class="task-card-title' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         +     (deptBadges ? '<div class="task-card-sub">' + deptBadges + '</div>' : '')
+        +     curatorHtml
         +   '</div>'
         +   '<div class="task-card-topright">'
         +     (statusBadge || '')
@@ -3623,6 +3626,126 @@ document.addEventListener('keydown', function(e) {
     var cf = $('tsumConfirm');
     if (e.key === 'Escape' && cf && cf.classList.contains('active')) { e.stopPropagation(); _tsumConfirmShow(false); }
 }, true);
+/* PATCH task-history: хронология проверки (статусы, продления, изменения полей) */
+var _TH_STATUS = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена', archived: 'Завершена' };
+function _thStatus(s) { return (state.taskStatusLabels && state.taskStatusLabels[s]) || _TH_STATUS[s] || s || '—'; }
+var _TH_FIELDS = { name: 'Название', status: 'Статус', curator: 'Куратор ЦА', lead_department: 'Банк-руководитель', lead_employee: 'Руководитель (сотрудник)', task_type: 'Направление', pocket: 'Карман', task_kind: 'Вид задачи', icon: 'Завершение', start_date: 'Дата начала', deadline: 'Дедлайн', is_urgent: 'Срочность', load_coef: 'Коэффициент нагрузки', description: 'Описание', department_ids: 'Банки', assignees: 'Участники' };
+function _thTs(ts) {
+    if (!ts) return '';
+    var m = String(ts).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+    return m ? m[3] + '.' + m[2] + '.' + m[1] + (m[4] ? ' ' + m[4] + ':' + m[5] : '') : escapeHtml(ts);
+}
+function _thVal(field, v) {
+    var EMPTY = '<span class="th-empty">—</span>';
+    if (v === null || v === undefined || v === '') return EMPTY;
+    if (field === 'status') return escapeHtml(_thStatus(v));
+    if (field === 'lead_department') return _tsumDepName(v);
+    if (field === 'lead_employee') return _tsumEmpName(v);
+    if (field === 'start_date' || field === 'deadline' || field === 'stage') return escapeHtml(formatDateShort(v));
+    if (field === 'icon') { var q = window.trkQuarterValue ? window.trkQuarterValue(v) : v; return q ? escapeHtml(q) : EMPTY; }
+    if (field === 'is_urgent') return (['1', 'true', 'True'].indexOf(String(v)) >= 0) ? 'да' : 'нет';
+    if (field === 'task_kind') return v === 'other' ? 'Другое' : 'Аудиторская проверка';
+    if (field === 'curator' && v === 'нет') return EMPTY;
+    if (field === 'task_type') return escapeHtml(String(v).charAt(0).toUpperCase() + String(v).slice(1));
+    return escapeHtml(String(v));
+}
+function _thChange(c) {
+    if (c.field === 'department_ids' || c.field === 'assignees') {
+        var nm = c.field === 'department_ids' ? _tsumDepName : _tsumEmpName;
+        var parts = [];
+        if ((c.added || []).length) parts.push('добавлено: ' + c.added.map(function(x) { return nm(x); }).join(', '));
+        if ((c.removed || []).length) parts.push('удалено: ' + c.removed.map(function(x) { return nm(x); }).join(', '));
+        return '<b>' + _TH_FIELDS[c.field] + '</b>: ' + parts.join('; ');
+    }
+    var label = c.field === 'stage'
+        ? 'Этап «' + escapeHtml((typeof TASK_STAGE_LABELS !== 'undefined' && TASK_STAGE_LABELS[c.stage]) || c.stage) + '»'
+        : escapeHtml(_TH_FIELDS[c.field] || c.field);
+    if (c.field === 'description') return '<b>' + label + '</b> изменено';
+    return '<b>' + label + '</b>: ' + _thVal(c.field, c.from) + ' → ' + _thVal(c.field, c.to);
+}
+function _thEvent(e) {
+    var d = e.details || {}, icon = '✏️', title = 'Изменена карточка', lines = [], cls = '';
+    if (e.kind === 'create') {
+        icon = '🆕'; title = 'Проверка создана'; cls = 'th-create';
+        if (d.status) lines.push('Статус: ' + _thVal('status', d.status));
+        if (d.inferred) lines.push('<span class="th-empty">время из карточки, автор не записан</span>');
+    } else if (e.kind === 'extend') {
+        icon = '⏳'; title = 'Продление на ' + (parseInt(d.days, 10) || 0) + ' дн.'; cls = 'th-extend';
+        lines.push('Дедлайн: ' + _thVal('deadline', d.prev_deadline) + ' → ' + _thVal('deadline', d.new_deadline));
+        if (d.comment) lines.push('Комментарий: ' + escapeHtml(d.comment));
+    } else if (e.kind === 'task_auto_activate') {
+        icon = '▶️'; title = 'Автоматически переведена в «' + escapeHtml(_thStatus('active')) + '»'; cls = 'th-status';
+        lines.push('наступила дата начала');
+    } else if (e.kind === 'merge') {
+        icon = '🔗'; title = 'Объединена с другими задачами';
+        if ((d.merged_ids || []).length) lines.push('Присоединено задач: ' + d.merged_ids.length);
+    } else if (e.kind === 'update' && d.action === 'auto_reopen') {
+        icon = '🔄'; title = 'Автоматически возвращена в «' + escapeHtml(_thStatus('active')) + '»'; cls = 'th-status';
+        lines.push('исполнитель отменил закрытие');
+    } else if (e.kind === 'update') {
+        var ch = d.changes;
+        if (!Array.isArray(ch)) lines.push('<span class="th-empty">подробности изменений не сохранялись</span>');
+        else if (!ch.length) return '';
+        else {
+            var st = ch.filter(function(c) { return c.field === 'status'; })[0];
+            if (st) {
+                var ST_ICON = { approved: '✅', active: '▶️', done: '🏁', cancelled: '⛔', planning: '📝' };
+                icon = ST_ICON[st.to] || '🔁'; title = 'Статус: ' + escapeHtml(_thStatus(st.to)); cls = 'th-status';
+            }
+            ch.forEach(function(c) { lines.push(_thChange(c)); });
+        }
+    } else {
+        title = escapeHtml(e.kind || 'событие');
+    }
+    return '<li class="th-item ' + cls + '"><div class="th-dot">' + icon + '</div><div class="th-main">'
+        + '<div class="th-head"><span class="th-title">' + title + '</span><span class="th-ts">' + _thTs(e.ts) + (e.who ? ' · ' + escapeHtml(e.who) : '') + '</span></div>'
+        + (lines.length ? '<ul class="th-lines">' + lines.map(function(l) { return '<li>' + l + '</li>'; }).join('') + '</ul>' : '')
+        + '</div></li>';
+}
+function loadTaskDateHistory(taskId) {
+    if (!taskId) return;
+    var body = $('taskDatesBody'), m = $('taskDatesModal');
+    if (!body || !m) return;
+    body.innerHTML = '<div class="assignees-hint">Загрузка…</div>';
+    m.setAttribute('data-task-id', taskId);
+    m.classList.add('active');
+    fetch('/api/tracker/task/history?id=' + encodeURIComponent(taskId), { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d || !d.success) {
+                body.innerHTML = '<div class="assignees-hint">Не удалось загрузить историю' + (d && d.error ? ': ' + escapeHtml(d.error) : '') + '</div>';
+                return;
+            }
+            var t = d.task || {};
+            var head = '<div class="th-summary"><b>' + escapeHtml(t.name || '') + '</b><div>🚀 ' + _thVal('start_date', t.start_date) + ' → ⏰ ' + _thVal('deadline', t.deadline)
+                + (t.initial_deadline && t.initial_deadline !== t.deadline ? ' <span class="th-empty">(изначально ' + _thVal('deadline', t.initial_deadline) + ')</span>' : '')
+                + '</div></div>';
+            var items = (d.events || []).map(_thEvent).filter(Boolean);
+            body.innerHTML = head + (items.length ? '<ol class="th-list">' + items.join('') + '</ol>' : '<div class="assignees-hint">Событий пока нет.</div>');
+        })
+        .catch(function() { body.innerHTML = '<div class="assignees-hint">Ошибка сети при загрузке истории</div>'; });
+}
+window.loadTaskDateHistory = loadTaskDateHistory;
+window.trkApiJson = apiJson;
+window.trkNotify = notify;
+/* Сообщение по центру экрана (поверх всех окон), исчезает само или по клику */
+window.trkShowCenterMsg = function(text, ms) {
+    var el = document.getElementById('trkCenterMsg');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'trkCenterMsg'; el.className = 'trk-center-msg'; el.setAttribute('role', 'status');
+        el.addEventListener('click', function() { el.classList.remove('active'); });
+        document.body.appendChild(el);
+    }
+    el.innerHTML = '<div class="trk-center-msg-box">' + escapeHtml(text) + '</div>';
+    el.classList.add('active');
+    clearTimeout(window.__trkCenterMsgT);
+    window.__trkCenterMsgT = setTimeout(function() { el.classList.remove('active'); }, ms || 2200);
+};
+window.trkReopenTaskSummary = function(id) {
+    var t = (state.tasks || []).find(function(x) { return String(x.id) === String(id); });
+    if (t) openTaskSummary(t);
+};
 on('tsumHistoryBtn', 'click', function() {
     var t = _tsumCurrentTask();
     if (!t || !t.id) return;
@@ -14298,7 +14421,7 @@ window.trkApplyTaskLockState = function(task){
         extendBtn.style.opacity = canExtend ? '' : '0.5';
     }
     if (histBtn) histBtn.style.display = hasId ? 'inline-flex' : 'none';
-    var lockHint = isPlanning ? '' : 'Редактирование закрыто: проверка не в статусе «Планирование»' + (canExtend ? '. Для сдвига сроков используйте «Продлить»' : '');
+    var lockHint = isPlanning ? '' : 'Редактирование закрыто: проверка не в статусе «Планирование»' + (canExtend ? '. Для сдвига сроков используйте ⏳ в карточке просмотра' : '');
     ['task_name', 'task_description', 'task_folder', 'task_curator', 'task_type', 'task_pocket', 'task_start_date', 'task_deadline', 'task_load_coef', 'task_lead_department', 'task_lead_employee'].forEach(function(fid){
         var el = document.getElementById(fid);
         if (!el) return;
@@ -16900,11 +17023,21 @@ if (window.__trkMergeFixV1019) return;
 window.__trkMergeFixV1019 = true;
 
 function _hasCb(card){
-    for (var i = 0; i < card.children.length; i++) {
-        var c = card.children[i];
-        if (c && c.classList && c.classList.contains('task-merge-cb')) return true;
+    return !!(card && card.querySelector('.task-merge-cb'));
+}
+/* PATCH merge-cb-slot: чекбокс переносится в блок действий (рядом с 🗑),
+   чтобы не наезжал на текст и не нажимался случайно при клике по карточке */
+function _placeCb(card){
+    var cb = card.querySelector('.task-merge-cb');
+    if (!cb) return;
+    var slot = card.querySelector('.task-card-actions') || card.querySelector('.dict-actions');
+    if (!slot) {
+        slot = document.createElement('div');
+        slot.className = card.classList.contains('task-card') ? 'task-card-actions' : 'dict-actions';
+        card.appendChild(slot);
     }
-    return false;
+    if (cb.parentNode !== slot) slot.insertBefore(cb, slot.firstChild);
+    if (!cb.classList.contains('task-merge-cb--slot')) cb.classList.add('task-merge-cb--slot');
 }
 
 function _selectedIds(){
@@ -16951,6 +17084,7 @@ function _scan(){
     list.querySelectorAll('.task-card').forEach(_attach);
     // Список
     list.querySelectorAll('.dict-item').forEach(_attach);
+    list.querySelectorAll('.task-card, .dict-item').forEach(_placeCb);
     _updateBar();
 }
 
@@ -20411,56 +20545,44 @@ document.addEventListener('click', function(e){
 
 document.addEventListener('click', function(e) {
     if (!e.target || !e.target.closest) return;
-    
-    if (e.target.closest('#taskExtendBtn')) {
-        if (e.target.closest('#taskExtendBtn').disabled) return;
-        var extM = document.getElementById('extendTaskModal');
-        if (extM) extM.classList.add('active');
-    }
-    
-    if (e.target.closest('#confirmExtendBtn')) {
-        var tid = document.getElementById('task_id').value;
+    var _ntf = function(m, k){ if (window.trkNotify) window.trkNotify(m, k); };
+    var cbtn = e.target.closest('#confirmExtendBtn');
+    if (cbtn) {
+        if (cbtn.disabled) return;
+        var em = document.getElementById('extendTaskModal');
+        var tidEl = document.getElementById('task_id');
+        var tid = (em && em.getAttribute('data-task-id')) || (tidEl ? tidEl.value : '') || '';
         var days = parseInt(document.getElementById('extendDays').value, 10);
         var comment = document.getElementById('extendComment').value;
-        if (!tid || days <= 0) return;
-        apiJson('/api/tracker/task/extend', {
+        if (!tid) { _ntf('❌ Не выбрана проверка', 'error'); return; }
+        if (!days || days <= 0) { _ntf('❌ Укажите число дней больше нуля', 'error'); return; }
+        cbtn.disabled = true;
+        window.trkApiJson('/api/tracker/task/extend', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({id: tid, days: days, comment: comment})
         }).then(function(d) {
-            if (d.success) {
-                document.getElementById('extendTaskModal').classList.remove('active');
-                notify('✅ Проверка продлена');
-                trkRefreshAll(); // Перезагрузит данные и карточку закроет
-                document.getElementById('taskModal').classList.remove('active');
+            cbtn.disabled = false;
+            if (d && d.success) {
+                if (em) em.classList.remove('active');
+                var tm = document.getElementById('taskModal'); if (tm) tm.classList.remove('active');
+                var sm = document.getElementById('taskSummaryModal');
+                var reopen = sm && sm.classList.contains('active') && String(sm.getAttribute('data-task-id')) === String(tid);
+                if (window.trkShowCenterMsg) window.trkShowCenterMsg('✅ Продление сделано успешно');
+                else _ntf('✅ Продление сделано успешно');
+                Promise.resolve(typeof window.__trkRefreshAll === 'function' ? window.__trkRefreshAll() : null).then(function() {
+                    if (reopen && window.trkReopenTaskSummary) window.trkReopenTaskSummary(tid);
+                });
             } else {
-                notify('❌ ' + (d.error || 'Ошибка'), 'error');
+                _ntf('❌ ' + ((d && d.error) || 'Ошибка'), 'error');
             }
-        });
+        }).catch(function() { cbtn.disabled = false; _ntf('❌ Не удалось продлить проверку', 'error'); });
+        return;
     }
-    
     if (e.target.closest('#taskDatesHistoryBtn')) {
-        var tid = document.getElementById('task_id').value;
-        if (!tid) { notify('Сначала сохраните задачу'); return; }
-        fetch('/api/tracker/task/dates_history?id=' + encodeURIComponent(tid), {credentials: 'same-origin'})
-            .then(r => r.json())
-            .then(d => {
-                if (!d.success) return;
-                var html = '<h3>Начальные и текущие даты</h3><table class="st-table"><tr><th>Параметр</th><th>Начальные</th><th>Текущие</th></tr>';
-                html += '<tr><td>Начало</td><td>' + (d.task.initial_start_date || d.task.start_date || '-') + '</td><td>' + (d.task.start_date || '-') + '</td></tr>';
-                html += '<tr><td>Дедлайн</td><td>' + (d.task.initial_deadline || d.task.deadline || '-') + '</td><td>' + (d.task.deadline || '-') + '</td></tr>';
-                html += '</table><br><h3>История продлений</h3>';
-                if (!d.history || !d.history.length) {
-                    html += '<div class="assignees-hint">Продлений не было.</div>';
-                } else {
-                    html += '<table class="st-table"><tr><th>Дата продления</th><th>+ Дней</th><th>Старый дедлайн</th><th>Новый дедлайн</th><th>Комментарий</th><th>Кто</th></tr>';
-                    d.history.forEach(function(h) {
-                        html += '<tr><td>' + (h.extended_at || '') + '</td><td>+' + h.days_added + '</td><td>' + (h.prev_deadline || '') + '</td><td>' + (h.new_deadline || '') + '</td><td>' + (h.comment || '') + '</td><td>' + (h.created_by || '') + '</td></tr>';
-                    });
-                    html += '</table>';
-                }
-                document.getElementById('taskDatesBody').innerHTML = html;
-                document.getElementById('taskDatesModal').classList.add('active');
-            });
+        var hEl = document.getElementById('task_id');
+        var hid = hEl ? hEl.value : '';
+        if (!hid) { _ntf('Сначала сохраните задачу'); return; }
+        window.loadTaskDateHistory(hid);
     }
 }, true);
 
@@ -20477,11 +20599,16 @@ document.addEventListener('click', function(e) {
             var m = document.getElementById(id);
             if (m) new MutationObserver(sync).observe(m, { attributes: true, attributeFilter: ['class'] });
         });
-        var tm = document.getElementById('taskModal');
-        if (tm) new MutationObserver(function(){
-            if (!tm.classList.contains('active')) IDS.forEach(function(id){ var m = document.getElementById(id); if (m) m.classList.remove('active'); });
+        var HOSTS = ['taskModal', 'taskSummaryModal'];
+        function hostChanged() {
+            var anyOpen = HOSTS.some(function(id){ var h = document.getElementById(id); return h && h.classList.contains('active'); });
+            if (!anyOpen) IDS.forEach(function(id){ var m = document.getElementById(id); if (m) m.classList.remove('active'); });
             sync();
-        }).observe(tm, { attributes: true, attributeFilter: ['class'] });
+        }
+        HOSTS.forEach(function(id){
+            var h = document.getElementById(id);
+            if (h) new MutationObserver(hostChanged).observe(h, { attributes: true, attributeFilter: ['class'] });
+        });
         sync();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
