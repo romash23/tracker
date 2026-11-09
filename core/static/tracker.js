@@ -49,7 +49,8 @@
         var r = [];
         if (!(t.assignees || []).length) r.push('нет участников');
         if (isAudit && !(t.department_ids || []).length) r.push('нет банков-участников');
-        if (!t.curator || t.curator === 'нет') r.push('нет куратора');
+        var _cur = String(t.curator || '').trim().toLowerCase();
+        if (!_cur || _cur === 'нет' || _cur === '-' || _cur === '—' || _cur === 'не указан') r.push('не указан куратор ЦА');
         if (isAudit && !String(t.pocket || '').trim()) r.push('нет кармана');
         if (isAudit && (!t.lead_department || !t.lead_employee)) r.push('нет руководителя');
         var q = (window.trkQuarterValue ? window.trkQuarterValue(t.icon) : '');
@@ -19272,6 +19273,16 @@ function renderBankStatsPanel(bank){
         d.setDate(d.getDate() + delta);
         return ymd(d);
     }
+    var DASH_NEW_START_OFFSET_DAYS = 30, DASH_NEW_LENGTH_MONTHS = 2;
+    function addMonthsISO(iso, months){
+        var d = parse(iso) || new Date();
+        var day = d.getDate();
+        d.setDate(1);
+        d.setMonth(d.getMonth() + months);
+        var last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        d.setDate(Math.min(day, last));
+        return ymd(d);
+    }
     function ovl(a, b, ps, pe){
         return a && b && a <= pe && b >= ps;
     }
@@ -19421,8 +19432,9 @@ function renderBankStatsPanel(bank){
         } else if (stateDash.lanes.length < 5) {
             addLane();
         }
-        var start = todayISO();
-        var end = addDaysISO(start, 90);
+        // Новая колбаска: старт через 30 дней от сегодня, длина 2 календарных месяца
+        var start = addDaysISO(todayISO(), DASH_NEW_START_OFFSET_DAYS);
+        var end = addDaysISO(addMonthsISO(start, DASH_NEW_LENGTH_MONTHS), -1);
         var allDeps = (st().departments || []);
         var firstDepIds = allDeps.length ? [allDeps[0].id] : [];
         var shares = {};
@@ -19449,7 +19461,7 @@ function renderBankStatsPanel(bank){
         renderSelector();
         renderGantt();
         renderLoad();
-        notify('Создана проверка «' + draft.name + '» (' + DASH_DIR_LABEL[dir] + ', 3 мес: ' + start + ' → ' + end + ')', 'info');
+        notify('Создана проверка «' + draft.name + '» (' + DASH_DIR_LABEL[dir] + ', ' + DASH_NEW_LENGTH_MONTHS + ' мес: ' + start + ' → ' + end + ')', 'info');
     }
 
     function dashCloseCreateModal(){
