@@ -10707,3 +10707,17 @@ body:not(.trk-theme-light) .trk-center-msg-box { background: #1f2a24; color: #b9
 #dashLoadContainer .dash-mini-chart-wrap{margin-top:0!important;min-height:0!important;position:relative}
 #dashLoadContainer .dash-mini-chart{min-height:0!important;align-items:flex-end}
 #dashLoadContainer .dash-mini-col{height:100%!important;padding-top:0!important;gap:0!important}
+
+/* ===== Песочница: окно подтверждения сохранения со списком изменений (09.11.2026) ===== */
+.dash-sc-overlay { z-index:20500; }
+.tsum-confirm.dash-sc { width:min(680px, 100%); display:flex; flex-direction:column; max-height:86vh; }
+.dash-sc-title { font-weight:700; font-size:16px; margin-bottom:10px; }
+.dash-sc-body { overflow-y:auto; min-height:0; padding-right:4px; }
+.dash-sc-item { border-left:3px solid #2874a6; background:rgba(40,116,166,.06); border-radius:6px; padding:7px 10px; margin-bottom:8px; }
+.dash-sc-item--new { border-left-color:#7e57c2; background:rgba(126,87,194,.07); }
+.dash-sc-head { font-weight:600; font-size:14px; }
+.dash-sc-list { margin:4px 0 0; padding-left:20px; font-size:13.5px; line-height:1.45; }
+.dash-sc-list li { margin:1px 0; }
+.dash-sc-ask { margin-top:10px; font-weight:600; }
+body:not(.trk-theme-light) .dash-sc-item { background:rgba(40,116,166,.16); }
+body:not(.trk-theme-light) .dash-sc-item--new { background:rgba(126,87,194,.18); }

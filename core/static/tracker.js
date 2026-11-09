@@ -19457,11 +19457,12 @@ function renderBankStatsPanel(bank){
         if (stateDash.dir !== 'all' && stateDash.dir !== dir) stateDash.dir = 'all';
         stateDash.task = null;
         stateDash.draft = draft;
+        syncLane();
         syncControls();
         renderSelector();
         renderGantt();
         renderLoad();
-        notify('Создана проверка «' + draft.name + '» (' + DASH_DIR_LABEL[dir] + ', ' + DASH_NEW_LENGTH_MONTHS + ' мес: ' + start + ' → ' + end + ')', 'info');
+        notify('Черновик «' + draft.name + '» добавлен на ось (' + DASH_DIR_LABEL[dir] + ', ' + DASH_NEW_LENGTH_MONTHS + ' мес: ' + dashFmtD(start) + ' → ' + dashFmtD(end) + '). В БД он попадёт после «Сохранить изменения»', 'info');
     }
 
     function dashCloseCreateModal(){
@@ -19532,6 +19533,7 @@ function renderBankStatsPanel(bank){
     function loadDraft(t){
         stateDash.task = t || null;
         stateDash.draft = t ? dashBuildDraft(t) : null;
+        syncLane();
         syncControls();
         renderSelector();
         renderGantt();
@@ -20257,23 +20259,23 @@ function renderBankStatsPanel(bank){
         });
     }
 
-    function saveDraft(){
-        if (!stateDash.draft) { notify('Сначала выберите проверку или нажмите «+ Создать проверку»', 'error'); return; }
-        var d = stateDash.draft;
-        var nameVal = (d.name || '').trim();
-        if (!nameVal) {
-            var asked = window.prompt('Введите название проверки:', 'Новая проверка');
-            if (!asked || !asked.trim()) { notify('Название проверки обязательно', 'error'); return; }
-            nameVal = asked.trim();
-            d.name = nameVal;
+    /* ===== Сохранение песочницы: все оси, сводка изменений, подтверждение (09.11.2026) ===== */
+    function dashFmtD(iso){
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+        return m ? (m[3] + '.' + m[2] + '.' + m[1]) : '—';
+    }
+    function dashDepName(id){ var d = deptById(id); return d ? (d.name || id) : (id || '—'); }
+    function dashStageMap(stages){
+        var out = {};
+        if (Array.isArray(stages)) {
+            stages.forEach(function(x){ if (x && x.key && x.start) out[x.key] = x.start; });
+        } else if (stages && typeof stages === 'object') {
+            Object.keys(stages).forEach(function(k){ if (stages[k]) out[k] = stages[k]; });
         }
-        if (!(d.department_ids || []).length) {
-            notify('Добавьте хотя бы один банк-участник (кликните по банку в плашке «Банки в проверке»)', 'error');
-            return;
-        }
-        if (!d.lead_department || d.department_ids.indexOf(d.lead_department) < 0) {
-            d.lead_department = d.department_ids[0];
-        }
+        return out;
+    }
+    function dashBuildPayload(d, orig){
+        var base = orig ? clone(orig) : {};
         var normStages = dashNormalizeStages(d);
         var stageStarts = {};
         var prevDate = '';
@@ -20284,15 +20286,16 @@ function renderBankStatsPanel(bank){
             stageStarts[s.key] = dt;
             prevDate = dt;
         });
-
-        var orig = stateDash.task ? (st().tasks || []).find(function(t){ return t.id === stateDash.task.id; }) : null;
-        var base = orig ? clone(orig) : {};
-        var payload = {
+        var isNew = !(d.id || base.id);
+        var leadDep = d.lead_department;
+        if (!leadDep || (d.department_ids || []).indexOf(leadDep) < 0) leadDep = (d.department_ids || [])[0] || '';
+        return {
             id: d.id || (base.id || ''),
-            name: nameVal,
+            name: (d.name || '').trim(),
             icon: base.icon || '📋',
             description: base.description || '',
-            status: base.status || 'active',
+            // Новая проверка из песочницы всегда создаётся в статусе «Планирование»
+            status: isNew ? 'planning' : (base.status || 'planning'),
             start_date: d.start_date || todayISO(),
             deadline: d.deadline || addDaysISO(d.start_date || todayISO(), 90),
             completed_at: base.completed_at || '',
@@ -20303,44 +20306,177 @@ function renderBankStatsPanel(bank){
             department_ids: (d.department_ids || []).slice(),
             task_kind: 'audit',
             load_coef: base.load_coef || 0,
-            lead_department: d.lead_department || '',
+            lead_department: leadDep,
             lead_employee: base.lead_employee || '',
             is_urgent: !!base.is_urgent,
             links: (base.links || []).slice(),
             orders: (base.orders || []).slice(),
             task_type: d.task_type || base.task_type || (stateDash.dir !== 'all' ? dirTaskType(stateDash.dir) : 'розничная'),
             pocket: (d.pocket !== undefined && d.pocket !== null && d.pocket !== '') ? d.pocket : (base.pocket || ''),
-            curator: d.curator || base.curator || 'нет',
+            curator: isNew ? (d.curator || 'нет') : (base.curator || d.curator || ''),
             department_shares: clone(d.department_shares || {}),
             stages: stageStarts,
             force_duplicate: true
         };
+    }
+    function dashDiffLines(orig, p){
+        var L = [];
+        if (!orig) {
+            L.push('статус: Планирование');
+            L.push('сроки: ' + dashFmtD(p.start_date) + ' → ' + dashFmtD(p.deadline));
+            if (p.task_type) L.push('направление: ' + p.task_type);
+            if (p.pocket) L.push('карман: ' + p.pocket);
+            L.push('банки: ' + (p.department_ids.map(dashDepName).join(', ') || '—'));
+            if (p.lead_department) L.push('банк-руководитель: ' + dashDepName(p.lead_department));
+            var ks = STAGE_ORDER.filter(function(k){ return p.stages[k]; });
+            if (ks.length) L.push('этапы: ' + ks.map(function(k){ return stageLabel(k) + ' с ' + dashFmtD(p.stages[k]); }).join('; '));
+            return L;
+        }
+        if ((orig.name || '') !== p.name) L.push('название: «' + (orig.name || '—') + '» → «' + p.name + '»');
+        if ((orig.start_date || '') !== p.start_date) L.push('дата начала: ' + dashFmtD(orig.start_date) + ' → ' + dashFmtD(p.start_date));
+        if ((orig.deadline || '') !== p.deadline) L.push('дедлайн: ' + dashFmtD(orig.deadline) + ' → ' + dashFmtD(p.deadline));
+        var os = dashStageMap(orig.stages), ns = p.stages;
+        var origHasStages = Object.keys(os).length > 0;
+        STAGE_ORDER.concat(Object.keys(ns).filter(function(k){ return STAGE_ORDER.indexOf(k) < 0; })).forEach(function(k){
+            var a = os[k] || '', b = ns[k] || '';
+            if (a === b) return;
+            // Этап по умолчанию, который песочница подставляет проверке без этапов, — не изменение
+            if (!origHasStages && !a && k === DASH_STAGE_KEY_DEFAULT && b === p.start_date) return;
+            if (!a) L.push('добавлен этап «' + stageLabel(k) + '» с ' + dashFmtD(b));
+            else if (!b) L.push('убран этап «' + stageLabel(k) + '»');
+            else L.push('этап «' + stageLabel(k) + '»: начало ' + dashFmtD(a) + ' → ' + dashFmtD(b));
+        });
+        var od = Array.isArray(orig.department_ids) ? orig.department_ids : [];
+        p.department_ids.filter(function(x){ return od.indexOf(x) < 0; }).forEach(function(x){ L.push('добавлен банк «' + dashDepName(x) + '»'); });
+        od.filter(function(x){ return p.department_ids.indexOf(x) < 0; }).forEach(function(x){ L.push('убран банк «' + dashDepName(x) + '»'); });
+        if ((orig.lead_department || '') !== p.lead_department) {
+            L.push('банк-руководитель: ' + (orig.lead_department ? '«' + dashDepName(orig.lead_department) + '»' : 'не указан') + ' → ' + (p.lead_department ? '«' + dashDepName(p.lead_department) + '»' : 'не указан'));
+        }
+        var osh = orig.department_shares || {};
+        p.department_ids.filter(function(x){ return od.indexOf(x) >= 0; }).forEach(function(x){
+            var a = (osh[x] == null || osh[x] === '') ? 100 : Number(osh[x]);
+            var b = (p.department_shares[x] == null || p.department_shares[x] === '') ? 100 : Number(p.department_shares[x]);
+            if (a !== b) L.push('доля банка «' + dashDepName(x) + '»: ' + fmtNum(a) + '% → ' + fmtNum(b) + '%');
+        });
+        if ((orig.task_type || '') !== (p.task_type || '')) L.push('направление: ' + (orig.task_type || '—') + ' → ' + (p.task_type || '—'));
+        if ((orig.pocket || '') !== (p.pocket || '')) L.push('карман: ' + (orig.pocket || '—') + ' → ' + (p.pocket || '—'));
+        if ((orig.curator || '') !== (p.curator || '')) L.push('куратор ЦА: ' + (orig.curator || '—') + ' → ' + (p.curator || '—'));
+        return L;
+    }
+    function dashCollectChanges(){
+        syncLane();
+        var lanes = (Array.isArray(stateDash.lanes) && stateDash.lanes.length) ? stateDash.lanes : [{ task: stateDash.task, draft: stateDash.draft }];
+        var items = [], errors = [], seen = {};
+        lanes.forEach(function(l, li){
+            if (!l || !l.draft) return;
+            var d = l.draft;
+            if (d.id) { if (seen[d.id]) return; seen[d.id] = 1; }
+            var axis = 'Ось ' + (li + 1);
+            if (!(d.name || '').trim()) { errors.push(axis + ': не указано название проверки'); return; }
+            if (!(d.department_ids || []).length) { errors.push(axis + ' («' + d.name + '»): добавьте хотя бы один банк-участник'); return; }
+            var tid = d.id || (l.task && l.task.id) || '';
+            var orig = tid ? ((st().tasks || []).find(function(t){ return t.id === tid; }) || null) : null;
+            var p = dashBuildPayload(d, orig);
+            var lines = dashDiffLines(orig, p);
+            if (orig && !lines.length) return;
+            items.push({ lane: li, isNew: !orig, name: p.name, payload: p, lines: lines });
+        });
+        return { items: items, errors: errors };
+    }
+    function dashCloseSaveConfirm(){
+        var ov = byId('dashSaveConfirm');
+        if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+        document.removeEventListener('keydown', dashSaveConfirmEsc);
+    }
+    function dashSaveConfirmEsc(e){ if (e.key === 'Escape') dashCloseSaveConfirm(); }
+    function dashOpenSaveConfirm(items, onYes){
+        dashCloseSaveConfirm();
+        var html = items.map(function(it){
+            var head = it.isNew
+                ? 'Создаётся проверка «' + escapeHtml(it.name) + '»'
+                : 'В проверке «' + escapeHtml(it.name) + '» изменится:';
+            return '<div class="dash-sc-item' + (it.isNew ? ' dash-sc-item--new' : '') + '">'
+                + '<div class="dash-sc-head">' + (it.isNew ? '✨ ' : '✏️ ') + head + '</div>'
+                + '<ul class="dash-sc-list">' + it.lines.map(function(x){ return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ul>'
+                + '</div>';
+        }).join('');
+        var ov = document.createElement('div');
+        ov.id = 'dashSaveConfirm';
+        ov.className = 'tsum-confirm-overlay active dash-sc-overlay';
+        ov.innerHTML = '<div class="tsum-confirm dash-sc" role="dialog" aria-modal="true">'
+            + '<div class="dash-sc-title">Изменения в песочнице планирования</div>'
+            + '<div class="dash-sc-body">' + html + '</div>'
+            + '<p class="tsum-confirm-text dash-sc-ask">Уверены, что хотите внести данные изменения?</p>'
+            + '<div class="tsum-confirm-actions">'
+            +   '<button type="button" class="tsum-cbtn tsum-cbtn--no" id="dashScNo">Нет</button>'
+            +   '<button type="button" class="tsum-cbtn tsum-cbtn--yes" id="dashScYes">Да</button>'
+            + '</div></div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('mousedown', function(e){ if (e.target === ov) dashCloseSaveConfirm(); });
+        byId('dashScNo').addEventListener('click', dashCloseSaveConfirm);
+        byId('dashScYes').addEventListener('click', function(){ dashCloseSaveConfirm(); onYes(); });
+        document.addEventListener('keydown', dashSaveConfirmEsc);
+        setTimeout(function(){ var y = byId('dashScYes'); if (y) y.focus(); }, 30);
+    }
+    function dashRunSave(items){
         var btn = byId('dashSaveBtn');
         if (btn) { btn.disabled = true; btn.textContent = 'Сохранение…'; }
-        apiJson('/api/tracker/task/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(function(r){
-            if (!r || !r.success) throw new Error((r && (r.message || r.error)) || 'Ошибка сохранения');
-            var savedId = r.id || payload.id;
-            notify('✅ Проверка сохранена в БД', 'success');
+        var saved = [], failed = null;
+        var chain = Promise.resolve();
+        items.forEach(function(it){
+            chain = chain.then(function(){
+                if (failed) return;
+                return apiJson('/api/tracker/task/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(it.payload)
+                }).then(function(r){
+                    if (!r || !r.success) throw new Error((r && (r.message || r.error)) || 'Ошибка сохранения');
+                    saved.push({ lane: it.lane, id: r.id || it.payload.id });
+                }).catch(function(err){
+                    failed = '«' + it.name + '»: ' + ((err && err.message) || 'Ошибка сохранения');
+                });
+            });
+        });
+        return chain.then(function(){
+            if (!saved.length) return;
             var refreshFn = window.__trkRefreshAll || window.__trkLoadState;
             return (typeof refreshFn === 'function' ? Promise.resolve(refreshFn()) : Promise.resolve()).then(function(){
-                var nt = (st().tasks || []).find(function(t){ return t.id === savedId; });
-                if (nt) loadDraft(nt);
-                else { renderSelector(); renderGantt(); renderLoad(); }
+                var keep = stateDash.activeLane;
+                saved.forEach(function(sv){
+                    var nt = (st().tasks || []).find(function(t){ return t.id === sv.id; });
+                    var l = stateDash.lanes[sv.lane];
+                    if (nt && l) { l.task = nt; l.draft = dashBuildDraft(nt); }
+                });
+                switchLane(Math.min(keep, stateDash.lanes.length - 1));
+                syncControls(); renderSelector(); renderGantt(); renderLoad();
             });
-        })
-        .catch(function(err){
-            notify('❌ ' + ((err && err.message) || 'Ошибка сохранения'), 'error');
-        })
-        .then(function(){
+        }).then(function(){
+            if (failed) {
+                notify('❌ ' + failed + (saved.length ? ' (сохранено до ошибки: ' + saved.length + ')' : ''), 'error');
+            } else if (window.trkShowCenterMsg) {
+                window.trkShowCenterMsg('✅ Изменения сохранены (' + saved.length + ')');
+            } else {
+                notify('✅ Изменения сохранены (' + saved.length + ')', 'success');
+            }
+        }).catch(function(err){
+            notify('❌ ' + ((err && err.message) || 'Ошибка обновления данных'), 'error');
+        }).then(function(){
             var b2 = byId('dashSaveBtn');
             if (b2) { b2.disabled = false; b2.textContent = 'Сохранить изменения'; }
         });
     }
+    function saveDraft(){
+        var res = dashCollectChanges();
+        if (res.errors.length) { notify(res.errors.join('; '), 'error'); return; }
+        if (!res.items.length) {
+            var anyDraft = (stateDash.lanes || []).some(function(l){ return l && l.draft; }) || !!stateDash.draft;
+            notify(anyDraft ? 'Изменений нет' : 'Сначала выберите проверку или нажмите «+ Создать проверку»', anyDraft ? 'info' : 'error');
+            return;
+        }
+        dashOpenSaveConfirm(res.items, function(){ dashRunSave(res.items); });
+    }
+    window.__dashCollectChanges = dashCollectChanges;
 
     function bindControls(){
         var btn = byId('tabDashboardsBtn');
