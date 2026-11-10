@@ -10742,3 +10742,38 @@ body.trk-theme-light .tsk-dir-seg button:hover { color: #7a5600; }
 .cmp-simple-date { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.86rem; color: var(--trk-meta, #a0a0a0); }
 body.trk-theme-light .cmp-dev-note { background: #fff6e5; color: #6b4e00; }
 body.trk-theme-light .cmp-simple { border-color: rgba(0,0,0,0.14); background: #fff; }
+
+/* ===== Карта проверок: таблица (режим «Список») ===== */
+.kp-wrap { overflow-x:auto; }
+.kp-table { width:100%; border-collapse:separate; border-spacing:0; font-size:.86rem; background:var(--card-bg,#fff); border-radius:10px; overflow:hidden; }
+.kp-table th { position:sticky; top:0; text-align:left; font-weight:700; font-size:.76rem; text-transform:uppercase; letter-spacing:.02em; color:var(--text-muted,#6b7280); background:var(--bg-soft,#f3f5f4); padding:8px 10px; border-bottom:1px solid rgba(0,0,0,.08); white-space:nowrap; }
+.kp-table td { padding:7px 10px; border-bottom:1px solid rgba(0,0,0,.06); vertical-align:top; }
+.kp-table tr.dict-item { display:table-row; cursor:pointer; }
+.kp-table tr.kp-row:hover td { background:rgba(46,125,50,.06); }
+.kp-table tr.kp-row td:first-child { border-left:4px solid #9e9e9e; }
+.kp-table tr.st-planning td:first-child { border-left-color:#7e57c2; }
+.kp-table tr.st-approved td:first-child { border-left-color:#d68910; }
+.kp-table tr.st-active td:first-child { border-left-color:#2874a6; }
+.kp-table tr.st-done td:first-child { border-left-color:#239b56; }
+.kp-table tr.kp-row--overdue td:first-child { border-left-color:#e53935; }
+.kp-name { font-weight:600; min-width:180px; }
+.kp-sub { font-size:.76rem; font-weight:400; color:var(--text-muted,#6b7280); }
+.kp-muted { color:var(--text-muted,#9aa0a6); }
+.kp-warn { color:#d68910; }
+.kp-term { white-space:nowrap; }
+.kp-com { max-width:320px; }
+.kp-com-date { font-size:.74rem; font-weight:700; color:#2e7d32; white-space:nowrap; }
+.kp-probs { max-width:260px; }
+.kp-probs .trk-prob-chip { margin:1px 3px 1px 0; }
+[data-theme="dark"] .kp-table { background:#1f2326; }
+[data-theme="dark"] .kp-table th { background:#262b2f; color:#9aa4ab; border-bottom-color:rgba(255,255,255,.08); }
+[data-theme="dark"] .kp-table td { border-bottom-color:rgba(255,255,255,.06); }
+/* ===== «Другое»: подвиды и периоды ===== */
+.tk-other-info { margin:0 0 12px; padding:8px 12px; border-radius:8px; background:rgba(46,125,50,.08); font-size:.88rem; }
+.tk-other-info:empty { display:none; }
+.tk-periods { display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+.tk-period-row { display:flex; align-items:center; gap:8px; }
+.tk-period-row input[type=date] { flex:1; min-width:0; }
+.tk-period-n { width:20px; text-align:center; font-weight:700; color:var(--text-muted,#6b7280); }
+.tk-period-del { border:0; background:transparent; cursor:pointer; color:#e53935; font-size:1rem; }
+.tk-period-add { padding:6px 12px !important; font-size:.85rem; }

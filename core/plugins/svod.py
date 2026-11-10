@@ -8,6 +8,7 @@ KPI за период, разрез по банкам (загрузка как �
 __version__ = '1.0'
 __description__ = 'Свод по проверкам: KPI, банки, карманы, отсутствия, Excel'
 
+import json
 import io
 from datetime import date, datetime, timedelta
 from flask import request, jsonify, Response
@@ -349,6 +350,18 @@ def svod_compute(data, d1, d2, scope, overrides=None, extensions=None, today=Non
 
     def weight_at(t, mon):
         iso = mon.strftime('%Y-%m-%d')
+        if t.get('task_kind') == 'other':
+            if t.get('status') in ('cancelled', 'done'):
+                return 0.0
+            end = (mon + timedelta(days=6)).strftime('%Y-%m-%d')
+            try:
+                prs = json.loads(t.get('periods_json') or '[]') or []
+            except Exception:
+                prs = []
+            if not prs:
+                prs = [{'start': t.get('start_date') or iso, 'end': t.get('deadline') or end}]
+            on = any((p.get('start') or '') <= end and (p.get('end') or p.get('start') or '') >= iso for p in prs)
+            return float(t.get('load_coef') or 0) if on else 0.0
         # завершённые (с даты завершения) и отменённые проверки нагрузку не дают
         if t.get('status') == 'cancelled':
             return 0.0
@@ -367,6 +380,13 @@ def svod_compute(data, d1, d2, scope, overrides=None, extensions=None, today=Non
         weeks.append(m)
         m += timedelta(days=7)
     load_tasks = [t for t in tasks if t.get('status') != 'cancelled']
+    # Доп. задачи в проверке («Другое» → привязаны к проверке): нагрузка = заданная пользователем
+    _scope_ids = {t['id'] for t in tasks}
+    _all_by_id = {t['id']: t for t in data.get('tasks', [])}
+    for _x in data.get('tasks', []):
+        if (_x.get('task_kind') == 'other' and (_x.get('other_subkind') or '') == 'audit_extra'
+                and (_x.get('parent_task_id') or '') in _scope_ids and _x.get('status') != 'cancelled'):
+            load_tasks.append(_x)
     bank_ids = sorted({b for t in tasks for b in (t.get('department_ids') or [])}, key=lambda b: dname.get(b, b).lower())
 
     def cap(b):

@@ -82,6 +82,9 @@ def _heatmap_compute(data, d1, d2, mode):
         return w
 
     def other_active(t, ps, pe):
+        _prs = _g_periods(t)
+        if _prs:
+            return any(_ov(_d(p['start']), _d(p.get('end') or p['start']), ps, pe) for p in _prs)
         a = _d(t.get('start_date'))
         b = _d(t.get('deadline'))
         if a is None:
@@ -1318,14 +1321,21 @@ var ggTaskOv = {}, ggTaskOvAny = {}, ggTasksById = {}, ggCanOv = false;
 function ggTovGet(tid, did, mon) { var k = tid + '|' + did + '|' + mon; return ggTaskOv.hasOwnProperty(k) ? ggTaskOv[k] : null; }
 function ggTovAny(tid, mon) { return !!ggTaskOvAny[tid + '|' + mon]; }
 /* Расчётная нагрузка проверки на банк в неделю (без ручной правки) */
+/* Задачи «Другое»: несколько периодов (10.11–22.11 + 01.12–20.12); span — длина окна в днях */
+function ggOtherActiveAt(t, day, span) {
+    var end = span > 1 ? isoAddDays(day, span - 1) : day;
+    var prs = t.periods || [];
+    if (prs.length) return prs.some(function(p) { return p.start <= end && (p.end || p.start) >= day; });
+    if (t.start_date && end < t.start_date) return false;
+    if (t.deadline && day > t.deadline) return false;
+    return true;
+}
 function ggTaskCalcAt(t, did, mon) {
     if (ggZeroAt(t, mon)) return 0;
     if ((t.task_kind || 'audit') === 'other') {
         var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
         if (lc <= 0) return 0;
-        if (t.start_date && mon < mondayOf(t.start_date)) return 0;
-        if (t.deadline && mon > t.deadline) return 0;
-        return lc;
+        return ggOtherActiveAt(t, mon, 7) ? lc : 0;
     }
     var st = stageAtMonday(t.stages, mon);
     if (!st) return 0;
@@ -1578,6 +1588,9 @@ function ggTaskSave() {
         if (!p.lead_department) { ggTaskErr('Нужно выбрать банк-руководитель.'); return; }
         if (p.department_ids.indexOf(p.lead_department) < 0) { ggTaskErr('Банк-руководитель должен входить в состав участников.'); return; }
     }
+    var _o = ggTaskCurrent || {}, _dd = [];
+    Object.keys(p.stages || {}).forEach(function(k) { var ov = ''; (Array.isArray(_o.stages) ? _o.stages : []).forEach(function(x) { if (x && x.key === k) ov = x.start || ''; }); if ((p.stages[k] || '') !== ov) { if (p.stages[k]) _dd.push(p.stages[k]); if (ov) _dd.push(ov); } });
+    if (!ggRetroOk(_dd.length ? _dd : [p.start_date])) return;
     ggTaskErr(''); body.classList.add('gg-saving');
     var _hdrs = {'Content-Type':'application/json'};
     if (window.__ggCsrf) _hdrs['X-CSRF-Token'] = window.__ggCsrf;
@@ -1662,6 +1675,7 @@ function render(d) {
     (d.task_overrides || []).forEach(function(o) { ggTaskOv[o.task + '|' + o.bank + '|' + o.week] = +o.value || 0; ggTaskOvAny[o.task + '|' + o.week] = 1; });
     (d.tasks || []).forEach(function(t) { ggTasksById[t.id] = t; });
     ggCanOv = !!d.can_override;
+    if (d.today) window.__ggToday = d.today;
     document.body.classList.toggle('gg-can-ov', ggCanOv);
     var view = document.getElementById('fView').value;
     if (view === 'week') { renderWeek(d); }
@@ -2153,9 +2167,8 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
         if (isOther) {
             var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
             if (lc <= 0) return null;
-            if (t.start_date && day < t.start_date) return null;
-            if (t.deadline && day > t.deadline) return null;
-            return { base: lc, k: 1, stLbl: 'Другое (коэф. нагрузки)' };
+            if (!ggOtherActiveAt(t, day, (isWeek || isMonth) ? 7 : 1)) return null;
+            return { base: lc, k: 1, stLbl: (t.other_subkind === 'audit_extra' ? 'Доп. задача в проверке' : t.other_subkind === 'ck' ? 'Задача по ЦК' : 'Другое') + ' (нагрузка задана вручную)' };
         }
         var st = stageAtMonday(t.stages, day);
         if (!st) return null;
@@ -2483,6 +2496,12 @@ function ggPerLabel(mode, p) {
     if (mode === 'month') return MONTH_NAMES[p.mi] + ' ' + p.yr;
     return fmtD(p) + ' (неделя с ' + fmtD(mondayOf(p)) + ')';
 }
+/* Правка прошлых дат: предупреждение (ретро-данные в проверках не предусмотрены) */
+function ggRetroOk(dates) {
+    var td = (window.__ggToday || new Date().toISOString().slice(0, 10));
+    if (!(dates || []).some(function(d) { return d && String(d).slice(0, 10) < td; })) return true;
+    return window.confirm('В проверках не предусмотрена правка ретро-данных. Уверены, что хотите продолжить?');
+}
 function ggConfirm(title, lines, onYes) {
     var mk = document.createElement('div'); mk.className = 'gg-cf-mask'; mk.id = 'ggConfirm';
     mk.innerHTML = '<div class="gg-cf-box" role="dialog" aria-modal="true"><h3>' + esc(title) + '</h3><ul>'
@@ -2558,6 +2577,7 @@ function ggTovOpen(tid, banks, mode, p) {
         });
         if (bad) return;
         if (!items.length) { ggFlash('Изменений нет'); return; }
+        if (!ggRetroOk(items.map(function(x) { return isoAddDays(x.week, 6); }))) return;
         ggConfirm('Нагрузка по проверке «' + t.name + '»', lines, function() {
             var hd = { 'Content-Type': 'application/json' };
             if (window.__ggCsrf) hd['X-CSRF-Token'] = window.__ggCsrf;
@@ -3026,6 +3046,15 @@ document.addEventListener('click', function(ev) {
 # ============================================================
 # Регистрация в приложении
 # ============================================================
+def _g_periods(t):
+    import json as _json
+    try:
+        v = _json.loads(t.get('periods_json') or '[]')
+        return [p for p in v if isinstance(p, dict) and p.get('start')] if isinstance(v, list) else []
+    except Exception:
+        return []
+
+
 def _g_zero_from(t, today=None):
     """Дата, с которой проверка перестаёт давать нагрузку (вес этапов = 0).
     Завершена — с min(дата завершения, сегодня): оставшиеся этапы не считаются
@@ -3193,7 +3222,8 @@ def register(app, db, hooks):
         for t in data.get('tasks', []):
             if status_sel and (t.get('status') or 'active') not in status_sel:
                 continue
-            if ((t.get('task_kind') or 'audit')) not in kind_set:
+            _is_extra = (t.get('task_kind') == 'other' and (t.get('other_subkind') or '') == 'audit_extra')
+            if ((t.get('task_kind') or 'audit')) not in kind_set and not (_is_extra and 'audit' in kind_set):
                 continue
             if f_type and (t.get('task_type') or '') != f_type:
                 continue
@@ -3255,6 +3285,9 @@ def register(app, db, hooks):
                 'task_type': t.get('task_type') or '',
                 'pocket': t.get('pocket') or '',
                 'task_kind': t.get('task_kind') or 'audit',
+                'other_subkind': t.get('other_subkind') or '',
+                'parent_task_id': t.get('parent_task_id') or '',
+                'periods': _g_periods(t),
                 'load_coef': (lambda v: (float(v) if v not in (None, '') else 0.0))(t.get('load_coef')),
                 'dept_ids': t_dept_ids,
                 # П.2: руководитель проверки — для коэффициента нагрузки и 👑
@@ -3343,7 +3376,7 @@ def register(app, db, hooks):
         except Exception:
             task_overrides = []
         try:
-            can_override = bool(user_has(db, u, 'action.load.override'))
+            can_override = bool(user_has(db, u, 'action.load.override')) and (u or {}).get('role') == 'admin'
         except Exception:
             can_override = False
         return jsonify({
@@ -3436,8 +3469,8 @@ def register(app, db, hooks):
                 return None, (jsonify({'success': False, 'error': 'auth'}), 401)
             if not check_csrf():
                 return None, (jsonify({'success': False, 'error': 'csrf'}), 403)
-            if not user_has(db, u, perm):
-                return None, (jsonify({'success': False, 'error': 'forbidden'}), 403)
+            if not user_has(db, u, perm) or (u or {}).get('role') != 'admin':
+                return None, (jsonify({'success': False, 'error': 'Редактирование доступно только администратору'}), 403)
             return u, None
         except Exception:
             return None, (jsonify({'success': False, 'error': 'auth'}), 401)

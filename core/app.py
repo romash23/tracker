@@ -593,7 +593,8 @@ def _audit_details_json(details):
 # PATCH task-history: снимок и дифф карточки проверки для хронологии
 _TASK_HIST_FIELDS = ['name', 'status', 'curator', 'lead_department', 'lead_employee', 'task_type',
                      'pocket', 'task_kind', 'icon', 'start_date', 'deadline', 'is_urgent',
-                     'load_coef', 'description']
+                     'load_coef', 'description', 'folder', 'parent_task_id', 'other_subkind',
+                     'periods_json']
 
 
 def _task_snapshot(db, task_id):
@@ -1199,6 +1200,13 @@ def create_app():
         if 'curator' not in cols:
             db.exec("ALTER TABLE tasks ADD COLUMN curator TEXT DEFAULT ''")
             print('[INIT] tasks.curator добавлено')
+        # Подвиды «Другого»: audit_extra (доп. задача в проверке) | ck (задачи по ЦК) | other
+        for _col, _ddl in (('parent_task_id', "TEXT DEFAULT ''"),
+                           ('other_subkind', "TEXT DEFAULT ''"),
+                           ('periods_json', "TEXT DEFAULT ''")):
+            if _col not in cols:
+                db.exec(f"ALTER TABLE tasks ADD COLUMN {_col} {_ddl}")
+                print(f'[INIT] tasks.{_col} добавлено')
     except Exception as _e:
         print(f'[INIT] migration task lead: {_e}')
     # PATCH v1.0.4 — миграция: JSON-поля в work_logs
@@ -1725,6 +1733,8 @@ def create_app():
     @app.route('/api/tracker/task/save', methods=['POST'])
     @login_required
     def api_task_save():
+        if (current_user(db) or {}).get('role') != 'admin':
+            return jsonify({'success': False, 'error': 'Редактирование доступно только администратору'}), 403
         body = request.get_json() or {}
         task_id = str(body.get('id', '')).strip()
         name = str(body.get('name', '')).strip()[:200]
@@ -1869,6 +1879,59 @@ def create_app():
         # Банк-руководитель обязателен и должен быть среди банков-участников.
         # Сотрудник-руководитель опционален; если задан — должен работать
         # в банке-руководителе.
+        # Подвид «Другого», привязка к проверке и прерывистые периоды
+        _old_row = db.query_one('SELECT parent_task_id, other_subkind, periods_json FROM tasks WHERE id=?',
+                                (task_id,)) if task_id else None
+        other_subkind = str(body['other_subkind'] if 'other_subkind' in body
+                            else ((_old_row or {}).get('other_subkind') or '')).strip()
+        parent_task_id = str(body['parent_task_id'] if 'parent_task_id' in body
+                             else ((_old_row or {}).get('parent_task_id') or '')).strip()
+        if 'periods' in body:
+            _pr = body.get('periods') or []
+        else:
+            try:
+                _pr = json.loads((_old_row or {}).get('periods_json') or '[]')
+            except Exception:
+                _pr = []
+        periods = []
+        if isinstance(_pr, list):
+            for _p in _pr[:20]:
+                if not isinstance(_p, dict):
+                    continue
+                _a = str(_p.get('start') or '').strip()[:10]
+                _b = str(_p.get('end') or '').strip()[:10] or _a
+                if not _valid_date(_a) or not _valid_date(_b):
+                    continue
+                if _b < _a:
+                    return jsonify({'success': False, 'error': f'Период {_a} — {_b}: конец раньше начала'}), 400
+                periods.append({'start': _a, 'end': _b})
+        periods.sort(key=lambda x: x['start'])
+        for _k in range(1, len(periods)):
+            if periods[_k]['start'] <= periods[_k - 1]['end']:
+                return jsonify({'success': False, 'error': 'Периоды задачи пересекаются'}), 400
+        if task_kind != 'other':
+            other_subkind, parent_task_id, periods = '', '', []
+        else:
+            if other_subkind not in ('audit_extra', 'ck', 'other'):
+                other_subkind = 'other'
+            if other_subkind != 'audit_extra':
+                parent_task_id = ''
+            if periods:
+                start_date = periods[0]['start']
+                deadline = max(x['end'] for x in periods)
+        if task_kind == 'other' and other_subkind == 'audit_extra':
+            _par = db.query_one('SELECT id, status, task_kind, task_type, pocket FROM tasks WHERE id=?',
+                                (parent_task_id,)) if parent_task_id else None
+            if not _par or (_par.get('task_kind') or 'audit') != 'audit':
+                return jsonify({'success': False, 'error': 'Выберите проверку, к которой относится задача'}), 400
+            _old_parent = (_old_row or {}).get('parent_task_id') or ''
+            if _par.get('status') not in ('planning', 'approved', 'active') and _old_parent != parent_task_id:
+                return jsonify({'success': False, 'error': 'Привязать можно только к проверке в статусе Планирование, Утверждена или Активна'}), 400
+            _par_deps = [r['department_id'] for r in db.query(
+                'SELECT department_id FROM task_departments WHERE task_id=?', (parent_task_id,))]
+            dep_ids = [d for d in dep_ids if d in _par_deps] or list(_par_deps)
+            task_type = _par.get('task_type') or ''
+            pocket = _par.get('pocket') or ''
         if task_kind == 'other':
             # Задача «Другое»: нет банка-руководителя и этапов.
             # Обязателен коэффициент нагрузки (> 0), руководитель сбрасывается.
@@ -1879,7 +1942,7 @@ def create_app():
             if _lc <= 0:
                 return jsonify({'success': False,
                                 'error': 'Укажите коэффициент нагрузки (число больше нуля)'}), 400
-            if not assignees:
+            if not assignees and other_subkind != 'audit_extra':
                 return jsonify({'success': False,
                                 'error': 'Назначьте хотя бы одного сотрудника'}), 400
             load_coef = _lc
@@ -1966,6 +2029,22 @@ def create_app():
                     print(f'[task_save] auto-assign {_u_emp} to new task')
             except Exception as _e:
                 print(f'[task_save] auto-assign failed: {_e}')
+        # Доп. данные: новые строки без даты получают префикс «ДД.ММ.ГГГГ — » (журнал комментариев)
+        try:
+            import re as _re_f
+            _old_f = (db.query_one('SELECT folder FROM tasks WHERE id=?', (task_id,)) or {}).get('folder', '') if task_id else ''
+            _old_lines = set(l.strip() for l in str(_old_f or '').splitlines() if l.strip())
+            _today_ru = datetime.now().strftime('%d.%m.%Y')
+            _out = []
+            for _ln in folder.splitlines():
+                _st = _ln.strip()
+                if _st and _st not in _old_lines and not _re_f.match(r'^\d{2}\.\d{2}\.\d{4}', _st):
+                    _st = f'{_today_ru} — {_st}'
+                if _st:
+                    _out.append(_st)
+            folder = '\n'.join(_out)[:2000]
+        except Exception as _e:
+            print(f'[task_save] folder dating failed: {_e}')
         _hist_old = _task_snapshot(db, task_id) if task_id else None
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if not task_id:
@@ -2008,6 +2087,12 @@ def create_app():
         except ValueError as _ve:
             # PATCH tasks-stages: валидация пересечения этапов в db.upsert_task
             return jsonify({'success': False, 'error': str(_ve)}), 400
+        try:
+            db.exec('UPDATE tasks SET parent_task_id=?, other_subkind=?, periods_json=? WHERE id=?',
+                    (parent_task_id, other_subkind,
+                     json.dumps(periods, ensure_ascii=False) if periods else '', task_id))
+        except Exception as _e:
+            print(f'[task_save] subkind/periods failed: {_e}')
         # PATCH v1.0.9: если админ вручную вернул задачу из done в другой
         # статус — снимаем метку авто (статус снова считается решением админа).
         try:
@@ -2041,6 +2126,8 @@ def create_app():
     @app.route('/api/tracker/task/extend', methods=['POST'])
     @login_required
     def api_task_extend():
+        if (current_user(db) or {}).get('role') != 'admin':
+            return jsonify({'success': False, 'error': 'Редактирование доступно только администратору'}), 403
         body = request.get_json() or {}
         task_id = str(body.get('id', '')).strip()
         days = int(body.get('days', 0))
@@ -2164,6 +2251,8 @@ def create_app():
     @login_required
     @permission_required('action.task.delete')
     def api_task_delete():
+        if (current_user(db) or {}).get('role') != 'admin':
+            return jsonify({'success': False, 'error': 'Удаление доступно только администратору'}), 403
         body = request.get_json() or {}
         tid = str(body.get('id', '')).strip()
         force = bool(body.get('force'))

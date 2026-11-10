@@ -55,7 +55,7 @@
         </div>
     </div>
     <div class="tracker-tabs">
-        {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>📋</span><span>Задачи</span></button>{% endif %}
+        {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>🗺️</span><span>Карта проверок</span></button>{% endif %}
         {# PATCH: «Текущие проверки» вставляется сюда JS-ом buildGanttTab() — сразу после «Задачи» (второй вкладкой) #}
         {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'completed' %} active{% endif %}" data-tab="completed"><span>✅</span><span>Завершенные</span></button>{% endif %}
@@ -462,7 +462,17 @@
     <div class="assignees-hint" style="margin-bottom:14px;">От типа зависит набор полей карточки.</div>
     <div class="task-kind-choices" style="display:flex;flex-direction:column;gap:10px;">
         <button type="button" class="btn btn-primary" id="taskKindAudit" style="justify-content:flex-start;text-align:left;padding:14px 16px;">🚀 Аудиторская проверка</button>
-        <button type="button" class="btn btn-secondary" id="taskKindOther" style="justify-content:flex-start;text-align:left;padding:14px 16px;">📌 Другое</button>
+        <button type="button" class="btn btn-secondary" id="taskKindOther" style="justify-content:flex-start;text-align:left;padding:14px 16px;">📌 Другое…</button>
+    </div>
+    <div class="task-kind-choices" id="taskKindOtherBox" style="display:none;flex-direction:column;gap:10px;">
+        <button type="button" class="btn btn-secondary" data-other-sub="audit_extra" style="justify-content:flex-start;text-align:left;padding:14px 16px;">🧩 Дополнительная задача в проверке</button>
+        <div id="taskKindParentRow" style="display:none;gap:8px;align-items:center;">
+            <select id="taskKindParentSel" style="flex:1;min-width:0;"></select>
+            <button type="button" class="btn btn-primary" data-other-sub="audit_extra_go">Далее</button>
+        </div>
+        <button type="button" class="btn btn-secondary" data-other-sub="ck" style="justify-content:flex-start;text-align:left;padding:14px 16px;">🎯 Задачи по ЦК</button>
+        <button type="button" class="btn btn-secondary" data-other-sub="other" style="justify-content:flex-start;text-align:left;padding:14px 16px;">📌 Другое</button>
+        <button type="button" class="btn btn-secondary" data-other-sub="back" style="justify-content:flex-start;padding:8px 16px;opacity:.8;">← Назад</button>
     </div>
     <div class="modal-actions">
         <button class="btn btn-secondary" data-close="taskKindModal">Отмена</button>
@@ -472,6 +482,9 @@
     <h2 id="taskModalTitle">Новая задача</h2>
     <input type="hidden" id="task_id">
     <input type="hidden" id="task_kind" value="audit">
+    <input type="hidden" id="task_other_subkind" value="">
+    <input type="hidden" id="task_parent_id" value="">
+    <div class="tk-other-only tk-other-info" id="taskOtherInfo"></div>
     <div class="form-row">
         <div class="form-group"><label>Завершение</label>
             <select id="task_icon" class="task-quarter-select">
@@ -492,7 +505,7 @@
     </div>
     <div class="form-row task-row-2" id="taskDescFolderRow">
         <div class="form-group"><label>Описание</label><textarea id="task_description" rows="4"></textarea></div>
-        <div class="form-group"><label>📁 Дополнительные данные (по одной записи на строку)</label><textarea id="task_folder" rows="4" maxlength="2000"></textarea></div>
+        <div class="form-group"><label>📁 Дополнительные данные (по одной записи на строку)</label><textarea id="task_folder" rows="4" maxlength="2000" placeholder="Текущий комментарий по статусу. Дата добавится автоматически при сохранении."></textarea><div class="assignees-hint">Новая строка сохраняется с датой: «10.11.2026 — скинуть первый драфт». Последняя запись видна в колонке «Комментарий».</div></div>
     </div>
     <div class="form-group" id="taskOrdersGroup">
         <label>📄 Приказы / распоряжения</label>
@@ -535,10 +548,16 @@
             <div class="assignees-hint" id="taskCompletionHint"></div>
         </div>
     </div>
+    <div class="form-group tk-other-only" id="taskPeriodsGroup">
+        <label>📅 Периоды <span class="lead-req">*</span></label>
+        <div id="taskPeriodsList" class="tk-periods"></div>
+        <button type="button" class="btn btn-secondary tk-period-add" id="taskPeriodAddBtn">➕ Добавить период</button>
+        <div class="assignees-hint">Период может прерываться, например 10.11–22.11 + 01.12–20.12. Вне периодов нагрузки нет.</div>
+    </div>
     <div class="form-group tk-other-only" id="taskLoadCoefGroup">
-        <label>⚖️ Коэффициент нагрузки <span class="lead-req">*</span></label>
+        <label>⚖️ Нагрузка в неделю <span class="lead-req">*</span></label>
         <input type="number" id="task_load_coef" min="0" step="0.1" inputmode="decimal" placeholder="например: 1.5" autocomplete="off">
-        <div class="assignees-hint">Обязательно для типа «Другое». Суммируется в таблице «Нагрузка по тер банкам» наравне с этапами проверок.</div>
+        <div class="assignees-hint">Задаётся пользователем, на этапы не делится. Для доп. задачи в проверке добавляется каждому выбранному банку проверки, для остальных — назначенным сотрудникам.</div>
     </div>
     <div class="form-row tk-audit-only">
         <div class="form-group"><label>🧭 Направление</label>

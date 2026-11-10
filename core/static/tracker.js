@@ -1241,6 +1241,58 @@ function taskCardRow(t) {
         + '</div></div>';
 }
 /* Список задач: одна строка на задачу — название, статус, банки, сроки; проблемы отдельной строкой */
+/* «Карта проверок» — режим «Список»: таблица */
+function _kpLastComment(folder) {
+    var lines = String(folder || '').split(/\r?\n/).map(function(x) { return x.trim(); }).filter(Boolean);
+    if (!lines.length) return null;
+    function key(l) { var m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(l); return m ? m[3] + m[2] + m[1] : ''; }
+    var best = lines[lines.length - 1], bk = key(best);
+    lines.forEach(function(l) { var k = key(l); if (k && k >= bk) { best = l; bk = k; } });
+    var m = /^(\d{2}\.\d{2}\.\d{4})\s*[—–-]?\s*(.*)$/.exec(best);
+    return m ? { date: m[1], text: m[2] || '', n: lines.length } : { date: '', text: best, n: lines.length };
+}
+function trkMapTableHtml(tasks) {
+    var stMap = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена' };
+    var depName = function(id) { var d = (state.departments || []).find(function(x) { return x.id === id; }); return d ? d.name : (id || ''); };
+    var empName = function(id) { var e = (state.employees || []).find(function(x) { return x.id === id; }); return e ? maskName(e.name) : ''; };
+    var extras = {};
+    (state.tasks || []).forEach(function(x) { if (x.task_kind === 'other' && x.other_subkind === 'audit_extra' && x.parent_task_id) (extras[x.parent_task_id] = extras[x.parent_task_id] || []).push(x); });
+    var canDel = hasPerm('action.task.delete') && !!(state.currentUser && state.currentUser.role === 'admin');
+    var h = '<table class="kp-table"><thead><tr>'
+        + '<th>Проверка</th><th>Куратор</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
+        + (canDel ? '<th></th>' : '') + '</tr></thead><tbody>';
+    tasks.forEach(function(t) {
+        var sv = t.status || 'active';
+        var isOther = (t.task_kind || 'audit') === 'other';
+        var lead = t.lead_department ? escapeHtml(depName(t.lead_department)) + (t.lead_employee ? ' <span class="kp-sub">→ ' + escapeHtml(empName(t.lead_employee)) + '</span>' : '') : '<span class="kp-muted">—</span>';
+        var parts = (t.department_ids || []).filter(function(d) { return d !== t.lead_department; }).map(depName);
+        var cur = (t.curator && t.curator !== 'нет') ? escapeHtml(t.curator) : '<span class="kp-warn">не указан</span>';
+        var c = _kpLastComment(t.folder);
+        var com = c ? ('<span class="kp-com-date">' + escapeHtml(c.date) + '</span> ' + escapeHtml(c.text) + (c.n > 1 ? ' <span class="kp-sub">(' + c.n + ')</span>' : '')) : '<span class="kp-muted">—</span>';
+        var nm = escapeHtml(t.name || '');
+        var sub = '';
+        if (isOther) {
+            var par = t.parent_task_id ? (state.tasks || []).find(function(x) { return x.id === t.parent_task_id; }) : null;
+            sub = '<div class="kp-sub">' + escapeHtml(TRK_OTHER_SUB[t.other_subkind] || TRK_OTHER_SUB.other) + (par ? ' · ' + escapeHtml(par.name) : '') + '</div>';
+        } else if (extras[t.id]) sub = '<div class="kp-sub">🧩 доп. задач: ' + extras[t.id].length + '</div>';
+        var prs = _trkTaskPeriods(t);
+        var term = prs.length > 1
+            ? prs.map(function(p) { return formatDateShort(p.start) + '–' + formatDateShort(p.end); }).join(' + ')
+            : (t.start_date ? formatDateShort(t.start_date) : '') + (t.start_date && t.deadline ? ' → ' : '') + (t.deadline ? formatDateShort(t.deadline) : '');
+        var probs = window.trkTaskProblemsBadge ? window.trkTaskProblemsBadge(t, { soft: true }) : '';
+        h += '<tr class="dict-item kp-row st-' + escapeHtml(sv) + (t.overdue ? ' kp-row--overdue' : '') + '" data-id="' + escapeHtml(t.id) + '">'
+            + '<td class="kp-name"><span class="dict-item-name">' + nm + '</span>' + sub + '</td>'
+            + '<td>' + cur + '</td><td>' + lead + '</td>'
+            + '<td>' + (parts.length ? escapeHtml(parts.join(', ')) : '<span class="kp-muted">—</span>') + '</td>'
+            + '<td><span class="task-card-badge status-' + escapeHtml(sv) + '">' + escapeHtml(stMap[sv] || sv) + '</span></td>'
+            + '<td class="kp-term' + (t.overdue ? ' tsk-row-overdue' : '') + '">' + escapeHtml(term || '—') + '</td>'
+            + '<td class="kp-com">' + com + '</td>'
+            + '<td class="kp-probs">' + (probs || '') + '</td>'
+            + (canDel ? '<td class="dict-actions"><button class="dict-action-btn danger" data-act="delete" title="Удалить">🗑</button></td>' : '')
+            + '</tr>';
+    });
+    return h + '</tbody></table>';
+}
 function taskRowMin(t) {
     var stMap = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена' };
     var sv = t.status || 'active';
@@ -1504,7 +1556,7 @@ function bindTaskCardActions(container, sel) {
             e.stopPropagation();
             deleteTask(id);
         });
-        var canEdit = hasPerm('action.task.edit');
+        var canEdit = true; /* просмотр — всем, правка внутри карточки только админу */
         var noAssignees = !((state.tasks.find(function(x) { return x.id === id; }) || {}).assignees || []).length;
         if (noAssignees) item.classList.add('task-card--no-assignees');
         if (canEdit) {
@@ -1669,16 +1721,15 @@ function renderTasksFull() {
 
     if (_view === 'list') {
         // Список: dict-item как на Справочниках, но в N колонках
-        var _listHtml = '';
-        tasks.forEach(function(t) { _listHtml += taskRowMin(t); });
-        list.className = 'dict-list tasks-list-view tsk-rows';
+        var _listHtml = trkMapTableHtml(tasks);
+        list.className = 'dict-list tasks-list-view kp-wrap';
         list.removeAttribute('data-cols');
         list.removeAttribute('data-auto-cols');
         list.style.removeProperty('grid-template-columns');
         list.removeAttribute('data-compact');
         list.removeAttribute('data-view');
         list.style.maxHeight = 'none';
-        list.style.display = 'flex';
+        list.style.display = 'block';
         list.innerHTML = _listHtml;
         bindTaskCardActions(list, '.dict-item');
         try {
@@ -3400,7 +3451,102 @@ function renderTaskStages() {
 }
 
 function openTaskKindChooser() {
-    var m = $('taskKindModal'); if (m) m.classList.add('active');
+    if (!(state.currentUser && state.currentUser.role === 'admin')) { notify('Создание задач доступно только администратору', 'error'); return; }
+    var m = $('taskKindModal'); if (!m) return;
+    var main = m.querySelector('.task-kind-choices'), sub = $('taskKindOtherBox');
+    if (main) main.style.display = 'flex';
+    if (sub) sub.style.display = 'none';
+    m.classList.add('active');
+}
+/* ---- Ретро-данные: предупреждение при правке прошлых дат ---- */
+window.trkRetroConfirm = function(dates) {
+    var today = (state && state.today) || todayISO();
+    var past = (dates || []).filter(function(d) { return d && String(d).slice(0, 10) < today; });
+    if (!past.length) return true;
+    return window.confirm('В проверках не предусмотрена правка ретро-данных. Уверены, что хотите продолжить?');
+};
+/* Даты, которые меняются при сохранении (и старое, и новое значение) */
+window.trkChangedDates = function(orig, next) {
+    var out = [];
+    function cmp(a, b) { a = a || ''; b = b || ''; if (a !== b) { if (a) out.push(a); if (b) out.push(b); } }
+    orig = orig || {};
+    cmp(orig.start_date, next.start_date);
+    cmp(orig.deadline, next.deadline);
+    var os = {};
+    (Array.isArray(orig.stages) ? orig.stages : []).forEach(function(x) { if (x && x.key) os[x.key] = x.start || ''; });
+    if (orig.stages && !Array.isArray(orig.stages)) os = orig.stages;
+    var ns = next.stages || {};
+    if (Array.isArray(ns)) { var o2 = {}; ns.forEach(function(x) { if (x && x.key) o2[x.key] = x.start || ''; }); ns = o2; }
+    Object.keys(Object.assign({}, os, ns)).forEach(function(k) { cmp(os[k], ns[k]); });
+    var op = JSON.stringify(_trkTaskPeriods(orig)), np = JSON.stringify(next.periods || []);
+    if (next.periods && op !== np) {
+        _trkTaskPeriods(orig).concat(next.periods).forEach(function(p) { out.push(p.start); out.push(p.end); });
+    }
+    if (!orig.id) {  // новая задача: любые даты в прошлом
+        out = [next.start_date, next.deadline].concat(Object.keys(ns).map(function(k) { return ns[k]; }));
+        (next.periods || []).forEach(function(p) { out.push(p.start); });
+    }
+    return out;
+};
+function _trkTaskPeriods(t) {
+    if (!t) return [];
+    if (Array.isArray(t.periods)) return t.periods;
+    try { var v = JSON.parse(t.periods_json || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+window._trkTaskPeriods = _trkTaskPeriods;
+window.openTaskKindChooser = function() { return openTaskKindChooser(); };
+window.__trkPeriodsApi = { get: function() { return _taskPeriodsDraft; }, set: function(v) { _taskPeriodsDraft = v; renderTaskPeriods(); } };
+window.__trkOpenTaskModal = function(t, k) { return openTaskModal(t, k); };
+/* ---- «Другое»: подвиды и периоды ---- */
+var _taskPeriodsDraft = [];
+var TRK_OTHER_SUB = { audit_extra: '🧩 Доп. задача в проверке', ck: '🎯 Задача по ЦК', other: '📌 Другое' };
+function renderTaskPeriods() {
+    var box = $('taskPeriodsList'); if (!box) return;
+    if (!_taskPeriodsDraft.length) _taskPeriodsDraft = [{ start: '', end: '' }];
+    box.innerHTML = _taskPeriodsDraft.map(function(p, i) {
+        return '<div class="tk-period-row" data-i="' + i + '">'
+            + '<span class="tk-period-n">' + (i + 1) + '</span>'
+            + '<input type="date" data-k="start" value="' + escapeHtml(p.start || '') + '">'
+            + '<span class="tk-period-dash">—</span>'
+            + '<input type="date" data-k="end" value="' + escapeHtml(p.end || '') + '">'
+            + (_taskPeriodsDraft.length > 1 ? '<button type="button" class="tk-period-del" title="Удалить период">✕</button>' : '')
+            + '</div>';
+    }).join('');
+    box.querySelectorAll('input').forEach(function(inp) {
+        inp.addEventListener('change', function() {
+            var i = +this.closest('.tk-period-row').getAttribute('data-i');
+            _taskPeriodsDraft[i][this.getAttribute('data-k')] = this.value;
+        });
+    });
+    box.querySelectorAll('.tk-period-del').forEach(function(b) {
+        b.addEventListener('click', function() {
+            _taskPeriodsDraft.splice(+this.closest('.tk-period-row').getAttribute('data-i'), 1);
+            renderTaskPeriods();
+        });
+    });
+}
+function _collectTaskPeriods() {
+    var out = [], err = '';
+    _taskPeriodsDraft.forEach(function(p, i) {
+        if (!p.start && !p.end) return;
+        var a = p.start || p.end, b = p.end || p.start;
+        if (b < a) err = 'Период ' + (i + 1) + ': конец раньше начала';
+        out.push({ start: a, end: b });
+    });
+    out.sort(function(x, y) { return x.start < y.start ? -1 : 1; });
+    for (var i = 1; i < out.length; i++) if (out[i].start <= out[i - 1].end) err = 'Периоды пересекаются';
+    return { periods: out, error: err };
+}
+function _applyOtherSubUI(sub, parentId) {
+    var hs = $('task_other_subkind'); if (hs) hs.value = sub || '';
+    var hp = $('task_parent_id'); if (hp) hp.value = parentId || '';
+    var info = $('taskOtherInfo');
+    if (info) {
+        var par = parentId ? (state.tasks || []).find(function(x) { return x.id === parentId; }) : null;
+        info.innerHTML = '<b>' + escapeHtml(TRK_OTHER_SUB[sub] || TRK_OTHER_SUB.other) + '</b>'
+            + (sub === 'audit_extra' ? ' · проверка: <b>' + escapeHtml(par ? par.name : '— не выбрана —') + '</b>'
+              + '<br><span class="assignees-hint">Нагрузка добавляется банкам проверки (можно оставить часть банков). Этапов нет — нагрузку в неделю задаёт пользователь.</span>' : '');
+    }
 }
 /* Показ/скрытие полей карточки по виду задачи: 'audit' | 'other'. */
 function applyTaskKindUI(kind) {
@@ -3414,6 +3560,10 @@ function applyTaskKindUI(kind) {
     /* Straховка от кеша/рассинхрона разметки: для 'other' принудительно
        прячем и обнуляем поля, которых у этого вида задач нет -
        срочность, тип задачи, карман. */
+    ['task_start_date', 'task_deadline'].forEach(function(id) {
+        var el = document.getElementById(id), w = el && el.closest('.form-group');
+        if (w) w.style.display = isOther ? 'none' : '';
+    });
     var hideById = ['task_is_urgent', 'task_type', 'task_pocket'];
     hideById.forEach(function(id) {
         var el = document.getElementById(id);
@@ -3430,7 +3580,7 @@ function applyTaskKindUI(kind) {
 window.trkOpenTaskById = function(id) {
     var t = (state.tasks || []).find(function(x) { return String(x.id) === String(id); });
     if (!t) { notify('Задача не найдена', 'error'); return; }
-    if (!hasPerm('action.task.edit')) { notify('Нет прав на просмотр карточки проверки', 'error'); return; }
+
     trkOpenTaskSmart(t);
 };
 function openTaskModal(task, forceKind) {
@@ -3500,6 +3650,26 @@ function openTaskModal(task, forceKind) {
     // PATCH tasks-lead: руководитель проверки
     renderTaskLead((task && task.lead_department) || '', (task && task.lead_employee) || '');
     syncTaskCompletedAt();
+    if (kind === 'other') {
+        var _pre = window.__trkOtherPreset || null; window.__trkOtherPreset = null;
+        var _sub = (task && task.other_subkind) || (_pre && _pre.sub) || 'other';
+        var _par = (task && task.parent_task_id) || (_pre && _pre.parent) || '';
+        _applyOtherSubUI(_sub, _par);
+        _taskPeriodsDraft = _trkTaskPeriods(task).map(function(x) { return { start: x.start, end: x.end }; });
+        if (!_taskPeriodsDraft.length && task && (task.start_date || task.deadline)) _taskPeriodsDraft = [{ start: task.start_date || '', end: task.deadline || '' }];
+        renderTaskPeriods();
+        if (!task && _sub === 'audit_extra' && _par) {
+            var _pt = (state.tasks || []).find(function(x) { return x.id === _par; });
+            if (_pt) {
+                renderTaskDepartmentsList((_pt.department_ids || []).slice());
+                renderAssigneesList([], (_pt.department_ids || []).slice());
+                g('task_curator', _pt.curator || '');
+                var _nm = $('task_name'); if (_nm && !_nm.value) _nm.value = 'Доп. задача: ' + _pt.name;
+            }
+        }
+        var _ttl = $('taskModalTitle');
+        if (_ttl && !task) _ttl.textContent = 'Новая задача · ' + (TRK_OTHER_SUB[_sub] || '').replace(/^\S+\s/, '');
+    } else { _applyOtherSubUI('', ''); }
     var m = $('taskModal'); if (m) m.classList.add('active');
     setTimeout(function() { var n = $('task_name'); if (n) n.focus(); }, 50);
     if (typeof window.trkApplyTaskLockState === 'function') window.trkApplyTaskLockState(task);
@@ -3512,6 +3682,8 @@ function _tsumIsAdmin() {
 }
 function trkOpenTaskSmart(task) {
     window.__trkTaskEditOverride = '';
+    var _adm = !!(state.currentUser && state.currentUser.role === 'admin');
+    if (!_adm) { if (task && task.id) openTaskSummary(task); else notify('Создание задач доступно только администратору', 'error'); return; }
     if (!task || !task.id || !task.status || task.status === 'planning') { openTaskModal(task); return; }
     openTaskSummary(task);
 }
@@ -3807,7 +3979,14 @@ function saveTask() {
         }
         // Задача «Другое» обязана иметь хотя бы одного сотрудника
         // (её коэффициент нагрузки привязан к назначенным людям).
-        if (!getSelectedAssignees().length) {
+        var _subk = $('task_other_subkind') ? $('task_other_subkind').value : '';
+        if (_subk === 'audit_extra' && !($('task_parent_id') && $('task_parent_id').value)) {
+            notify('❌ Выберите проверку, к которой относится задача', 'error'); return;
+        }
+        var _pc = _collectTaskPeriods();
+        if (_pc.error) { notify('❌ ' + _pc.error, 'error'); return; }
+        if (!_pc.periods.length) { notify('❌ Укажите хотя бы один период', 'error'); return; }
+        if (_subk !== 'audit_extra' && !getSelectedAssignees().length) {
             notify('❌ Назначьте хотя бы одного сотрудника', 'error');
             return;
         }
@@ -3860,6 +4039,16 @@ function saveTask() {
         department_shares: window.__taskDepSharesDraft || {},
         stages: (function(){ var o = {}; TASK_STAGE_ORDER.forEach(function(k){ o[k] = _taskStagesDraft[k] || ''; }); return o; })(),
     };
+    if (_isOther) {
+        var _pcs = _collectTaskPeriods().periods;
+        payload.periods = _pcs;
+        payload.other_subkind = $('task_other_subkind') ? ($('task_other_subkind').value || 'other') : 'other';
+        payload.parent_task_id = $('task_parent_id') ? $('task_parent_id').value : '';
+        if (_pcs.length) { payload.start_date = _pcs[0].start; payload.deadline = _pcs.reduce(function(m, x) { return x.end > m ? x.end : m; }, ''); }
+        payload.stages = {};
+    }
+    var _origT = payload.id ? ((state.tasks || []).find(function(x) { return x.id === payload.id; }) || null) : null;
+    if (!window.trkRetroConfirm(window.trkChangedDates(_origT || {}, payload))) return;
     // PATCH v1.0.15: закрываем карточку СРАЗУ — пользователь видит
     // лоадер («Загрузка…»), а не пустую модалку. При ошибке вернём.
     var _taskModal = $('taskModal');
@@ -3900,9 +4089,43 @@ on('taskKindAudit', 'click', function() {
     openTaskModal(null, 'audit');
 });
 on('taskKindOther', 'click', function() {
+    var m = $('taskKindModal'); if (!m) return;
+    var main = m.querySelector('.task-kind-choices'), sub = $('taskKindOtherBox');
+    if (main) main.style.display = 'none';
+    if (sub) sub.style.display = 'flex';
+    var sel = $('taskKindParentSel');
+    if (sel) {
+        var lbl = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна' };
+        var aud = (state.tasks || []).filter(function(t) { return (t.task_kind || 'audit') === 'audit' && lbl[t.status]; })
+            .sort(function(a, b) { return String(a.name).localeCompare(String(b.name), 'ru'); });
+        sel.innerHTML = '<option value="">— выберите проверку —</option>' + aud.map(function(t) {
+            return '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + ' · ' + lbl[t.status] + '</option>';
+        }).join('');
+    }
+    var pr = $('taskKindParentRow'); if (pr) pr.style.display = 'none';
+});
+document.addEventListener('click', function(ev) {
+    var b = ev.target.closest ? ev.target.closest('[data-other-sub]') : null;
+    if (!b) return;
+    var sub = b.getAttribute('data-other-sub');
+    if (sub === 'back') { openTaskKindChooser(); return; }
+    if (sub === 'audit_extra') { var pr = $('taskKindParentRow'); if (pr) pr.style.display = 'flex'; return; }
+    var parent = '';
+    if (sub === 'audit_extra_go') {
+        parent = $('taskKindParentSel') ? $('taskKindParentSel').value : '';
+        if (!parent) { notify('Выберите проверку', 'error'); return; }
+        sub = 'audit_extra';
+    }
     var m = $('taskKindModal'); if (m) m.classList.remove('active');
+    window.__trkOtherPreset = { sub: sub, parent: parent };
     openTaskModal(null, 'other');
 });
+on('taskPeriodAddBtn', 'click', function() {
+    var last = _taskPeriodsDraft[_taskPeriodsDraft.length - 1] || {};
+    _taskPeriodsDraft.push({ start: last.end ? addDaysISO_trk(last.end, 1) : '', end: '' });
+    renderTaskPeriods();
+});
+function addDaysISO_trk(iso, n) { var p = iso.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2] + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 on('taskIconPickBtn', 'click', function() {
     var m = $('emojiModal'); if (m) m.classList.add('active');
 });
@@ -20496,6 +20719,14 @@ function renderBankStatsPanel(bank){
             notify(anyDraft ? 'Изменений нет' : 'Сначала выберите проверку или нажмите «+ Создать проверку»', anyDraft ? 'info' : 'error');
             return;
         }
+        if (!(window.__trkState && window.__trkState.currentUser && window.__trkState.currentUser.role === 'admin')) { notify('Сохранение доступно только администратору', 'error'); return; }
+        var _rd = [];
+        res.items.forEach(function(it){
+            var tid = it.payload && it.payload.id;
+            var orig = tid ? ((st().tasks || []).find(function(t){ return t.id === tid; }) || {}) : {};
+            _rd = _rd.concat(window.trkChangedDates ? window.trkChangedDates(orig, it.payload) : []);
+        });
+        if (window.trkRetroConfirm && !window.trkRetroConfirm(_rd)) return;
         dashOpenSaveConfirm(res.items, function(){ dashRunSave(res.items); });
     }
     window.__dashCollectChanges = dashCollectChanges;
