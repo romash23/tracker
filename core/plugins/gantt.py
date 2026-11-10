@@ -1080,18 +1080,19 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
             <select id="fTeam"><option value="">Все команды</option></select>
             <label>С <input type="date" id="fFrom"></label>
             <label>По <input type="date" id="fTo"></label>
-            <select id="fStatus">
-                <option value="">Все статусы</option>
-                <option value="active">Активные</option>
-                <option value="paused">Приостановленные</option>
-                <option value="done">Выполненные</option>
-                <option value="archived">Архив</option>
+            <select id="fStatus" style="display:none;" aria-hidden="true">
+                <option value="">Все</option>
+                <option value="planning">Планирование</option>
+                <option value="approved">Утверждена</option>
+                <option value="active">Активна</option>
+                <option value="done">Завершена</option>
+                <option value="cancelled">Отменена</option>
             </select>
-            <label>Вид <select id="fView">
+            <select id="fView" style="display:none;" aria-hidden="true">
                 <option value="week">Недели</option>
                 <option value="day">Дни</option>
                 <option value="month">Месяцы</option>
-            </select></label>
+            </select>
             <button class="apply" id="fApply">✓ Показать</button>
         </div>
         <div class="gg-seg-row">
@@ -1105,6 +1106,19 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
                 <button type="button" data-v="banks">Банки</button>
                 <button type="button" data-v="tasks">Проверки</button>
                 <button type="button" data-v="all">Все</button>
+            </div>
+            <div class="gg-seg" id="ggViewSeg" role="group" aria-label="Шаг">
+                <button type="button" data-v="day">Дни</button>
+                <button type="button" data-v="week">Недели</button>
+                <button type="button" data-v="month">Месяцы</button>
+            </div>
+            <div class="gg-seg" id="ggStatusSeg" role="group" aria-label="Статус">
+                <button type="button" data-v="">Все</button>
+                <button type="button" data-v="planning">Планирование</button>
+                <button type="button" data-v="approved">Утверждена</button>
+                <button type="button" data-v="active">Активна</button>
+                <button type="button" data-v="done">Завершена</button>
+                <button type="button" data-v="cancelled">Отменена</button>
             </div>
         </div>
     </div>
@@ -2854,6 +2868,7 @@ document.getElementById('fApply').addEventListener('click', load);
 document.getElementById('fTeam').addEventListener('change', load);
 document.getElementById('fStatus').addEventListener('change', load);
 document.getElementById('fView').addEventListener('change', function() {
+    ggSegMark('ggViewSeg', this.value);
     /* «Месяцы»: период = сегодня … сегодня + 360 дней, конец округляется вверх до воскресенья */
     if (this.value === 'month') {
         var t = new Date(); t.setHours(0, 0, 0, 0);
@@ -2955,6 +2970,27 @@ document.getElementById('ggXlsBtn').addEventListener('click', ggExportXls);
 })();
 ggSetType(ggLsGet('gg.fType') || '', true);
 ggSetShow(ggLsGet('gg.show2') || 'banks');
+/* Шаг и статус — колбаски поверх скрытых select (их значения читает load()) */
+(function() {
+    var fs = document.getElementById('fStatus');
+    var sv = ggLsGet('gg.status') || '';
+    if (Array.from(fs.options).some(function(o) { return o.value === sv; })) fs.value = sv;
+    ggSegMark('ggStatusSeg', fs.value);
+    ggSegMark('ggViewSeg', document.getElementById('fView').value);
+    document.getElementById('ggViewSeg').addEventListener('click', function(ev) {
+        var b = ev.target.closest('button[data-v]'); if (!b || b.classList.contains('active')) return;
+        var fv = document.getElementById('fView');
+        fv.value = b.getAttribute('data-v');
+        fv.dispatchEvent(new Event('change'));
+    });
+    document.getElementById('ggStatusSeg').addEventListener('click', function(ev) {
+        var b = ev.target.closest('button[data-v]'); if (!b || b.classList.contains('active')) return;
+        fs.value = b.getAttribute('data-v');
+        ggSegMark('ggStatusSeg', fs.value);
+        ggLsSet('gg.status', fs.value);
+        fs.dispatchEvent(new Event('change'));
+    });
+})();
 
 msInit();
 msRenderPanel('kind'); msUpdateBtn('kind');

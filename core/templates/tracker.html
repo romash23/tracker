@@ -271,6 +271,9 @@
     <!-- ============================== СВОД ============================== -->
     {% if P.get('tab.summary') %}
     <div class="tracker-panel{% if AT == 'summary' %} active{% endif %}" id="panel-summary">
+        <div id="svodRoot"></div>
+        {# Старый свод часов скрыт: элементы оставлены в DOM, чтобы не ломать обработчики tracker.js #}
+        <div class="sum-legacy" style="display:none;" aria-hidden="true">
         <div class="sum-toolbar">
             <div class="period-arrows" title="Предыдущая неделя">
                 <button class="period-arrow-btn" id="sumPrevWeekBtn">◀</button>
@@ -320,6 +323,7 @@
         </div>
         <div class="sum-table-wrap" id="sumWrap"><div class="sum-empty">Загрузка...</div></div>
         <div id="sumExtras"></div>
+        </div>
     </div>
     {% endif %}
     <!-- ============================== СТАТИСТИКА ============================== -->
@@ -794,8 +798,8 @@
 <script src="/plugins-assets/my_week.js"></script>
 <script src="/plugins-assets/pulse.js"></script>
 <script src="/plugins-assets/gantt.js"></script>
-<script src="/plugins-assets/capacity.js"></script>
-<script src="/plugins-assets/stats_teams.js"></script>
+{# «Загрузка сотрудников» (capacity) и «Статистика по командам» (stats_teams) убраны из меню «Статистика»; страницы плагинов остались #}
+<script src="/plugins-assets/svod.js"></script>
 <script src="/plugins-assets/week_achievements.js"></script>
 <script src="/plugins-assets/excel_export.js"></script>
 <script src="/plugins-assets/reminders.js"></script>

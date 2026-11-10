@@ -174,8 +174,10 @@ window.__trkBuildStatsMenu = function(){
     /* PATCH: «Свод» переехал из верхнего ряда в меню «Статистика» */
     html += '<div class="spm-item" data-action="summary"><span>📊</span><span>Свод</span></div>';
     var arr = window.__trkPluginRegistry || [];
+    var HIDDEN_PLUGINS = { capacity: 1, stats_teams: 1 };   /* убраны из меню, страницы остались */
     for (var i = 0; i < arr.length; i++) {
         var p = arr[i];
+        if (p.id && HIDDEN_PLUGINS[p.id]) continue;
         if (p.perm && !perms[p.perm]) continue;
         if (typeof p.onClick === 'function') {
             html += '<button type="button" class="spm-item" data-plugin-idx="' + i + '"><span>' + (p.icon || '🔗') + '</span><span>' + p.name + '</span></button>';
@@ -3916,6 +3918,11 @@ function updateSumRowToggle() {
 }
 
 function loadSummary() {
+    /* «Свод» по проверкам (plugins/svod.py) вместо свода часов */
+    if (typeof window.__svodLoad === 'function' && document.getElementById('svodRoot')) {
+        window.__svodLoad();
+        return Promise.resolve();
+    }
     var from = $('sumDateFrom') ? $('sumDateFrom').value : '';
     var to = $('sumDateTo') ? $('sumDateTo').value : '';
     if (!from) { from = firstOfMonthISO(todayYM()); if ($('sumDateFrom')) $('sumDateFrom').value = from; }
