@@ -10731,3 +10731,14 @@ body:not(.trk-theme-light) .dash-sc-item--new { background:rgba(126,87,194,.18);
 body.trk-theme-light .tsk-dir-seg { background: #dfe3e8; border-color: rgba(0,0,0,0.08); }
 body.trk-theme-light .tsk-dir-seg button.active { background: #fff8dc; border-color: #d4a017; color: #7a5600; font-weight: 700; }
 body.trk-theme-light .tsk-dir-seg button:hover { color: #7a5600; }
+
+/* Вкладка «Завершенные» (в разработке): простой список */
+.cmp-dev-note { margin: 4px 0 12px; padding: 12px 16px; border: 1px dashed rgba(214,137,16,0.7); border-radius: 10px; background: rgba(214,137,16,0.10); color: var(--trk-text, #e8e8e8); font-weight: 700; font-size: 0.92rem; text-align: center; }
+.cmp-simple { max-width: 720px; border: 1px solid var(--trk-border, rgba(255,255,255,0.12)); border-radius: 10px; overflow: hidden; }
+.cmp-simple-head, .cmp-simple-row { display: flex; justify-content: space-between; gap: 16px; padding: 7px 14px; }
+.cmp-simple-head { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--trk-meta, #a0a0a0); border-bottom: 1px solid var(--trk-border, rgba(255,255,255,0.12)); }
+.cmp-simple-row + .cmp-simple-row { border-top: 1px solid var(--trk-border-soft, rgba(255,255,255,0.06)); }
+.cmp-simple-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.86rem; }
+.cmp-simple-date { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.86rem; color: var(--trk-meta, #a0a0a0); }
+body.trk-theme-light .cmp-dev-note { background: #fff6e5; color: #6b4e00; }
+body.trk-theme-light .cmp-simple { border-color: rgba(0,0,0,0.14); background: #fff; }

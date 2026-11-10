@@ -999,6 +999,19 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
 #ganttBox .gg-mode-day .gg-edit { font-size: 0.72rem; padding: 0 4px; line-height: 1.2; }
 #ganttBox .gg-mode-day .gg-task-name { font-size: 0.76rem; }
 #tasksTitle { margin-top: 10px; }
+/* Колбаски проверок в «Неделях» и «Месяцах»: без цифр, блоки по неделям */
+#ganttBox .gg-sau { position: absolute; top: 50%; transform: translateY(-50%); height: 18px; border-radius: 7px; overflow: hidden; display: flex; z-index: 2; cursor: default;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 4px rgba(0,0,0,0.3); }
+body.gg-can-ov #ganttBox .gg-sau { cursor: cell; }
+#ganttBox .gg-sau-col { display: flex; height: 100%; }
+#ganttBox .gg-sau-col.gg-sau-sep { box-shadow: inset 1px 0 0 rgba(0,0,0,0.45); }
+#ganttBox .gg-sau-col > i { flex: 1 1 0; height: 100%; display: block; position: relative; }
+#ganttBox .gg-sau-col > i + i { box-shadow: inset 1px 0 0 rgba(0,0,0,0.18); }
+#ganttBox .gg-sau-col > i.gg-sau-gap { background: repeating-linear-gradient(135deg, rgba(160,160,160,0.35) 0 4px, rgba(160,160,160,0.15) 4px 8px); }
+.gg-sau-gapchip { background: repeating-linear-gradient(135deg, rgba(160,160,160,0.55) 0 3px, rgba(160,160,160,0.2) 3px 6px) !important; }
+#ganttBox .gg-sau-col > i.gg-man { box-shadow: inset 0 0 0 2px #3949ab; }
+#ganttBox .gg-sau-col > i.gg-man::after { content: '✎'; position: absolute; right: 1px; top: 50%; transform: translateY(-50%); font-size: 8px; line-height: 1; color: #fff; text-shadow: 0 0 2px #1a237e; }
+
 /* ручная правка нагрузки по проверке */
 body.gg-can-ov #ganttBox .gg-task-row .gg-track, body.gg-can-ov #ganttBox .gg-sub-row .gg-track { cursor: cell; }
 #ganttBox .gg-wk-cell.gg-man, #ganttBox .gg-bank-cell.gg-man, #ganttBox .gg-mo-cell.gg-man { outline: 2px solid #3949ab; outline-offset: -2px; }
@@ -1792,9 +1805,6 @@ function renderDay(d) {
                 html += '<div class="gg-stage-seg" style="left:' + segLeft + 'px;width:' + segWidth + 'px;background:' + col + '" title="' + esc(stTitle) + '"></div>';
             });
         }
-        if (barWidth > 80) {
-            html +=     '<span class="gg-bar-label" style="position:relative;z-index:2">' + esc(t.name) + '</span>';
-        }
         html +=     '</div>';
         html +=   '</div>';
         html += '</div>';
@@ -1890,17 +1900,8 @@ function renderWeek(d) {
         html +=     '<button type="button" class="gg-edit" data-edit-tid="' + esc(t.id) + '" title="Редактировать" aria-label="Редактировать">\u270f\ufe0f</button>';
         html +=   '</div>';
         html +=   '<div class="gg-track" style="width:' + trackW + 'px">';
-        /* По каждой неделе — цвет этапа, активного в понедельник (свёрнуто = x1) */
-        weeks.forEach(function(w, i) {
-            var st = stageAtMonday(t.stages, w.mon);
-            if (!st) return;
-            var col = STAGE_COLORS[st.key] || '#888';
-            var wt = (st.weight != null ? st.weight : 1);
-            var wtTxt = round2(wt).toString();
-            var ttl = (STAGE_LABELS[st.key] || st.key) + ' · неделя ' + fmtD(w.mon) + '–' + fmtD(w.sun) + ' · нагрузка ' + wtTxt;
-            html += '<div class="gg-wk-cell' + (ggTovAny(t.id, w.mon) ? ' gg-man' : '') + '" style="left:' + (i * WEEK_W + 2) + 'px;width:' + (WEEK_W - 4) + 'px;background:' + col + '" title="' + esc(ttl) + '">' +
-                    '<span class="gg-wk-load-c">' + wtTxt + '</span></div>';
-        });
+        /* Колбаска без цифр: блок на каждую неделю, цвет = этап, активный в понедельник */
+        html += ggSausageHtml(t, weeks.map(function(w) { return [w.mon]; }), WEEK_W, STAGE_COLORS, STAGE_LABELS, function(i) { return 'неделя ' + fmtD(weeks[i].mon) + '–' + fmtD(weeks[i].sun); });
         html +=   '</div>';
         html += '</div>';
         /* П.2/П.3: раскрытые банки-участники под задачей */
@@ -1915,6 +1916,7 @@ function renderWeek(d) {
     STAGE_ORDER.forEach(function(k) {
         html += '<span class="lg-item"><span class="lg-chip" style="background:' + STAGE_COLORS[k] + '"></span>' + STAGE_LABELS[k] + '</span>';
     });
+    html += '<span class="lg-item"><span class="lg-chip gg-sau-gapchip"></span>Нет активного этапа</span>';
     html += '</div>';
 
     box.innerHTML = html;
@@ -1924,6 +1926,42 @@ function renderWeek(d) {
 }
 
 /* Шаг «Месяцы»: колонка = календарный месяц; полоса проверки делится на недели месяца */
+/* Ширина колонки месяца: ось растягивается на всю ширину экрана (мин. 64 px) */
+function ggFitMonthW(n) {
+    var gb = document.getElementById('ganttBox'), bb = document.getElementById('banksBox');
+    var w = Math.max(gb ? gb.clientWidth : 0, bb ? bb.clientWidth : 0);
+    if (!w) { var par = (gb && gb.parentElement) || document.body; w = par.clientWidth || window.innerWidth; }
+    var nameW = window.innerWidth <= 700 ? 220 : NAME_W;
+    var avail = w - nameW - 4;
+    return Math.max(64, Math.floor(avail / Math.max(1, n)));
+}
+/* Колбаска проверки для «Недель» и «Месяцев»: сплошная полоса от первой до последней
+   активной недели, внутри — блоки по неделям цвета этапа. Подписей нет.
+   groups[i] — список понедельников, попадающих в колонку i (неделя: 1, месяц: 4–5). */
+function ggSausageHtml(t, groups, cellW, COLORS, LABELS, perLbl) {
+    var first = -1, last = -1;
+    groups.forEach(function(mons, i) {
+        var any = mons.some(function(mn) { return !!stageAtMonday(t.stages, mn) || ggTaskCalcAt(t, '', mn) > 0; });
+        if (any) { if (first < 0) first = i; last = i; }
+    });
+    if (first < 0) return '';
+    var left = first * cellW + 2, width = (last - first + 1) * cellW - 4;
+    var h = '<div class="gg-sau" style="left:' + left + 'px;width:' + width + 'px">';
+    for (var i = first; i <= last; i++) {
+        var mons = groups[i] || [], n = Math.max(1, mons.length);
+        h += '<span class="gg-sau-col' + (i > first ? ' gg-sau-sep' : '') + '" style="flex:0 0 ' + (cellW - ((i === first ? 2 : 0) + (i === last ? 2 : 0))) + 'px">';
+        mons.forEach(function(mn) {
+            var st = stageAtMonday(t.stages, mn);
+            var col = st ? (COLORS[st.key] || '#888') : ((t.task_kind === 'other' && ggTaskCalcAt(t, '', mn) > 0) ? '#8FA9C9' : '');
+            var man = ggTovAny(t.id, mn);
+            var ttl = perLbl(i) + ' · ' + fmtD(mn) + ': ' + (st ? (LABELS[st.key] || st.key) : 'нет активного этапа') + (man ? ' · ✎ нагрузка задана вручную' : '');
+            h += '<i class="' + (col ? '' : 'gg-sau-gap') + (man ? ' gg-man' : '') + '"' + (col ? ' style="background:' + col + '"' : '') + ' title="' + esc(ttl) + '"></i>';
+        });
+        if (!mons.length) h += '<i class="gg-sau-gap"></i>';
+        h += '</span>';
+    }
+    return h + '</div>';
+}
 function buildMonths(days) {
     if (!days.length) return [];
     var weeks = buildWeeks(days), out = [];
@@ -1948,6 +1986,7 @@ function renderMonth(d) {
     if (!months.length) { box.innerHTML = '<div class="empty">Пустой диапазон дат</div>'; return; }
     var STAGE_COLORS = {'подготовка':'#C9CDCC','проверка_нжя':'#DFD4BD','проверка_соглЦА':'#D4B64B','ос_проф':'#747677','реализация_возражения':'#9BB393','реализация_согласования':'#6E8F6A','запас':'#B0BEC5','оценка_тб':'#8FA9C9'};
     var SL = GG_STAGE_LABELS;
+    MONTH_W = ggFitMonthW(months.length);
     var trackW = months.length * MONTH_W;
     var ySpans = [];
     months.forEach(function(p) { var l = ySpans[ySpans.length - 1]; if (l && l.yr === p.yr) l.count++; else ySpans.push({ yr: p.yr, count: 1 }); });
@@ -1971,21 +2010,13 @@ function renderMonth(d) {
         html += '<span class="gg-task-name" title="' + esc(t.name) + '">' + esc(t.name) + '</span>';
         html += '<button type="button" class="gg-edit" data-edit-tid="' + esc(t.id) + '" title="Редактировать" aria-label="Редактировать">✏️</button>';
         html += '</div><div class="gg-track" style="width:' + trackW + 'px">';
-        months.forEach(function(p, i) {
-            var parts = [], any = false, ttl = [];
-            p.mons.forEach(function(mn) {
-                var st = stageAtMonday(t.stages, mn);
-                if (st) { any = true; parts.push('<i style="background:' + (STAGE_COLORS[st.key] || '#888') + '"></i>'); ttl.push(fmtD(mn) + ': ' + (SL[st.key] || st.key)); }
-                else parts.push('<i></i>');
-            });
-            if (!any) return;
-            html += '<div class="gg-mo-cell' + (p.mons.some(function(mn) { return ggTovAny(t.id, mn); }) ? ' gg-man' : '') + '" style="left:' + (i * MONTH_W + 2) + 'px;width:' + (MONTH_W - 4) + 'px" title="' + esc(ttl.join('\n')) + '">' + parts.join('') + '</div>';
-        });
+        html += ggSausageHtml(t, months.map(function(p) { return p.mons; }), MONTH_W, STAGE_COLORS, SL, function(i) { return MONTH_NAMES[months[i].mi] + ' ' + months[i].yr; });
         html += '</div></div>';
     });
     html += '</div></div>';
     html += '<div class="gg-stage-legend">';
     Object.keys(SL).forEach(function(k) { html += '<span class="lg-item"><span class="lg-chip" style="background:' + (STAGE_COLORS[k] || '#888') + '"></span>' + SL[k] + '</span>'; });
+    html += '<span class="lg-item"><span class="lg-chip gg-sau-gapchip"></span>Нет активного этапа</span>';
     html += '</div>';
     box.innerHTML = html;
     renderBanks(d, months, 'month', MONTH_W, STAGE_COLORS, SL);
@@ -2561,20 +2592,60 @@ document.addEventListener('click', function(ev) {
     ggTovOpen(tid, bank ? [bank] : null, per.mode, p);
 });
 /* Выгрузка в Excel */
+var GG_STAGE_COLORS_X = {'подготовка':'#C9CDCC','проверка_нжя':'#DFD4BD','проверка_соглЦА':'#D4B64B','ос_проф':'#747677','реализация_возражения':'#9BB393','реализация_согласования':'#7D9B6E','запас':'#A8A9AB','оценка_тб':'#A3A4A7'};
+/* Лист «Проверки» для выгрузки: строки — проверки, колонки — текущие периоды */
+function ggExportTasksPart() {
+    var d = window.__ggLastData, per = window.__ggPer;
+    if (!d || !per || !(d.tasks || []).length) return null;
+    var mode = per.mode, periods = per.periods, SL = GG_STAGE_LABELS;
+    var plabel = function(p) {
+        if (mode === 'week') return fmtD(p.mon) + '–' + fmtD(p.sun);
+        if (mode === 'month') return MONTH_NAMES[p.mi].slice(0, 3) + ' ' + String(p.yr).slice(2);
+        return fmtD(p);
+    };
+    var stLbl = { planning:'Планирование', approved:'Утверждена', active:'Активна', done:'Завершена', cancelled:'Отменена', paused:'Приостановлена', archived:'Архив' };
+    var rows = (d.tasks || []).map(function(t) {
+        var cells = periods.map(function(p) {
+            var mons = ggPeriodWeeks(mode, p), keys = [], col = '', man = false;
+            if (mode === 'day') {
+                var st0 = null;
+                (t.stages || []).forEach(function(st) { if (!st0 && st.start && st.start <= p && p <= (st.end || st.start)) st0 = st; });
+                if (st0) { keys.push(st0.key); col = GG_STAGE_COLORS_X[st0.key] || ''; }
+                man = ggTovAny(t.id, mondayOf(p));
+            } else {
+                mons.forEach(function(mn) {
+                    var st = stageAtMonday(t.stages, mn);
+                    if (st) { if (keys.indexOf(st.key) < 0) keys.push(st.key); if (!col) col = GG_STAGE_COLORS_X[st.key] || ''; }
+                    if (ggTovAny(t.id, mn)) man = true;
+                });
+            }
+            return { label: keys.map(function(k) { return SL[k] || k; }).join(' / '), color: col, man: man };
+        });
+        var banks = (t.dept_ids || []).map(function(id) { return (ggDeptNames[id] || id) + (id === t.lead_department ? ' (рук.)' : ''); }).join(', ');
+        return { name: t.name || '', info: [stLbl[t.status] || t.status || '', t.task_type || '', t.pocket || '', banks, (t.start_date || '').split('-').reverse().join('.'), (t.deadline || '').split('-').reverse().join('.')], cells: cells };
+    });
+    return { title: 'Проверки · шаг: ' + ({ week: 'недели', month: 'месяцы', day: 'дни' })[mode] + ' · ' + document.getElementById('fFrom').value + ' — ' + document.getElementById('fTo').value,
+             info_cols: ['Статус', 'Направление', 'Карман', 'Банки', 'Начало', 'Дедлайн'],
+             periods: periods.map(plabel), rows: rows };
+}
 function ggExportXls() {
-    var m = ggLoadModel; if (!m) return;
+    var m = ggLoadModel;
     var btn = document.getElementById('ggXlsBtn');
+    var wantLoad = ggShowMode !== 'tasks', wantTasks = ggShowMode !== 'banks';
+    var tasksPart = wantTasks ? ggExportTasksPart() : null;
+    if ((!wantLoad || !m) && !tasksPart) { ggFlash('Нет данных для выгрузки', true); return; }
     var segTxt = function(id) { var b = document.querySelector('#' + id + ' button.active'); return b ? b.textContent.trim() : ''; };
-    var payload = {
-        title: 'Нагрузка по ТБ · ' + segTxt('ggTypeSeg') + ' · численность: ' + segTxt('ggHcSeg').toLowerCase()
-            + (ggIncPlan ? ' · с предварительными' : ' · без предварительных') + ' · ' + document.getElementById('fFrom').value + ' — ' + document.getElementById('fTo').value,
-        periods: m.pinfo.map(function(p) { return p.short || p.label.replace(/^неделя /, ''); }),
-        rows: m.rows.map(function(r) {
+    var payload = { include_load: !!(wantLoad && m), tasks: tasksPart };
+    if (wantLoad && m) {
+        payload.title = 'Нагрузка по ТБ · ' + segTxt('ggTypeSeg') + ' · численность: ' + segTxt('ggHcSeg').toLowerCase()
+            + (ggIncPlan ? ' · с предварительными' : ' · без предварительных') + ' · ' + document.getElementById('fFrom').value + ' — ' + document.getElementById('fTo').value;
+        payload.periods = m.pinfo.map(function(p) { return p.short || p.label.replace(/^неделя /, ''); });
+        payload.rows = m.rows.map(function(r) {
             return { name: r.name, cap: r.cap, total: r.total,
                      values: r.load.map(function(v, i) { return m.pinfo[i].offDay ? null : Math.round(v * 100) / 100; }),
                      manual: r.manual || [], plan: (r.plan || []).map(function(v) { return Math.round(v * 100) / 100; }) };
-        })
-    };
+        });
+    }
     var h = { 'Content-Type': 'application/json' };
     if (window.__ggCsrf) h['X-CSRF-Token'] = window.__ggCsrf;
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Excel'; }
@@ -2585,14 +2656,15 @@ function ggExportXls() {
                 try { var j = JSON.parse(tx); if (j && j.error) msg += ' · ' + j.error; } catch (e) {}
                 throw new Error(msg);
             });
-            var ext = (r.headers.get('X-Export-Format') === 'csv') ? 'csv' : 'xlsx';
-            return r.blob().then(function(b) { return { blob: b, ext: ext }; });
+            var fmt = r.headers.get('X-Export-Format') || 'xlsx';
+            return r.blob().then(function(b) { return { blob: b, ext: (fmt === 'csv' ? 'csv' : 'xlsx'), fmt: fmt }; });
         })
         .then(function(res) {
             var blob = res.blob;
             var a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'Нагрузка_по_ТБ_' + (m.today || '').replace(/-/g, '') + '.' + res.ext;
+            var _td = ((m && m.today) || (window.__ggLastData && window.__ggLastData.today) || '').replace(/-/g, '');
+            a.download = (payload.include_load ? (payload.tasks ? 'Текущая_загрузка_' : 'Нагрузка_по_ТБ_') : 'Проверки_') + _td + '.' + res.ext;
             if (res.ext === 'csv') ggFlash('⚠ На сервере не удалось собрать .xlsx, выгружен CSV. Подробности в окне сервера.', true);
             document.body.appendChild(a); a.click();
             setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -2870,6 +2942,18 @@ document.getElementById('ggPlanChk').addEventListener('change', function() {
     ggIncPlan = this.checked; ggLsSet('gg.plan', ggIncPlan ? '1' : '0'); ggRerender();
 });
 document.getElementById('ggXlsBtn').addEventListener('click', ggExportXls);
+(function() {
+    var tm = null, lastW = window.innerWidth;
+    window.addEventListener('resize', function() {
+        if (tm) clearTimeout(tm);
+        tm = setTimeout(function() {
+            if (Math.abs(window.innerWidth - lastW) < 8) return;
+            lastW = window.innerWidth;
+            var v = document.getElementById('fView');
+            if (v && v.value === 'month' && window.__ggLastData) ggRerender();
+        }, 250);
+    });
+})();
 ggSetType(ggLsGet('gg.fType') || '', true);
 ggSetShow(ggLsGet('gg.show2') || 'banks');
 
@@ -3421,59 +3505,58 @@ def register(app, db, hooks):
         for r in rows:
             r['name'] = _s(r.get('name'), 120)
         title = _s(body.get('title') or 'Нагрузка по ТБ', 200)
+        include_load = body.get('include_load', True) is not False
+        tasks_part = None
+        tp = body.get('tasks')
+        if isinstance(tp, dict):
+            t_periods = [_s(p, 40) for p in (tp.get('periods') or [])][:600]
+            t_rows = []
+            for r in (tp.get('rows') or [])[:500]:
+                if not isinstance(r, dict):
+                    continue
+                cells = []
+                for c in (r.get('cells') or [])[:600]:
+                    c = c if isinstance(c, dict) else {}
+                    col = _s(c.get('color'), 7)
+                    cells.append({'label': _s(c.get('label'), 80),
+                                  'color': col if _re.match(r'^#[0-9A-Fa-f]{6}$', col or '') else '',
+                                  'man': bool(c.get('man'))})
+                t_rows.append({'name': _s(r.get('name'), 200), 'sub': bool(r.get('sub')),
+                               'info': [_s(x, 300) for x in (r.get('info') or [])[:8]], 'cells': cells})
+            tasks_part = {'title': _s(tp.get('title') or 'Проверки', 200),
+                          'info_cols': [_s(x, 40) for x in (tp.get('info_cols') or [])[:8]],
+                          'periods': t_periods, 'rows': t_rows}
+        sheets = _g_export_model(periods, rows, title, include_load, tasks_part)
+        fname = 'tekushchaya_zagruzka_' + date.today().strftime('%Y%m%d')
         try:
-            return _g_export_xlsx(periods, rows, title)
+            data = _g_xlsx_openpyxl(sheets)
+            fmt = 'xlsx'
         except Exception as _e:
             import traceback
             traceback.print_exc()
-            print('[gantt] Excel через openpyxl не удался, отдаю CSV:', repr(_e))
-            return _g_export_csv(periods, rows, title)
-
-    def _g_export_csv(periods, rows, title):
-        import csv
-
-        def _f(v):
+            print('[gantt] Excel через openpyxl не удался, собираю xlsx встроенным писателем:', repr(_e))
             try:
-                return float(v)
-            except Exception:
-                return None
-        sio = io.StringIO()
-        w = csv.writer(sio, delimiter=';')
-        w.writerow([title])
-        w.writerow(['Тер банк', 'Ёмкость'] + periods)
-        for r in rows:
-            vals = r.get('values') or []
-            line = [r.get('name') or '', ('' if _f(r.get('cap')) is None else str(_f(r.get('cap'))).replace('.', ','))]
-            for pi in range(len(periods)):
-                v = _f(vals[pi]) if pi < len(vals) else None
-                line.append('' if not v else str(round(v, 2)).replace('.', ','))
-            w.writerow(line)
-        data = ('\ufeff' + sio.getvalue()).encode('utf-8')
-        resp = Response(data, mimetype='text/csv; charset=utf-8')
-        resp.headers['Content-Disposition'] = 'attachment; filename=nagruzka_tb_' + date.today().strftime('%Y%m%d') + '.csv'
-        resp.headers['X-Export-Format'] = 'csv'
+                data = _g_xlsx_builtin(sheets)
+                fmt = 'xlsx-builtin'
+            except Exception as _e2:
+                traceback.print_exc()
+                print('[gantt] встроенный xlsx тоже не удался, отдаю CSV:', repr(_e2))
+                return _g_export_csv(sheets, fname)
+        resp = Response(data, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        resp.headers['Content-Disposition'] = 'attachment; filename=' + fname + '.xlsx'
+        resp.headers['X-Export-Format'] = fmt
+        resp.headers['Access-Control-Expose-Headers'] = 'X-Export-Format'
         return resp
 
-    def _g_export_xlsx(periods, rows, title):
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.comments import Comment
-        from openpyxl.utils import get_column_letter
+    # ---------- Модель листов: [{name, cells:{(r,c): {...}}, widths:{c:w}, freeze:(r,c)}] ----------
+    _LV_FILL = {1: 'C8E6C9', 2: '81C784', 3: 'FFE082', 4: 'EF9A9A', 5: 'C62828'}
 
+    def _g_export_model(periods, rows, title, include_load, tasks_part):
         def _f(v):
             try:
                 return float(v)
             except Exception:
                 return None
-        FILLS = {
-            1: PatternFill('solid', fgColor='C8E6C9'),
-            2: PatternFill('solid', fgColor='81C784'),
-            3: PatternFill('solid', fgColor='FFE082'),
-            4: PatternFill('solid', fgColor='EF9A9A'),
-            5: PatternFill('solid', fgColor='C62828'),
-        }
-        red_side = Side(style='medium', color='B71C1C')
-        thin = Side(style='thin', color='D0D0D0')
 
         def _lvl(load, cap):
             if load is None or load <= 0 or cap is None:
@@ -3483,73 +3566,291 @@ def register(app, db, hooks):
             pc = round(load / cap * 100)
             return 1 if pc < 50 else 2 if pc < 75 else 3 if pc <= 100 else 4 if pc <= 125 else 5
 
+        sheets = []
+        if include_load:
+            for sname, kind in (('Загрузка', 'load'), ('% ёмкости', 'pct')):
+                cells = {}
+                cells[(1, 1)] = {'v': title, 'bold': True, 'size': 12}
+                for ci, h in enumerate(['Тер банк', 'Ёмкость'] + periods, 1):
+                    cells[(3, ci)] = {'v': h, 'bold': True, 'center': True, 'wrap': True, 'border': 'thin'}
+                for ri, r in enumerate(rows, 4):
+                    cap = _f(r.get('cap'))
+                    cells[(ri, 1)] = {'v': str(r.get('name') or '')[:120], 'bold': bool(r.get('total'))}
+                    cells[(ri, 2)] = {'v': cap}
+                    vals = r.get('values') or []
+                    man = r.get('manual') or []
+                    pln = r.get('plan') or []
+                    for pi in range(len(periods)):
+                        v = _f(vals[pi]) if pi < len(vals) else None
+                        c = {'center': True}
+                        if v is not None and v > 0:
+                            if kind == 'pct':
+                                if cap and cap > 0:
+                                    c['v'] = round(v / cap, 4)
+                                    c['pct'] = True
+                            else:
+                                c['v'] = round(v, 2)
+                        lv = _lvl(v, cap)
+                        if lv:
+                            c['fill'] = _LV_FILL[lv]
+                            if lv == 5:
+                                c['color'] = 'FFFFFF'
+                                c['bold'] = True
+                                c['border'] = 'red'
+                        notes = []
+                        if pi < len(man) and man[pi]:
+                            notes.append('Задано вручную')
+                            c['italic'] = True
+                            if lv != 5:
+                                c['color'] = '1A237E'
+                        if pi < len(pln) and _f(pln[pi]):
+                            notes.append('В т. ч. предварительно: ' + str(round(_f(pln[pi]), 2)))
+                        if notes:
+                            c['comment'] = '\n'.join(notes)
+                        if 'v' in c or 'fill' in c:
+                            cells[(ri, 3 + pi)] = c
+                lr = 5 + len(rows)
+                cells[(lr, 1)] = {'v': 'Легенда (% к ёмкости):', 'bold': True}
+                for k, (lbl, lv) in enumerate([('0–50%', 1), ('50–75%', 2), ('75–100%', 3), ('100–125%', 4), ('>125%', 5)]):
+                    cells[(lr + 1 + k, 1)] = {'v': lbl, 'fill': _LV_FILL[lv], 'color': ('FFFFFF' if lv == 5 else None), 'bold': lv == 5}
+                cells[(lr + 7, 1)] = {'v': 'Ёмкость = экспертный коэффициент × численность. Курсив — значение задано вручную.'}
+                widths = {1: 30, 2: 10}
+                for ci in range(3, 3 + len(periods)):
+                    widths[ci] = 11
+                sheets.append({'name': sname, 'cells': cells, 'widths': widths, 'freeze': (4, 3), 'hdr_row': 3})
+        if tasks_part:
+            ic = tasks_part['info_cols']
+            per = tasks_part['periods']
+            cells = {(1, 1): {'v': tasks_part['title'], 'bold': True, 'size': 12}}
+            for ci, h in enumerate(['Проверка'] + ic + per, 1):
+                cells[(3, ci)] = {'v': h, 'bold': True, 'center': True, 'wrap': True, 'border': 'thin'}
+            base = 2 + len(ic)
+            for ri, r in enumerate(tasks_part['rows'], 4):
+                cells[(ri, 1)] = {'v': ('    • ' if r['sub'] else '') + r['name'], 'bold': not r['sub'], 'italic': r['sub']}
+                for k, x in enumerate(r['info']):
+                    if k < len(ic):
+                        cells[(ri, 2 + k)] = {'v': x}
+                for pi, c in enumerate(r['cells']):
+                    if pi >= len(per) or not (c['label'] or c['color']):
+                        continue
+                    cc = {'v': c['label'] or None, 'center': True, 'size': 8}
+                    if c['color']:
+                        cc['fill'] = c['color'][1:].upper()
+                    if c['man']:
+                        cc['italic'] = True
+                        cc['border'] = 'blue'
+                        cc['comment'] = 'Нагрузка задана вручную'
+                    cells[(ri, base + pi)] = cc
+            widths = {1: 38}
+            for k in range(len(ic)):
+                widths[2 + k] = 14
+            for ci in range(base, base + len(per)):
+                widths[ci] = 11
+            sheets.append({'name': 'Проверки', 'cells': cells, 'widths': widths, 'freeze': (4, base), 'hdr_row': 3})
+        if not sheets:
+            sheets.append({'name': 'Пусто', 'cells': {(1, 1): {'v': 'Нет данных для выгрузки'}}, 'widths': {}, 'freeze': None})
+        return sheets
+
+    def _g_xlsx_openpyxl(sheets):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.comments import Comment
+        from openpyxl.utils import get_column_letter
+        sides = {'thin': Side(style='thin', color='D0D0D0'), 'red': Side(style='medium', color='B71C1C'),
+                 'blue': Side(style='medium', color='3949AB')}
         wb = Workbook()
-        sheets = [('Загрузка', 'load'), ('% ёмкости', 'pct')]
-        for si, (sname, kind) in enumerate(sheets):
+        for si, sh in enumerate(sheets):
             ws = wb.active if si == 0 else wb.create_sheet()
-            ws.title = sname
-            ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=12)
-            hdr = ['Тер банк', 'Ёмкость'] + periods
-            for ci, h in enumerate(hdr, 1):
-                c = ws.cell(row=3, column=ci, value=h)
-                c.font = Font(bold=True)
-                c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-                c.border = Border(top=thin, bottom=thin, left=thin, right=thin)
-            for ri, r in enumerate(rows, 4):
-                cap = _f(r.get('cap'))
-                nc = ws.cell(row=ri, column=1, value=str(r.get('name') or '')[:120])
-                if r.get('total'):
-                    nc.font = Font(bold=True)
-                ws.cell(row=ri, column=2, value=cap)
-                vals = r.get('values') or []
-                man = r.get('manual') or []
-                pln = r.get('plan') or []
-                for pi in range(len(periods)):
-                    v = _f(vals[pi]) if pi < len(vals) else None
-                    c = ws.cell(row=ri, column=3 + pi)
-                    if v is not None and v > 0:
-                        if kind == 'pct':
-                            if cap and cap > 0:
-                                c.value = round(v / cap, 4)
-                                c.number_format = '0%'
-                        else:
-                            c.value = round(v, 2)
-                    lv = _lvl(v, cap)
-                    if lv:
-                        c.fill = FILLS[lv]
-                        if lv == 5:
-                            c.font = Font(color='FFFFFF', bold=True)
-                            c.border = Border(top=red_side, bottom=red_side, left=red_side, right=red_side)
-                    notes = []
-                    if pi < len(man) and man[pi]:
-                        notes.append('Задано вручную')
-                        c.font = Font(italic=True, bold=(lv == 5), color=('FFFFFF' if lv == 5 else '1A237E'))
-                    if pi < len(pln) and _f(pln[pi]):
-                        notes.append('В т. ч. предварительно: ' + str(round(_f(pln[pi]), 2)))
-                    if notes:
-                        c.comment = Comment('\n'.join(notes), 'Трекер')
-                    c.alignment = Alignment(horizontal='center')
-            ws.column_dimensions['A'].width = 30
-            ws.column_dimensions['B'].width = 10
-            for ci in range(3, 3 + len(periods)):
-                ws.column_dimensions[get_column_letter(ci)].width = 11
-            ws.row_dimensions[3].height = 32
-            ws.freeze_panes = 'C4'
-            lr = 5 + len(rows)
-            ws.cell(row=lr, column=1, value='Легенда (% к ёмкости):').font = Font(bold=True)
-            for k, (lbl, lv) in enumerate([('0–50%', 1), ('50–75%', 2), ('75–100%', 3), ('100–125%', 4), ('>125%', 5)]):
-                c = ws.cell(row=lr + 1 + k, column=1, value=lbl)
-                c.fill = FILLS[lv]
-                if lv == 5:
-                    c.font = Font(color='FFFFFF', bold=True)
-            ws.cell(row=lr + 7, column=1, value='Ёмкость = экспертный коэффициент × численность. Курсив — значение задано вручную.')
+            ws.title = sh['name'][:31]
+            for (r, c), d in sh['cells'].items():
+                cell = ws.cell(row=r, column=c)
+                if d.get('v') is not None:
+                    cell.value = d['v']
+                if d.get('pct'):
+                    cell.number_format = '0%'
+                if d.get('bold') or d.get('italic') or d.get('color') or d.get('size'):
+                    cell.font = Font(bold=bool(d.get('bold')), italic=bool(d.get('italic')),
+                                     color=d.get('color') or None, size=d.get('size') or 11)
+                if d.get('fill'):
+                    cell.fill = PatternFill('solid', fgColor=d['fill'])
+                if d.get('border'):
+                    s = sides[d['border']]
+                    cell.border = Border(top=s, bottom=s, left=s, right=s)
+                if d.get('center') or d.get('wrap'):
+                    cell.alignment = Alignment(horizontal=('center' if d.get('center') else None),
+                                               vertical='center', wrap_text=bool(d.get('wrap')))
+                if d.get('comment'):
+                    cell.comment = Comment(d['comment'], 'Трекер')
+            for c, w in sh['widths'].items():
+                ws.column_dimensions[get_column_letter(c)].width = w
+            if sh.get('hdr_row'):
+                ws.row_dimensions[sh['hdr_row']].height = 32
+            if sh.get('freeze'):
+                ws.freeze_panes = ws.cell(row=sh['freeze'][0], column=sh['freeze'][1])
         bio = io.BytesIO()
         wb.save(bio)
-        bio.seek(0)
-        fname = 'nagruzka_tb_' + date.today().strftime('%Y%m%d') + '.xlsx'
-        resp = Response(bio.getvalue(),
-                        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        resp.headers['Content-Disposition'] = 'attachment; filename=' + fname
+        return bio.getvalue()
+
+    def _g_xlsx_builtin(sheets):
+        """Минимальный писатель .xlsx без сторонних библиотек (zipfile + XML).
+        Используется, если openpyxl недоступен или упал."""
+        import zipfile
+        from xml.sax.saxutils import escape as _x
+
+        def col_name(n):
+            s = ''
+            while n:
+                n, rem = divmod(n - 1, 26)
+                s = chr(65 + rem) + s
+            return s
+        fonts, fills, borders, xfs = [], [], [], []
+
+        def idx(lst, key):
+            if key not in lst:
+                lst.append(key)
+            return lst.index(key)
+        idx(fonts, (False, False, None, 11))
+        idx(fills, None)
+        idx(fills, 'gray125')
+        idx(borders, None)
+        idx(xfs, (0, 0, 0, False, False, False))
+
+        def style_of(d):
+            f = idx(fonts, (bool(d.get('bold')), bool(d.get('italic')), d.get('color') or None, d.get('size') or 11))
+            fl = idx(fills, d.get('fill')) if d.get('fill') else 0
+            b = idx(borders, d.get('border')) if d.get('border') else 0
+            return idx(xfs, (f, fl, b, bool(d.get('pct')), bool(d.get('center')), bool(d.get('wrap'))))
+        sheet_xml = []
+        for sh in sheets:
+            rows = {}
+            for (r, c), d in sh['cells'].items():
+                rows.setdefault(r, []).append((c, d))
+            out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+                   '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                   'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">']
+            if sh.get('freeze'):
+                fr, fc = sh['freeze']
+                out.append('<sheetViews><sheetView workbookViewId="0"><pane xSplit="%d" ySplit="%d" topLeftCell="%s%d" '
+                           'activePane="bottomRight" state="frozen"/></sheetView></sheetViews>' % (fc - 1, fr - 1, col_name(fc), fr))
+            if sh['widths']:
+                out.append('<cols>' + ''.join('<col min="%d" max="%d" width="%s" customWidth="1"/>' % (c, c, w)
+                                              for c, w in sorted(sh['widths'].items())) + '</cols>')
+            out.append('<sheetData>')
+            for r in sorted(rows):
+                ht = ' ht="32" customHeight="1"' if sh.get('hdr_row') == r else ''
+                out.append('<row r="%d"%s>' % (r, ht))
+                for c, d in sorted(rows[r], key=lambda x: x[0]):
+                    ref = col_name(c) + str(r)
+                    s = style_of(d)
+                    v = d.get('v')
+                    if v is None:
+                        out.append('<c r="%s" s="%d"/>' % (ref, s))
+                    elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                        out.append('<c r="%s" s="%d"><v>%s</v></c>' % (ref, s, repr(float(v))))
+                    else:
+                        out.append('<c r="%s" s="%d" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>' % (ref, s, _x(str(v))))
+                out.append('</row>')
+            out.append('</sheetData></worksheet>')
+            sheet_xml.append(''.join(out))
+        st = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+              '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+              '<fonts count="%d">' % len(fonts)]
+        for b, i, col, sz in fonts:
+            st.append('<font>' + ('<b/>' if b else '') + ('<i/>' if i else '') + '<sz val="%s"/>' % sz
+                      + ('<color rgb="FF%s"/>' % col if col else '') + '<name val="Calibri"/></font>')
+        st.append('</fonts><fills count="%d">' % len(fills))
+        for fl in fills:
+            if fl is None:
+                st.append('<fill><patternFill patternType="none"/></fill>')
+            elif fl == 'gray125':
+                st.append('<fill><patternFill patternType="gray125"/></fill>')
+            else:
+                st.append('<fill><patternFill patternType="solid"><fgColor rgb="FF%s"/><bgColor indexed="64"/></patternFill></fill>' % fl)
+        st.append('</fills><borders count="%d">' % len(borders))
+        bcol = {'thin': ('thin', 'D0D0D0'), 'red': ('medium', 'B71C1C'), 'blue': ('medium', '3949AB')}
+        for bd in borders:
+            if bd is None:
+                st.append('<border><left/><right/><top/><bottom/><diagonal/></border>')
+            else:
+                sty, col = bcol[bd]
+                one = '<%s style="' + sty + '"><color rgb="FF' + col + '"/></%s>'
+                st.append('<border>' + ''.join(one % (k, k) for k in ('left', 'right', 'top', 'bottom')) + '<diagonal/></border>')
+        st.append('</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>')
+        st.append('<cellXfs count="%d">' % len(xfs))
+        for f, fl, b, pct, cen, wrap in xfs:
+            al = ''
+            if cen or wrap:
+                al = '<alignment' + (' horizontal="center"' if cen else '') + ' vertical="center"' + (' wrapText="1"' if wrap else '') + '/>'
+            st.append('<xf numFmtId="%d" fontId="%d" fillId="%d" borderId="%d" xfId="0"%s%s%s%s>%s</xf>' % (
+                9 if pct else 0, f, fl, b, ' applyNumberFormat="1"' if pct else '', ' applyFont="1"', ' applyFill="1"' if fl else '',
+                ' applyBorder="1"' if b else '', al) if al else
+                '<xf numFmtId="%d" fontId="%d" fillId="%d" borderId="%d" xfId="0"%s applyFont="1"%s%s/>' % (
+                9 if pct else 0, f, fl, b, ' applyNumberFormat="1"' if pct else '', ' applyFill="1"' if fl else '', ' applyBorder="1"' if b else ''))
+        st.append('</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')
+        names = []
+        for sh in sheets:
+            nm = ''.join(ch for ch in sh['name'] if ch not in '[]:*?/\\')[:31] or 'Лист'
+            while nm in names:
+                nm = (nm[:28] + '_' + str(len(names)))
+            names.append(nm)
+        n = len(sheets)
+        bio = io.BytesIO()
+        with zipfile.ZipFile(bio, 'w', zipfile.ZIP_DEFLATED) as z:
+            z.writestr('[Content_Types].xml',
+                       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                       '<Default Extension="xml" ContentType="application/xml"/>'
+                       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                       '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+                       + ''.join('<Override PartName="/xl/worksheets/sheet%d.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' % (i + 1) for i in range(n))
+                       + '</Types>')
+            z.writestr('_rels/.rels',
+                       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                       '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')
+            z.writestr('xl/workbook.xml',
+                       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+                       + ''.join('<sheet name="%s" sheetId="%d" r:id="rId%d"/>' % (_x(nm, {'"': '&quot;'}), i + 1, i + 1) for i, nm in enumerate(names))
+                       + '</sheets></workbook>')
+            z.writestr('xl/_rels/workbook.xml.rels',
+                       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                       + ''.join('<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet%d.xml"/>' % (i + 1, i + 1) for i in range(n))
+                       + '<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' % (n + 1))
+            z.writestr('xl/styles.xml', ''.join(st))
+            for i, sx in enumerate(sheet_xml):
+                z.writestr('xl/worksheets/sheet%d.xml' % (i + 1), sx)
+        return bio.getvalue()
+
+    def _g_export_csv(sheets, fname):
+        import csv
+        sio = io.StringIO()
+        w = csv.writer(sio, delimiter=';')
+        for sh in sheets:
+            if sh['name'] == '% ёмкости':
+                continue
+            w.writerow(['== ' + sh['name'] + ' =='])
+            cells = sh['cells']
+            if not cells:
+                continue
+            mr = max(r for r, c in cells)
+            mc = max(c for r, c in cells)
+            for r in range(1, mr + 1):
+                line = []
+                for c in range(1, mc + 1):
+                    v = (cells.get((r, c)) or {}).get('v')
+                    if v is None:
+                        line.append('')
+                    elif isinstance(v, float):
+                        line.append(str(round(v, 2)).replace('.', ','))
+                    else:
+                        line.append(str(v))
+                w.writerow(line)
+            w.writerow([])
+        data = ('\ufeff' + sio.getvalue()).encode('utf-8')
+        resp = Response(data, mimetype='text/csv; charset=utf-8')
+        resp.headers['Content-Disposition'] = 'attachment; filename=' + fname + '.csv'
+        resp.headers['X-Export-Format'] = 'csv'
+        resp.headers['Access-Control-Expose-Headers'] = 'X-Export-Format'
         return resp
 
     def on_startup(**ctx):

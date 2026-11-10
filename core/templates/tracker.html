@@ -207,30 +207,8 @@
     </div>
     <!-- ============================== ЗАВЕРШЕННЫЕ ============================== -->
     <div class="tracker-panel{% if AT == 'completed' %} active{% endif %}" id="panel-completed">
-        <div class="sum-toolbar">
-            <label class="sum-filter" title="Банк"><span>🏢</span>
-                <select id="cmpDeptFilter"><option value="">Банки</option></select>
-            </label>
-            <label class="sum-filter" title="Куратор ЦА"><span>👤</span>
-                <select id="cmpCuratorFilter">
-                    <option value="">Куратор ЦА</option>
-                    <option value="Куратор1">Куратор1</option>
-                    <option value="Куратор2">Куратор2</option>
-                    <option value="Куратор3">Куратор3</option>
-                    <option value="нет">нет</option>
-                </select>
-            </label>
-            <label class="sum-filter tsk-search-wrap" title="Поиск по завершенным проверкам и задачам">
-                <span>🔍</span>
-                <input type="text" id="cmpSearchInput" placeholder="Поиск…" autocomplete="off">
-            </label>
-            <div class="segmented" id="cmpViewMode" style="margin-left:auto;">
-                <button class="active" data-mode="all_completed">Все завершенные</button>
-                <button data-mode="done">Завершена</button>
-                <button data-mode="cancelled">Отменена</button>
-            </div>
-        </div>
-        <div class="tasks-grid" id="completedFullList" data-cols="3"><div class="dict-empty">Загрузка...</div></div>
+        <div class="cmp-dev-note">🚧 Вкладка находится на этапе разработки</div>
+        <div class="cmp-simple" id="completedFullList"><div class="dict-empty">Загрузка...</div></div>
     </div>
     {% endif %}
     <!-- ============================== HEATMAP ============================== -->

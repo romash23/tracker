@@ -1721,39 +1721,22 @@ function renderTasksFull() {
 }
 
 function renderCompletedFull() {
+    /* Вкладка в разработке: только список завершённых проверок и дата завершения */
     var list = $('completedFullList'); if (!list) return;
-    var dept = $('cmpDeptFilter') ? ($('cmpDeptFilter').value || '') : '';
-    var curator = $('cmpCuratorFilter') ? ($('cmpCuratorFilter').value || '') : '';
-    var q = $('cmpSearchInput') ? ($('cmpSearchInput').value || '').trim().toLowerCase() : '';
-    var mode = state.cmpViewMode || 'all_completed';
-
-    var tasks = (state.tasks || []).filter(function(t) {
-        if (mode === 'done') return t.status === 'done';
-        if (mode === 'cancelled') return t.status === 'cancelled';
-        return t.status === 'done' || t.status === 'cancelled';
+    var tasks = (state.tasks || []).filter(function(t) { return t.status === 'done'; });
+    tasks.sort(function(a, b) {
+        var da = a.completed_at || '', db = b.completed_at || '';
+        if (da !== db) return da < db ? 1 : -1;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
     });
-    if (dept) tasks = tasks.filter(function(t) { return _taskMatchesDept(t, dept); });
-    if (curator) tasks = tasks.filter(function(t) { return (t.curator || 'нет') === curator; });
-    if (q) {
-        tasks = tasks.filter(function(t) {
-            var hay = [t.name || '', t.description || '', t.folder || '', t.order_ref || '', t.curator || ''].join(' ').toLowerCase();
-            return hay.indexOf(q) !== -1;
-        });
-    }
-    if (!tasks.length) {
-        list.innerHTML = '<div class="dict-empty">Нет завершенных задач по фильтру</div>';
-        return;
-    }
-    var html = '';
-    tasks.forEach(function(t) { html += taskCardRowGrid(t); });
-    list.className = 'tasks-grid tsk-auto-cols';
-    list.removeAttribute('data-cols');
-    list.setAttribute('data-compact', '1');
-    list.style.maxHeight = 'none';
-    list.style.display = 'grid';
+    if (!tasks.length) { list.innerHTML = '<div class="dict-empty">Завершённых проверок нет</div>'; return; }
+    var html = '<div class="cmp-simple-head"><span>Проверка</span><span>Дата завершения</span></div>';
+    tasks.forEach(function(t) {
+        var d = t.completed_at ? String(t.completed_at).slice(0, 10).split('-').reverse().join('.') : '—';
+        html += '<div class="cmp-simple-row"><span class="cmp-simple-name" title="' + escapeHtml(t.name || '') + '">' + escapeHtml(t.name || '') + '</span>'
+            + '<span class="cmp-simple-date">' + escapeHtml(d) + '</span></div>';
+    });
     list.innerHTML = html;
-    window.trkApplyAutoCols(list);
-    bindTaskCardActions(list, '.task-card');
 }
 window.renderCompletedFull = renderCompletedFull;
 
@@ -1801,7 +1784,7 @@ function fillDepartmentFilters() {
     var deps = (state.departments || []).slice().sort(function(a, b) {
         return String(a.name || '').toLowerCase().localeCompare(String(b.name || '').toLowerCase(), 'ru');
     });
-    ['calDeptFilter','hmDeptFilter','sumDeptFilter','stDeptFilter','tskDeptFilter','cmpDeptFilter'].forEach(function(elId) {
+    ['calDeptFilter','hmDeptFilter','sumDeptFilter','stDeptFilter','tskDeptFilter'].forEach(function(elId) {
         var sel = $(elId); if (!sel) return;
         var cur = sel.value;
         var defLbl = (elId === 'tskDeptFilter' || elId === 'cmpDeptFilter') ? 'Банки' : 'Отделы';
@@ -5128,9 +5111,6 @@ on('tskSortSelect', 'change', renderTasksFull);
         renderTasksFull();
     });
 })();
-on('cmpDeptFilter', 'change', renderCompletedFull);
-on('cmpCuratorFilter', 'change', renderCompletedFull);
-on('cmpSearchInput', 'input', renderCompletedFull);
 
 on('tskGridCols', 'change', function() {
     var v = parseInt(this.value, 10) || 3;
@@ -5220,8 +5200,6 @@ setupSegmented('sumTaskRowMode', state.sumTaskRowMode || 'full', function(mode) 
     if (state.summaryIsGrid && state.summary) renderSummaryGrid();
 });
 setupSegmented('tskViewMode', state.tskViewMode, function(mode) { state.tskViewMode = mode; renderTasksFull(); });
-state.cmpViewMode = 'all_completed';
-setupSegmented('cmpViewMode', state.cmpViewMode, function(mode) { state.cmpViewMode = mode; renderCompletedFull(); });
 
 /* ============================================================
    СТАРТ
