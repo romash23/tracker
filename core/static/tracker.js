@@ -3689,6 +3689,12 @@ function _thEvent(e) {
     } else if (e.kind === 'task_auto_activate') {
         icon = '▶️'; title = 'Автоматически переведена в «' + escapeHtml(_thStatus('active')) + '»'; cls = 'th-status';
         lines.push('наступила дата начала');
+    } else if (e.kind === 'load_override') {
+        icon = '✎'; title = 'Нагрузка задана вручную («Текущая загрузка»)'; cls = 'th-extend';
+        (d.items || []).forEach(function(it) {
+            var fmt = function(v) { return v == null ? 'расчёт' : String(v).replace('.', ','); };
+            lines.push(escapeHtml(it.bank_name || it.bank || '') + ', неделя с ' + _thVal('deadline', it.week) + ': ' + fmt(it.from) + ' → ' + fmt(it.to));
+        });
     } else if (e.kind === 'merge') {
         icon = '🔗'; title = 'Объединена с другими задачами';
         if ((d.merged_ids || []).length) lines.push('Присоединено задач: ' + d.merged_ids.length);
@@ -18144,7 +18150,7 @@ function buildGanttTab(){
     var btn = document.createElement('button');
     btn.className = 'tracker-tab';
     btn.setAttribute('data-tab-plugin', 'gantt');
-    btn.innerHTML = '<span>📅</span><span>Текущие проверки</span>';
+    btn.innerHTML = '<span>📅</span><span>Текущая загрузка</span>';
     btn.addEventListener('click', function(e){
         e.preventDefault();
         e.stopPropagation();

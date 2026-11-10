@@ -225,7 +225,7 @@ function register(){
     window.__trkRegisterPlugin({
         id: 'gantt',
         icon: '📊',
-        name: 'Текущие проверки',
+        name: 'Текущая загрузка',
         url: '/plugins/gantt/',
         perm: 'plugin.gantt.use'
     });
@@ -245,7 +245,7 @@ def _page_html():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Текущие проверки</title>
+<title>Текущая загрузка</title>
 <script src="/static/plugin_theme.js"></script>
 <script src="/static/plugin_mask.js"></script>
 <style>
@@ -754,7 +754,7 @@ body.trk-theme-light .gg-seg button:hover { color: #111; }
 body.trk-theme-light .gg-seg button.active { background: #ffffff; color: #111; font-weight: 700; box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.16); }
 /* Отображение: «Проверки» прячет нагрузку, «Банки» прячет Гант */
 body.gg-show-tasks #banksTitle, body.gg-show-tasks #banksBox { display: none !important; }
-body.gg-show-banks #ganttBox, body.gg-show-banks #ggLegend { display: none !important; }
+body.gg-show-banks #ganttBox, body.gg-show-banks #ggLegend, body.gg-show-banks #tasksTitle { display: none !important; }
 
 /* --- Вторая таблица: нагрузка по тер банкам --- */
 .banks-title {
@@ -948,7 +948,7 @@ body.trk-theme-light .gg-neg { color: #c62828; }
 .gg-xls-btn:disabled { opacity: .6; cursor: wait; }
 body.trk-theme-light .gg-plan-tgl { color: #4b5563; }
 body.trk-theme-light .gg-xls-btn { color: #14532d; background: #ecfdf3; border-color: #86d6a6; }
-body.gg-show-tasks #ggLoadBar, body.gg-show-tasks #ggKpi { display: none !important; }
+/* плашка статистики видна во всех режимах */
 .gg-kpi { margin: 0 4px 8px; }
 .gg-kpi-cards { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 8px; }
 .gg-kpi-card { border: 1px solid var(--pg-card-border-soft, rgba(255,255,255,0.10)); background: var(--pg-card-bg, #1a1a1a); border-radius: 10px; padding: 8px 12px; }
@@ -987,6 +987,44 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
 .gg-lp-man-hint { font-size: 0.72rem; color: var(--pg-meta, #a0a0a0); margin-top: 5px; }
 .gg-flash { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30000; background: #fff; color: #14532d; border: 3px solid #2e7d32; border-radius: 12px; padding: 14px 24px; font-weight: 700; box-shadow: 0 10px 40px rgba(0,0,0,0.35); display: none; }
 .gg-flash.bad { color: #7f1d1d; border-color: #c62828; }
+
+/* Таблица проверок в 2 раза ниже (компактно) */
+#ganttBox .gg-mode-week .gg-row, #ganttBox .gg-mode-week .gg-track { height: 35px; }
+#ganttBox .gg-mode-day .gg-row, #ganttBox .gg-mode-day .gg-track { height: 22px; }
+#ganttBox .gg-mode-day .gg-bar { height: 16px; border-radius: 5px; padding: 0 8px; font-size: 0.72rem; }
+#ganttBox .gg-wk-cell, #ganttBox .gg-mo-cell { top: 3px; bottom: 3px; }
+#ganttBox .gg-wk-cell .gg-wk-load-c { bottom: auto; top: 50%; transform: translateY(-50%); font-size: 0.66rem; }
+#ganttBox .gg-bank-cell { top: 3px; bottom: 3px; font-size: 0.7rem; }
+#ganttBox .gg-mode-day .gg-bank-cell { top: 2px; bottom: 2px; font-size: 0.62rem; }
+#ganttBox .gg-mode-day .gg-edit { font-size: 0.72rem; padding: 0 4px; line-height: 1.2; }
+#ganttBox .gg-mode-day .gg-task-name { font-size: 0.76rem; }
+#tasksTitle { margin-top: 10px; }
+/* ручная правка нагрузки по проверке */
+body.gg-can-ov #ganttBox .gg-task-row .gg-track, body.gg-can-ov #ganttBox .gg-sub-row .gg-track { cursor: cell; }
+#ganttBox .gg-wk-cell.gg-man, #ganttBox .gg-bank-cell.gg-man, #ganttBox .gg-mo-cell.gg-man { outline: 2px solid #3949ab; outline-offset: -2px; }
+#ganttBox .gg-wk-cell.gg-man::after, #ganttBox .gg-bank-cell.gg-man::after { content: '✎'; position: absolute; right: 1px; top: 0; font-size: 9px; color: #fff; background: #3949ab; border-radius: 50%; width: 11px; height: 11px; line-height: 11px; text-align: center; }
+.gg-tov { max-width: 560px; width: 100%; }
+.gg-tov-sub { font-size: 0.8rem; color: var(--pg-meta, #a0a0a0); margin: -4px 0 10px; }
+.gg-tov-row { display: grid; grid-template-columns: 1fr 90px 90px 28px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(160,160,160,0.18); font-size: 0.85rem; }
+.gg-tov-row.h { font-weight: 700; font-size: 0.74rem; color: var(--pg-meta, #a0a0a0); }
+.gg-tov-row input { width: 80px; padding: 4px 6px; border-radius: 6px; border: 1px solid rgba(160,160,160,0.6); background: transparent; color: inherit; font: inherit; }
+.gg-tov-row input.man { border-color: #3949ab; box-shadow: 0 0 0 1px #3949ab; }
+.gg-tov-rs { cursor: pointer; border: none; background: transparent; color: inherit; font-size: 0.95rem; opacity: .7; }
+.gg-tov-rs:hover { opacity: 1; }
+.gg-tov-hint { font-size: 0.74rem; color: var(--pg-meta, #a0a0a0); margin-top: 8px; }
+.gg-lp-ov-btn { margin-top: 4px; border: 1px solid rgba(92,107,192,0.7); background: rgba(92,107,192,0.15); color: inherit; border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 0.74rem; cursor: pointer; }
+.gg-lp-ov-btn:hover { background: rgba(92,107,192,0.3); }
+.gg-cf-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 2600; }
+.gg-cf-box { background: #fff; color: #13351a; border: 3px solid #2e7d32; border-radius: 14px; padding: 18px 22px; max-width: 560px; width: calc(100% - 40px); max-height: 80vh; overflow: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+.gg-cf-box h3 { margin: 0 0 10px; font-size: 1rem; }
+.gg-cf-box ul { margin: 0 0 12px; padding-left: 18px; font-size: 0.86rem; line-height: 1.45; }
+.gg-cf-q { font-weight: 700; margin: 6px 0 12px; }
+.gg-cf-act { display: flex; gap: 10px; justify-content: flex-end; }
+.gg-cf-act button { border-radius: 8px; padding: 6px 18px; font: inherit; font-weight: 700; cursor: pointer; border: 1px solid #2e7d32; }
+.gg-cf-yes { background: #2e7d32; color: #fff; }
+.gg-cf-no { background: #fff; color: #2e7d32; }
+body:not(.trk-theme-light) .gg-cf-box { background: #1d241e; color: #e6efe7; }
+body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; }
 /* шаг «Месяцы» */
 .gg-mode-week .gg-mo-cell { position: absolute; top: 4px; bottom: 4px; border-radius: 4px; overflow: hidden; display: flex; }
 .gg-mo-cell > i { flex: 1 1 0; height: 100%; display: block; }
@@ -998,7 +1036,7 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
     <div class="head">
         <div class="head-top">
             <a class="back" href="/">← К трекеру</a>
-            <h1>📅 Текущие проверки</h1>
+            <h1>📅 Текущая загрузка</h1>
         </div>
         <div class="head-filters">
             <div class="ms-dd-group" id="fKindGroup">
@@ -1047,28 +1085,13 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
                 <button type="button" data-v="розничная_без_пвр">Розничное без ПВР</button>
             </div>
             <div class="gg-seg" id="ggShowSeg" role="group" aria-label="Отображение">
-                <button type="button" data-v="tasks">Проверки</button>
                 <button type="button" data-v="banks">Банки</button>
+                <button type="button" data-v="tasks">Проверки</button>
                 <button type="button" data-v="all">Все</button>
             </div>
         </div>
     </div>
-    <div class="gantt-box" id="ganttBox">
-        <div class="loading">Загрузка…</div>
-    </div>
-    <div class="gg-slider-wrap" id="ggSliderWrap" style="display:none;">
-        <input type="range" id="ggSlider" min="0" max="1000" value="0" step="1">
-    </div>
-    <div class="legend" id="ggLegend">
-        <div class="it"><span class="sw active"></span>В работе</div>
-        <div class="it"><span class="sw done"></span>Готово</div>
-        <div class="it"><span class="sw paused"></span>Приостановлено</div>
-        <div class="it"><span class="sw overdue"></span>Просрочено</div>
-        <div class="it"><span class="sw archived"></span>Архив</div>
-        <div class="it" style="margin-left:auto;font-style:italic;">Сегодняшний день выделен зелёным</div>
-    </div>
-    <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по ТБ</div>
-    <div class="gg-load-bar" id="ggLoadBar" style="display:none;">
+    <div class="gg-load-bar" id="ggLoadBar">
         <div class="gg-seg" id="ggMetricSeg" role="group" aria-label="Показатель">
             <button type="button" data-v="load">Загрузка</button>
             <button type="button" data-v="free">Свободно</button>
@@ -1082,6 +1105,10 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
         <button type="button" class="gg-xls-btn" id="ggXlsBtn" title="Выгрузить таблицу в Excel">⬇ Excel</button>
     </div>
     <div class="gg-kpi" id="ggKpi" style="display:none;"></div>
+    <div class="gg-slider-wrap" id="ggSliderWrap" style="display:none;">
+        <input type="range" id="ggSlider" min="0" max="1000" value="0" step="1">
+    </div>
+    <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по ТБ</div>
     <div class="gantt-box" id="banksBox" style="display:none;">
         <div class="loading">Загрузка…</div>
     </div>
@@ -1097,6 +1124,18 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
         <span class="it"><span class="sw gg-plan-sw"></span>есть предварительные</span>
         <span class="it"><span class="sw gg-man-sw">✎</span>задано вручную</span>
         <span class="gg-ll-note">Ёмкость = экспертный коэффициент × нормативная численность. Наведите на ячейку — подробности, клик — список проверок.</span>
+    </div>
+    <div class="banks-title" id="tasksTitle">Проверки</div>
+    <div class="gantt-box" id="ganttBox">
+        <div class="loading">Загрузка…</div>
+    </div>
+    <div class="legend" id="ggLegend">
+        <div class="it"><span class="sw active"></span>В работе</div>
+        <div class="it"><span class="sw done"></span>Готово</div>
+        <div class="it"><span class="sw paused"></span>Приостановлено</div>
+        <div class="it"><span class="sw overdue"></span>Просрочено</div>
+        <div class="it"><span class="sw archived"></span>Архив</div>
+        <div class="it" style="margin-left:auto;font-style:italic;">Сегодняшний день выделен зелёным</div>
     </div>
     <div class="gg-modal-mask" id="ggTaskMask">
     <div class="gg-modal" role="dialog" aria-modal="true" aria-labelledby="ggTaskTitle">
@@ -1244,6 +1283,8 @@ function leadCoef(task, bankId) {
 }
 /* Нагрузка задачи в неделю для КОНКРЕТНОГО банка (с учётом коэффициента). */
 function taskBankLoadAtMonday(task, bankId, mon) {
+    var _ov = ggTovGet(task.id, bankId, mondayOf(mon));
+    if (_ov != null) return _ov;
     var st = stageAtMonday(task.stages, mon);
     if (!st) return 0;
     var wt = (st.weight != null ? st.weight : 1);
@@ -1255,6 +1296,28 @@ function round2(v) { return Math.round(v * 100) / 100; }
 var ggExpanded = {};
 var ggDeptNames = {};
 var ggHolidays = {};
+/* Ручные правки нагрузки по конкретной проверке: ключ task|bank|понедельник */
+var ggTaskOv = {}, ggTaskOvAny = {}, ggTasksById = {}, ggCanOv = false;
+function ggTovGet(tid, did, mon) { var k = tid + '|' + did + '|' + mon; return ggTaskOv.hasOwnProperty(k) ? ggTaskOv[k] : null; }
+function ggTovAny(tid, mon) { return !!ggTaskOvAny[tid + '|' + mon]; }
+/* Расчётная нагрузка проверки на банк в неделю (без ручной правки) */
+function ggTaskCalcAt(t, did, mon) {
+    if ((t.task_kind || 'audit') === 'other') {
+        var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
+        if (lc <= 0) return 0;
+        if (t.start_date && mon < mondayOf(t.start_date)) return 0;
+        if (t.deadline && mon > t.deadline) return 0;
+        return lc;
+    }
+    var st = stageAtMonday(t.stages, mon);
+    if (!st) return 0;
+    return (st.weight != null ? +st.weight : 1) * leadCoef(t, did);
+}
+function ggPeriodWeeks(mode, p) {
+    if (mode === 'week') return [p.mon];
+    if (mode === 'month') return (p.mons || []).slice();
+    return [mondayOf(p)];
+}
 var ggTaskState = { loaded:false, tasksById:{}, employees:[], departments:[] };
 var ggTaskCurrent = null;
 var GG_STAGE_ORDER = ['подготовка','проверка_нжя','проверка_соглЦА','ос_проф','реализация_возражения','реализация_согласования','запас','оценка_тб'];
@@ -1287,7 +1350,7 @@ function participantRowsHtml(t, periods, mode, trackW, cellW) {
     ordered.forEach(function(did) {
         var isLead = (did === lead);
         var nm = ggDeptNames[did] || did;
-        html += '<div class="gg-row gg-sub-row' + (isLead ? ' gg-sub-lead' : '') + '">';
+        html += '<div class="gg-row gg-sub-row' + (isLead ? ' gg-sub-lead' : '') + '" data-tid="' + esc(t.id) + '" data-bank="' + esc(did) + '">';
         html +=   '<div class="gg-name gg-sub-name">';
         html +=     '<span class="gg-sub-bullet">•</span>';
         html +=     '<span class="gg-task-name" title="' + esc(nm) + '">' + esc(nm) + '</span>';
@@ -1300,9 +1363,10 @@ function participantRowsHtml(t, periods, mode, trackW, cellW) {
             if (v <= 0) return;
             var txt = round2(v).toString();
             var lvl = v >= 3 ? 3 : (v < 2 ? 1 : 2);
-            html += '<div class="gg-bank-cell lvl' + lvl + '" style="left:' + (i * cellW + 2) +
+            var _isMan = ggTovGet(t.id, did, mondayOf(mon)) != null;
+            html += '<div class="gg-bank-cell lvl' + lvl + (_isMan ? ' gg-man' : '') + '" style="left:' + (i * cellW + 2) +
                     'px;width:' + (cellW - 4) + 'px" title="' + esc(nm) +
-                    (isLead ? ' 👑' : '') + ' · нагрузка ' + txt + '">' + txt + '</div>';
+                    (isLead ? ' 👑' : '') + ' · нагрузка ' + txt + (_isMan ? ' · ✎ задано вручную' : '') + '">' + txt + '</div>';
         });
         html +=   '</div>';
         html += '</div>';
@@ -1568,6 +1632,11 @@ function render(d) {
     window.__ggLastData = d;
     ggDeptNames = d.dept_names || {};
     ggHolidays = d.holidays || {};
+    ggTaskOv = {}; ggTaskOvAny = {}; ggTasksById = {};
+    (d.task_overrides || []).forEach(function(o) { ggTaskOv[o.task + '|' + o.bank + '|' + o.week] = +o.value || 0; ggTaskOvAny[o.task + '|' + o.week] = 1; });
+    (d.tasks || []).forEach(function(t) { ggTasksById[t.id] = t; });
+    ggCanOv = !!d.can_override;
+    document.body.classList.toggle('gg-can-ov', ggCanOv);
     var view = document.getElementById('fView').value;
     if (view === 'week') { renderWeek(d); }
     else if (view === 'month') { renderMonth(d); }
@@ -1829,7 +1898,7 @@ function renderWeek(d) {
             var wt = (st.weight != null ? st.weight : 1);
             var wtTxt = round2(wt).toString();
             var ttl = (STAGE_LABELS[st.key] || st.key) + ' · неделя ' + fmtD(w.mon) + '–' + fmtD(w.sun) + ' · нагрузка ' + wtTxt;
-            html += '<div class="gg-wk-cell" style="left:' + (i * WEEK_W + 2) + 'px;width:' + (WEEK_W - 4) + 'px;background:' + col + '" title="' + esc(ttl) + '">' +
+            html += '<div class="gg-wk-cell' + (ggTovAny(t.id, w.mon) ? ' gg-man' : '') + '" style="left:' + (i * WEEK_W + 2) + 'px;width:' + (WEEK_W - 4) + 'px;background:' + col + '" title="' + esc(ttl) + '">' +
                     '<span class="gg-wk-load-c">' + wtTxt + '</span></div>';
         });
         html +=   '</div>';
@@ -1910,7 +1979,7 @@ function renderMonth(d) {
                 else parts.push('<i></i>');
             });
             if (!any) return;
-            html += '<div class="gg-mo-cell" style="left:' + (i * MONTH_W + 2) + 'px;width:' + (MONTH_W - 4) + 'px" title="' + esc(ttl.join('\n')) + '">' + parts.join('') + '</div>';
+            html += '<div class="gg-mo-cell' + (p.mons.some(function(mn) { return ggTovAny(t.id, mn); }) ? ' gg-man' : '') + '" style="left:' + (i * MONTH_W + 2) + 'px;width:' + (MONTH_W - 4) + 'px" title="' + esc(ttl.join('\n')) + '">' + parts.join('') + '</div>';
         });
         html += '</div></div>';
     });
@@ -1976,6 +2045,7 @@ function ggAddDays(iso, n) {
 }
 
 function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
+    window.__ggPer = { mode: mode, periods: periods, cellW: cellW };
     var titleEl = document.getElementById('banksTitle');
     var box = document.getElementById('banksBox');
     var legend = document.getElementById('banksLegend');
@@ -2025,13 +2095,18 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
     /* load[bankId][i] и вклад каждой задачи contrib[bankId][i] */
     var load = {}, contrib = {}, plan = {}, manual = {}, calc = {};
     var ovMap = {};
-    (d.overrides || []).forEach(function(o) { ovMap[o.bank + '|' + o.week] = +o.value || 0; });
+    /* правки на уровне банка отключены: нагрузку меняют только по конкретной проверке */
     banks.forEach(function(b) {
         load[b.id] = []; contrib[b.id] = []; plan[b.id] = []; manual[b.id] = []; calc[b.id] = [];
         for (var i = 0; i < periods.length; i++) { load[b.id].push(0); contrib[b.id].push([]); plan[b.id].push(0); manual[b.id].push(false); calc[b.id].push(0); }
     });
     /* вклад проверки в банк на дату day (понедельник недели / день) */
     function ggContribAt(t, did, day) {
+        var _ov = ggTovGet(t.id, did, (isWeek || isMonth) ? day : mondayOf(day));
+        if (_ov != null) {
+            var _st = stageAtMonday(t.stages, day);
+            return { base: _ov, k: 1, man: true, stLbl: (_st ? (SL[_st.key] || _st.key) : 'вне этапов') + ' · ✎ вручную' };
+        }
         var isOther = (t.task_kind || 'audit') === 'other';
         if (isOther) {
             var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
@@ -2053,21 +2128,23 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
             var div = isMonth ? (p.mons.length || 1) : 1;
             dids.forEach(function(did) {
                 if (!load[did]) return;
-                var sum = 0, first = null, wk = 0;
+                var sum = 0, first = null, wk = 0, anyMan = false;
                 days.forEach(function(day) {
                     var c = ggContribAt(t, did, day);
                     if (!c) return;
+                    if (c.man) anyMan = true;
                     var v = c.base * c.k;
                     if (!(v > 0)) return;
                     sum += v; wk++;
                     if (!first) first = c;
                 });
+                if (anyMan) manual[did][i] = true;
                 if (!(sum > 0)) return;
                 var v = sum / div;
                 load[did][i] += v;
                 if (t.status === 'planning') plan[did][i] += v;
                 contrib[did][i].push({ task: t, bank: did, stage: first.stLbl + (isMonth ? ' (' + wk + ' из ' + div + ' нед.)' : ''),
-                    weight: first.base, coef: first.k, lead: (t.lead_department || '') === did, value: v });
+                    weight: first.base, coef: first.k, lead: (t.lead_department || '') === did, value: v, man: anyMan });
             });
         });
     });
@@ -2114,7 +2191,7 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
     var totRow = { id: '__total', name: totName, cap: capOf(isFact ? d.total_capacity_fact : d.total_capacity), load: totLoad, contrib: totContrib, plan: totPlan, manual: totMan, calc: totCalc, total: true };
     rows.push(totRow);
     ggLoadModel = { rows: rows, pinfo: pinfo, tasks: tasks, isWeek: isWeek, isMonth: isMonth, mode: mode, dirs: dirs,
-                    canOv: !!d.can_override && isWeek, scope: d.ov_scope || 'oam', today: today };
+                    canOv: !!d.can_override, periods: periods, scope: d.ov_scope || 'oam', today: today };
 
     var html = '<div class="gantt-inner gg-mode-' + ((isWeek || isMonth) ? 'week' : 'day') + ' gg-load-tbl">';
     html += '<div class="gg-header"' + ((isWeek || isMonth) ? ' style="height:70px;"' : '') + '>';
@@ -2189,9 +2266,10 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
             if (pi.offWeek) cls += ' gg-offweek';
             if (!pi.offDay && r.plan && r.plan[i] > 0) cls += ' gg-has-plan';
             if (r.manual && r.manual[i] && !r.total) cls += ' gg-man';
+            /* итог: тоже без рамки ручной правки */
             var txt = pi.offDay ? '' : ggCellText(v, r.cap);
             if (ggMetric === 'free' && r.cap != null && r.cap - v < 0 && !pi.offDay) cls += ' gg-neg-free';
-            var fh = (ggLoadModel.canOv && !r.total && !pi.offDay) ? '<span class="gg-fill-h" title="Протяните, чтобы скопировать значение на соседние недели"></span>' : '';
+            var fh = false ? '<span class="gg-fill-h" title="Протяните, чтобы скопировать значение на соседние недели"></span>' : '';
             html += '<div class="' + cls + '" data-lrow="' + ri + '" data-lidx="' + i + '" style="left:' + (i * cellW + 2) + 'px;width:' + (cellW - 4) + 'px">' + txt + fh + '</div>';
         });
         html +=   '</div>';
@@ -2217,7 +2295,7 @@ function ggCellText(v, cap) {
 }
 function ggShowLoadBar(on) {
     var bar = document.getElementById('ggLoadBar'), k = document.getElementById('ggKpi');
-    if (bar) bar.style.display = on ? 'flex' : 'none';
+    if (bar) bar.style.display = 'flex';
     if (k && !on) { k.style.display = 'none'; k.innerHTML = ''; }
     if (on) { ggLoadBarSync(); ggRenderKpi(); }
 }
@@ -2357,6 +2435,131 @@ document.addEventListener('mouseup', function() {
     for (var k = a; k <= b; k++) { if (k !== f.from) weeks.push(m.pinfo[k].start); }
     ggOvSave(r.id, weeks, f.value);
 });
+
+/* ===== Ручная правка нагрузки по конкретной проверке ===== */
+function ggPerLabel(mode, p) {
+    if (mode === 'week') return 'неделя ' + fmtD(p.mon) + '–' + fmtD(p.sun);
+    if (mode === 'month') return MONTH_NAMES[p.mi] + ' ' + p.yr;
+    return fmtD(p) + ' (неделя с ' + fmtD(mondayOf(p)) + ')';
+}
+function ggConfirm(title, lines, onYes) {
+    var mk = document.createElement('div'); mk.className = 'gg-cf-mask'; mk.id = 'ggConfirm';
+    mk.innerHTML = '<div class="gg-cf-box" role="dialog" aria-modal="true"><h3>' + esc(title) + '</h3><ul>'
+        + lines.map(function(l) { return '<li>' + l + '</li>'; }).join('') + '</ul>'
+        + '<div class="gg-cf-q">Уверены, что хотите внести данные изменения?</div>'
+        + '<div class="gg-cf-act"><button type="button" class="gg-cf-no">Нет</button><button type="button" class="gg-cf-yes">Да</button></div></div>';
+    document.body.appendChild(mk);
+    function close() { document.removeEventListener('keydown', onKey, true); mk.remove(); }
+    function onKey(ev) { if (ev.key === 'Escape') { ev.stopPropagation(); close(); } }
+    document.addEventListener('keydown', onKey, true);
+    mk.addEventListener('click', function(ev) { if (ev.target === mk) close(); });
+    mk.querySelector('.gg-cf-no').addEventListener('click', close);
+    mk.querySelector('.gg-cf-yes').addEventListener('click', function() { close(); onYes(); });
+    mk.querySelector('.gg-cf-yes').focus();
+}
+function ggTovOpen(tid, banks, mode, p) {
+    var t = ggTasksById[tid]; if (!t || !ggCanOv) return;
+    banks = (banks && banks.length ? banks : (t.dept_ids || [])).filter(Boolean);
+    if (!banks.length) { ggFlash('❌ У проверки нет банков', true); return; }
+    var weeks = ggPeriodWeeks(mode, p);
+    var old = document.getElementById('ggTovMask'); if (old) old.remove();
+    var mk = document.createElement('div'); mk.className = 'gg-modal-mask open'; mk.id = 'ggTovMask';
+    var h = '<div class="gg-modal gg-tov" role="dialog" aria-modal="true"><div class="gg-modal-head"><div class="gg-modal-title">✎ Нагрузка по проверке</div>'
+        + '<button type="button" class="gg-modal-close" id="ggTovClose">✕</button></div><div class="gg-modal-body">'
+        + '<div class="gg-tov-sub"><b>' + esc((t.icon ? t.icon + ' ' : '') + t.name) + '</b> · ' + esc(ggPerLabel(mode, p)) + '</div>'
+        + '<div class="gg-tov-row h"><span>Банк · неделя</span><span>Расчёт</span><span>Значение</span><span></span></div>';
+    banks.forEach(function(did) {
+        weeks.forEach(function(mon) {
+            var calc = ggTaskCalcAt(t, did, mon), ov = ggTovGet(tid, did, mon);
+            var cur = (ov != null ? ov : calc);
+            h += '<div class="gg-tov-row" data-bank="' + esc(did) + '" data-week="' + mon + '">'
+               + '<span>' + esc(ggDeptNames[did] || did) + ((t.lead_department || '') === did ? ' 👑' : '') + (weeks.length > 1 || mode === 'day' ? ' · ' + fmtD(mon) : '') + '</span>'
+               + '<span>' + ggNum(calc) + '</span>'
+               + '<span><input type="text" inputmode="decimal" value="' + ggNum(cur) + '" data-calc="' + calc + '" data-ov="' + (ov != null ? ov : '') + '"' + (ov != null ? ' class="man"' : '') + '></span>'
+               + '<span>' + (ov != null ? '<button type="button" class="gg-tov-rs" title="Вернуть расчёт">↺</button>' : '') + '</span></div>';
+        });
+    });
+    h += '<div class="gg-tov-hint">Значение — нагрузка этой проверки на банк за неделю (вес этапа × коэффициент роли). Ручное значение заменяет расчёт только для этой проверки.</div>'
+       + '<div class="gg-modal-actions"><button type="button" class="gg-btn" id="ggTovCancel">Отмена</button><button type="button" class="gg-btn gg-btn-primary" id="ggTovSave">Сохранить</button></div></div></div>';
+    mk.innerHTML = h;
+    document.body.appendChild(mk);
+    function close() { mk.remove(); }
+    mk.addEventListener('click', function(ev) { if (ev.target === mk) close(); });
+    mk.querySelector('#ggTovClose').addEventListener('click', close);
+    mk.querySelector('#ggTovCancel').addEventListener('click', close);
+    Array.prototype.forEach.call(mk.querySelectorAll('.gg-tov-rs'), function(b) {
+        b.addEventListener('click', function() {
+            var inp = b.closest('.gg-tov-row').querySelector('input');
+            inp.value = ggNum(+inp.getAttribute('data-calc')); inp.setAttribute('data-reset', '1'); inp.classList.remove('man'); b.remove();
+        });
+    });
+    mk.querySelector('#ggTovSave').addEventListener('click', function() {
+        var items = [], lines = [], bad = false;
+        Array.prototype.forEach.call(mk.querySelectorAll('.gg-tov-row[data-bank]'), function(row) {
+            var inp = row.querySelector('input');
+            var calc = +inp.getAttribute('data-calc');
+            var ovs = inp.getAttribute('data-ov'), ov = ovs === '' ? null : +ovs;
+            var raw = String(inp.value).trim().replace(',', '.');
+            var v = raw === '' ? null : parseFloat(raw);
+            if (raw !== '' && (!(v >= 0) || v > 100)) { inp.style.borderColor = '#e53935'; bad = true; return; }
+            var did = row.getAttribute('data-bank'), mon = row.getAttribute('data-week');
+            var nm = esc(ggDeptNames[did] || did) + ' · ' + fmtD(mon);
+            var cur = (ov != null ? ov : calc);
+            if (inp.getAttribute('data-reset') === '1' || v == null) {
+                if (ov != null) { items.push({ bank: did, week: mon, value: null }); lines.push(nm + ': ' + ggNum(ov) + ' → расчёт ' + ggNum(calc)); }
+                return;
+            }
+            v = Math.round(v * 100) / 100;
+            if (Math.abs(v - cur) < 0.005) return;
+            if (ov == null && Math.abs(v - calc) < 0.005) return;
+            items.push({ bank: did, week: mon, value: v });
+            lines.push(nm + ': ' + ggNum(cur) + ' → <b>' + ggNum(v) + '</b> (вручную)');
+        });
+        if (bad) return;
+        if (!items.length) { ggFlash('Изменений нет'); return; }
+        ggConfirm('Нагрузка по проверке «' + t.name + '»', lines, function() {
+            var hd = { 'Content-Type': 'application/json' };
+            if (window.__ggCsrf) hd['X-CSRF-Token'] = window.__ggCsrf;
+            fetch('/api/plugins/gantt/task_override', { method: 'POST', credentials: 'same-origin', headers: hd,
+                body: JSON.stringify({ task_id: tid, items: items }) })
+                .then(function(r) { return r.json().catch(function() { return { success: false, error: 'HTTP ' + r.status }; }); })
+                .then(function(d) {
+                    if (!d || !d.success) { ggFlash('❌ Не сохранено: ' + ((d && d.error) || 'ошибка'), true); return; }
+                    close(); ggLoadPanelClose();
+                    ggFlash('✅ Нагрузка по проверке сохранена (' + items.length + ')');
+                    ggReload();
+                })
+                .catch(function() { ggFlash('❌ Ошибка соединения', true); });
+        });
+    });
+    var f = mk.querySelector('.gg-tov-row input'); if (f) { f.focus(); f.select(); }
+}
+/* Кнопка в боковой панели «Нагрузки по ТБ» */
+document.addEventListener('click', function(ev) {
+    var b = ev.target.closest ? ev.target.closest('.gg-lp-ov-btn[data-tov-tid]') : null;
+    if (!b || !ggLoadModel) return;
+    var pi = +b.getAttribute('data-tov-pi');
+    ggTovOpen(b.getAttribute('data-tov-tid'), (b.getAttribute('data-tov-banks') || '').split(','), ggLoadModel.mode, ggLoadModel.periods[pi]);
+});
+/* Клик по ячейке в таблице проверок (строка проверки — все банки, строка банка — один банк) */
+document.addEventListener('click', function(ev) {
+    if (!ggCanOv || !window.__ggPer) return;
+    var tr = ev.target.closest ? ev.target.closest('#ganttBox .gg-track') : null;
+    if (!tr) return;
+    var row = tr.closest('.gg-row[data-tid]'); if (!row) return;
+    var per = window.__ggPer;
+    var x = ev.clientX - tr.getBoundingClientRect().left;
+    var i = Math.floor(x / per.cellW);
+    if (i < 0 || i >= per.periods.length) return;
+    var tid = row.getAttribute('data-tid'), t = ggTasksById[tid]; if (!t) return;
+    var p = per.periods[i];
+    if (per.mode === 'day' && isOffDay(p)) return;
+    var weeks = ggPeriodWeeks(per.mode, p);
+    var inTask = weeks.some(function(mon) { return mon <= (t.deadline || '9999') && isoAddDays(mon, 6) >= (t.start_date || ''); });
+    if (!inTask) return;
+    var bank = row.getAttribute('data-bank');
+    ggTovOpen(tid, bank ? [bank] : null, per.mode, p);
+});
 /* Выгрузка в Excel */
 function ggExportXls() {
     var m = ggLoadModel; if (!m) return;
@@ -2377,13 +2580,20 @@ function ggExportXls() {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Excel'; }
     fetch('/api/plugins/gantt/export', { method: 'POST', credentials: 'same-origin', headers: h, body: JSON.stringify(payload) })
         .then(function(r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.blob();
+            if (!r.ok) return r.text().then(function(tx) {
+                var msg = 'HTTP ' + r.status;
+                try { var j = JSON.parse(tx); if (j && j.error) msg += ' · ' + j.error; } catch (e) {}
+                throw new Error(msg);
+            });
+            var ext = (r.headers.get('X-Export-Format') === 'csv') ? 'csv' : 'xlsx';
+            return r.blob().then(function(b) { return { blob: b, ext: ext }; });
         })
-        .then(function(blob) {
+        .then(function(res) {
+            var blob = res.blob;
             var a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'Нагрузка_по_ТБ_' + (m.today || '').replace(/-/g, '') + '.xlsx';
+            a.download = 'Нагрузка_по_ТБ_' + (m.today || '').replace(/-/g, '') + '.' + res.ext;
+            if (res.ext === 'csv') ggFlash('⚠ На сервере не удалось собрать .xlsx, выгружен CSV. Подробности в окне сервера.', true);
             document.body.appendChild(a); a.click();
             setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
         })
@@ -2497,8 +2707,13 @@ function ggLoadPanelOpen(ri, i) {
         g.parts.forEach(function(c) {
             var who = r.total ? esc(ggDeptNames[c.bank] || c.bank) + ': ' : '';
             var role = c.lead ? '👑 руководитель ×' + ggNum(c.coef) : 'участник ×1';
-            h += '<div class="gg-lp-part">' + who + esc(c.stage) + ' · вес ' + ggNum(c.weight) + ' · ' + role + ' = <b>' + ggNum(c.value) + '</b></div>';
+            if (c.man) h += '<div class="gg-lp-part">' + who + esc(c.stage) + ' = <b>' + ggNum(c.value) + '</b></div>';
+            else h += '<div class="gg-lp-part">' + who + esc(c.stage) + ' · вес ' + ggNum(c.weight) + ' · ' + role + ' = <b>' + ggNum(c.value) + '</b></div>';
         });
+        if (m.canOv && !pi.offDay) {
+            var _bk = r.total ? g.parts.map(function(c) { return c.bank; }).filter(function(b, k, a) { return a.indexOf(b) === k; }) : [r.id];
+            h += '<button type="button" class="gg-lp-ov-btn" data-tov-tid="' + esc(t.id) + '" data-tov-banks="' + esc(_bk.join(',')) + '" data-tov-pi="' + i + '">✎ Задать нагрузку вручную</button>';
+        }
         h += '</div>';
     });
 
@@ -2512,21 +2727,13 @@ function ggLoadPanelOpen(ri, i) {
             h += '<div class="gg-lp-sec">Также идут, без нагрузки в этом периоде (' + idle.length + ')</div>';
             idle.forEach(function(t) {
                 h += '<div class="gg-lp-item idle"><div class="gg-lp-row1"><span class="gg-lp-name">' + esc((t.icon ? t.icon + ' ' : '') + t.name) + '</span><b class="gg-lp-val">0</b></div>'
-                  + '<div class="gg-lp-row2">' + ggStatusBadge(t.status) + '<span class="gg-lp-tag">' + esc(fmtD(t.start_date) + '–' + fmtD(t.deadline)) + '</span></div></div>';
+                  + '<div class="gg-lp-row2">' + ggStatusBadge(t.status) + '<span class="gg-lp-tag">' + esc(fmtD(t.start_date) + '–' + fmtD(t.deadline)) + '</span></div>'
+                  + ((m.canOv && !pi.offDay) ? '<button type="button" class="gg-lp-ov-btn" data-tov-tid="' + esc(t.id) + '" data-tov-banks="' + esc(r.id) + '" data-tov-pi="' + i + '">✎ Задать нагрузку вручную</button>' : '') + '</div>';
             });
         }
     }
-    if (!r.total && m.isMonth && x.man) h += '<div class="gg-lp-note">✎ В месяце есть недели с загрузкой, заданной вручную. Править можно в шаге «Недели».</div>';
-    if (!r.total && m.canOv && !pi.offDay) {
-        h += '<div class="gg-lp-man"><div class="gg-lp-man-h">✎ Загрузка вручную' + (x.man ? ' · расчёт: ' + ggNum(x.calc) : '') + '</div>'
-           + '<div class="gg-lp-man-row"><input type="number" min="0" step="0.25" id="ggOvVal" value="' + (Math.round(x.v * 100) / 100) + '">'
-           + '<button type="button" class="gg-lp-btn" id="ggOvSaveBtn">Задать</button>'
-           + (x.man ? '<button type="button" class="gg-lp-btn" id="ggOvResetBtn">Вернуть расчёт</button>' : '') + '</div>';
-        var manW = [];
-        m.rows[ri].manual.forEach(function(f, k) { if (f) manW.push(m.pinfo[k].start); });
-        if (manW.length > 1 || (manW.length === 1 && !x.man)) h += '<div class="gg-lp-man-row" style="margin-top:6px"><button type="button" class="gg-lp-btn" id="ggOvResetAll">Вернуть расчёт для всех правок банка в окне (' + manW.length + ')</button></div>';
-        h += '<div class="gg-lp-man-hint">Чтобы скопировать значение на соседние недели, протяните за зелёный уголок ячейки.</div></div>';
-    }
+    if (m.canOv && !pi.offDay) h += '<div class="gg-lp-man-hint">✎ Нагрузку банка можно поменять только через конкретную проверку: кнопка «Задать нагрузку вручную» у проверки или клик по её ячейке в таблице «Проверки».</div>';
+    if (x.man) h += '<div class="gg-lp-note">✎ В этом периоде есть нагрузка, заданная вручную по проверке.</div>';
     el.querySelector('#ggLpBody').innerHTML = h;
     var _sv = el.querySelector('#ggOvSaveBtn');
     if (_sv) _sv.addEventListener('click', function() {
@@ -2575,7 +2782,18 @@ document.addEventListener('keydown', function(ev) {
 document.getElementById('fApply').addEventListener('click', load);
 document.getElementById('fTeam').addEventListener('change', load);
 document.getElementById('fStatus').addEventListener('change', load);
-document.getElementById('fView').addEventListener('change', load);
+document.getElementById('fView').addEventListener('change', function() {
+    /* «Месяцы»: период = сегодня … сегодня + 360 дней, конец округляется вверх до воскресенья */
+    if (this.value === 'month') {
+        var t = new Date(); t.setHours(0, 0, 0, 0);
+        var e = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 360);
+        while (e.getDay() !== 0) e.setDate(e.getDate() + 1);
+        var iso = function(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+        document.getElementById('fFrom').value = iso(t);
+        document.getElementById('fTo').value = iso(e);
+    }
+    load();
+});
 document.getElementById('fType').addEventListener('change', function() {
     // пересобираем список карманов до запроса, чтобы выбранный ПВР не ушёл в фильтр
     fillPocketFilter(ggPocketsAll);
@@ -2625,7 +2843,7 @@ function ggSetShow(v) {
     document.body.classList.toggle('gg-show-tasks', v === 'tasks');
     document.body.classList.toggle('gg-show-banks', v === 'banks');
     ggSegMark('ggShowSeg', v);
-    ggLsSet('gg.show', v);
+    ggLsSet('gg.show2', v);
     /* скрытая таблица теряет прокрутку, возвращаем ту же позицию обеим */
     if (box) box.scrollLeft = pos;
     if (banks) banks.scrollLeft = pos;
@@ -2653,7 +2871,7 @@ document.getElementById('ggPlanChk').addEventListener('change', function() {
 });
 document.getElementById('ggXlsBtn').addEventListener('click', ggExportXls);
 ggSetType(ggLsGet('gg.fType') || '', true);
-ggSetShow(ggLsGet('gg.show') || 'all');
+ggSetShow(ggLsGet('gg.show2') || 'banks');
 
 msInit();
 msRenderPanel('kind'); msUpdateBtn('kind');
@@ -2972,6 +3190,17 @@ def register(app, db, hooks):
                                   'value': float(_r['value'] or 0)})
         except Exception:
             overrides = []
+        task_overrides = []
+        try:
+            _tids = {o['id'] for o in out}
+            _w1 = (d1 - timedelta(days=d1.weekday() + 7)).strftime('%Y-%m-%d')
+            for _r in db.query('SELECT task_id, bank_id, week, value FROM gantt_task_load_overrides '
+                               'WHERE week >= ? AND week <= ?', (_w1, d2.strftime('%Y-%m-%d'))):
+                if _r['task_id'] in _tids:
+                    task_overrides.append({'task': _r['task_id'], 'bank': _r['bank_id'], 'week': _r['week'],
+                                           'value': float(_r['value'] or 0)})
+        except Exception:
+            task_overrides = []
         try:
             can_override = bool(user_has(db, u, 'action.load.override'))
         except Exception:
@@ -2986,6 +3215,7 @@ def register(app, db, hooks):
             'total_capacity': total_capacity,
             'total_capacity_fact': total_capacity_fact,
             'overrides': overrides,
+            'task_overrides': task_overrides,
             'can_override': can_override,
             'ov_scope': ov_scope,
             'capacity_dirs': cap_dirs,
@@ -3048,6 +3278,14 @@ def register(app, db, hooks):
                 'PRIMARY KEY (bank_id, week, scope))')
     except Exception as _e:
         print('[gantt] не удалось создать gantt_load_overrides:', _e)
+    # Ручная нагрузка по конкретной проверке (проверка × банк × неделя)
+    try:
+        db.exec('CREATE TABLE IF NOT EXISTS gantt_task_load_overrides ('
+                'task_id TEXT NOT NULL, bank_id TEXT NOT NULL, week TEXT NOT NULL, '
+                'value REAL NOT NULL, updated_by TEXT DEFAULT \'\', updated_at TEXT DEFAULT \'\', '
+                'PRIMARY KEY (task_id, bank_id, week))')
+    except Exception as _e:
+        print('[gantt] не удалось создать gantt_task_load_overrides:', _e)
 
     def _auth_post(perm):
         try:
@@ -3107,22 +3345,120 @@ def register(app, db, hooks):
                         (bank_id, w, scope, val, who, now))
         return jsonify({'success': True, 'count': len(clean)})
 
+    @app.route('/api/plugins/gantt/task_override', methods=['POST'])
+    def _g_task_override():
+        u, err = _auth_post('action.load.override')
+        if err:
+            return err
+        body = request.get_json(silent=True) or {}
+        tid = str(body.get('task_id') or '').strip()
+        task = db.query_one('SELECT id, name FROM tasks WHERE id = ?', (tid,)) if tid else None
+        if not task:
+            return jsonify({'success': False, 'error': 'проверка не найдена'}), 400
+        items = body.get('items') or []
+        if not isinstance(items, list) or not items or len(items) > 400:
+            return jsonify({'success': False, 'error': 'bad items'}), 400
+        clean = []
+        for it in items:
+            if not isinstance(it, dict):
+                return jsonify({'success': False, 'error': 'bad item'}), 400
+            bank_id = str(it.get('bank') or '').strip()
+            if not bank_id or not db.query_one('SELECT id FROM departments WHERE id = ?', (bank_id,)):
+                return jsonify({'success': False, 'error': 'bad bank'}), 400
+            try:
+                dw = datetime.strptime(str(it.get('week') or ''), '%Y-%m-%d').date()
+            except Exception:
+                return jsonify({'success': False, 'error': 'bad week'}), 400
+            if dw.weekday() != 0:
+                return jsonify({'success': False, 'error': 'week must be Monday'}), 400
+            val = it.get('value', None)
+            if val is not None:
+                try:
+                    val = round(float(val), 2)
+                except Exception:
+                    return jsonify({'success': False, 'error': 'bad value'}), 400
+                if val < 0 or val > 100:
+                    return jsonify({'success': False, 'error': 'bad value'}), 400
+            clean.append((bank_id, dw.strftime('%Y-%m-%d'), val))
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        who = str(u.get('username') or u.get('name') or u.get('login') or u.get('id') or '')
+        log = []
+        for bank_id, w, val in clean:
+            prev = db.query_one('SELECT value FROM gantt_task_load_overrides WHERE task_id = ? AND bank_id = ? AND week = ?',
+                                (tid, bank_id, w))
+            if val is None:
+                db.exec('DELETE FROM gantt_task_load_overrides WHERE task_id = ? AND bank_id = ? AND week = ?',
+                        (tid, bank_id, w))
+            else:
+                db.exec('INSERT OR REPLACE INTO gantt_task_load_overrides '
+                        '(task_id, bank_id, week, value, updated_by, updated_at) VALUES (?,?,?,?,?,?)',
+                        (tid, bank_id, w, val, who, now))
+            _bn = db.query_one('SELECT name FROM departments WHERE id = ?', (bank_id,))
+            log.append({'bank': bank_id, 'bank_name': (_bn['name'] if _bn else bank_id), 'week': w,
+                        'from': (float(prev['value']) if prev else None), 'to': val})
+        try:
+            import json as _json
+            db.exec('INSERT INTO audit_log (ts, user_id, username, kind, entity, entity_id, details) VALUES (?,?,?,?,?,?,?)',
+                    (now, u.get('id'), who, 'load_override', 'task', tid,
+                     _json.dumps({'items': log}, ensure_ascii=False)))
+        except Exception as _e:
+            print('[gantt] audit load_override:', _e)
+        return jsonify({'success': True, 'count': len(clean)})
+
     @app.route('/api/plugins/gantt/export', methods=['POST'])
     def _g_export():
         u, err = _auth_post('plugin.gantt.use')
         if err:
             return err
-        try:
-            from openpyxl import Workbook
-            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-            from openpyxl.comments import Comment
-            from openpyxl.utils import get_column_letter
-        except Exception:
-            return jsonify({'success': False, 'error': 'openpyxl не установлен'}), 500
+        import re as _re
+        _bad = _re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+        def _s(v, n):
+            return _bad.sub('', str(v if v is not None else ''))[:n]
         body = request.get_json(silent=True) or {}
-        periods = [str(p)[:40] for p in (body.get('periods') or [])][:400]
-        rows = (body.get('rows') or [])[:200]
-        title = str(body.get('title') or 'Нагрузка по ТБ')[:200]
+        periods = [_s(p, 40) for p in (body.get('periods') or [])][:600]
+        rows = [r for r in (body.get('rows') or [])[:300] if isinstance(r, dict)]
+        for r in rows:
+            r['name'] = _s(r.get('name'), 120)
+        title = _s(body.get('title') or 'Нагрузка по ТБ', 200)
+        try:
+            return _g_export_xlsx(periods, rows, title)
+        except Exception as _e:
+            import traceback
+            traceback.print_exc()
+            print('[gantt] Excel через openpyxl не удался, отдаю CSV:', repr(_e))
+            return _g_export_csv(periods, rows, title)
+
+    def _g_export_csv(periods, rows, title):
+        import csv
+
+        def _f(v):
+            try:
+                return float(v)
+            except Exception:
+                return None
+        sio = io.StringIO()
+        w = csv.writer(sio, delimiter=';')
+        w.writerow([title])
+        w.writerow(['Тер банк', 'Ёмкость'] + periods)
+        for r in rows:
+            vals = r.get('values') or []
+            line = [r.get('name') or '', ('' if _f(r.get('cap')) is None else str(_f(r.get('cap'))).replace('.', ','))]
+            for pi in range(len(periods)):
+                v = _f(vals[pi]) if pi < len(vals) else None
+                line.append('' if not v else str(round(v, 2)).replace('.', ','))
+            w.writerow(line)
+        data = ('\ufeff' + sio.getvalue()).encode('utf-8')
+        resp = Response(data, mimetype='text/csv; charset=utf-8')
+        resp.headers['Content-Disposition'] = 'attachment; filename=nagruzka_tb_' + date.today().strftime('%Y%m%d') + '.csv'
+        resp.headers['X-Export-Format'] = 'csv'
+        return resp
+
+    def _g_export_xlsx(periods, rows, title):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.comments import Comment
+        from openpyxl.utils import get_column_letter
 
         def _f(v):
             try:
