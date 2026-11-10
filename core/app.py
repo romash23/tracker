@@ -789,7 +789,9 @@ def _merge_log_data_into_task(db, task_id, employee_id, user,
         if norm in seen_ord:
             result['orders_skipped'] += 1
             continue
+        _oty = str(o.get('type') or 'order').strip()
         cur_orders.append({
+            'type': _oty if _oty in ('order', 'directive', 'sz', 'other') else 'order',
             'description': str(o.get('description') or '').strip()[:200],
             'value': val[:1000],
             'added_by': added_by, 'added_at': now, 'source': 'log',
@@ -1802,7 +1804,9 @@ def create_app():
             _ov = str(_o.get('value', '')).strip()[:1000]
             if not _ov and not _od:
                 continue
-            orders.append({'description': _od, 'value': _ov})
+            _oty = str(_o.get('type') or 'order').strip()
+            orders.append({'type': _oty if _oty in ('order', 'directive', 'sz', 'other') else 'order',
+                           'description': _od, 'value': _ov})
         if start_date and not _valid_date(start_date):
             start_date = ''
         if completed_at and not _valid_date(completed_at):
@@ -2430,7 +2434,9 @@ def create_app():
             _v = str(_o.get('value') or '').strip()[:1000]
             if not _v:
                 continue
+            _oty = str(_o.get('type') or 'order').strip()
             orders.append({
+                'type': _oty if _oty in ('order', 'directive', 'sz', 'other') else 'order',
                 'description': str(_o.get('description') or '').strip()[:200],
                 'value': _v,
             })

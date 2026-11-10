@@ -208,7 +208,14 @@
     <!-- ============================== ЗАВЕРШЕННЫЕ ============================== -->
     <div class="tracker-panel{% if AT == 'completed' %} active{% endif %}" id="panel-completed">
         <div class="cmp-dev-note">🚧 Вкладка находится на этапе разработки</div>
-        <div class="cmp-simple" id="completedFullList"><div class="dict-empty">Загрузка...</div></div>
+        <div class="cmp-plan">
+            <div class="cmp-plan-title">🗓 Планируется</div>
+            <ul>
+                <li>Баллы по итогам проверок и других задач — для каждого банка и каждого участника</li>
+                <li>Рейтинг ТБ (% от всех) и выбор метрики результатов</li>
+            </ul>
+        </div>
+        <div class="cmp-wrap" id="completedFullList"><div class="dict-empty">Загрузка...</div></div>
     </div>
     {% endif %}
     <!-- ============================== HEATMAP ============================== -->
@@ -508,10 +515,10 @@
         <div class="form-group"><label>📁 Комментарии</label><textarea id="task_folder" rows="4" maxlength="2000" placeholder="Текущий комментарий по статусу. Дата добавится автоматически при сохранении."></textarea><div class="assignees-hint">Новая строка сохраняется с датой: «10.11.2026 — скинуть первый драфт». Последняя запись видна в колонке «Комментарий».</div></div>
     </div>
     <div class="form-group" id="taskOrdersGroup">
-        <label>📄 Приказы / распоряжения</label>
+        <label>📄 Документы</label>
         <div id="taskOrdersList" class="task-links-list"></div>
-        <button type="button" class="btn btn-secondary" id="taskOrderAddBtn" style="align-self:flex-start;margin-top:6px;padding:6px 14px;font-size:0.82rem;">➕ Добавить распоряжение</button>
-        <div class="assignees-hint">Описание — короткое название. Значение — номер приказа или путь; кликом копируется, для http/https — открывается.</div>
+        <button type="button" class="btn btn-secondary" id="taskOrderAddBtn" style="align-self:flex-start;margin-top:6px;padding:6px 14px;font-size:0.82rem;">➕ Добавить документ</button>
+        <div class="assignees-hint">Тип (Приказ / Распоряжение / СЗ / Другое), описание и путь к файлу на общем ресурсе или ссылка. Сам файл не загружается.</div>
     </div>
     <div class="task-urgent-row tk-audit-only">
         <label class="task-urgent-toggle" title="Пометить задачу как очень срочную">
@@ -749,10 +756,10 @@
                 <div class="assignees-hint">Строки добавятся в карточку задачи как «Комментарии»</div>
             </div>
             <div class="form-group">
-                <label>📄 Приказы / распоряжения</label>
+                <label>📄 Документы</label>
                 <div id="logOrdersList" class="task-links-list"></div>
                 <button type="button" class="btn btn-secondary log-add-btn" id="logOrderAddBtn">➕ Добавить</button>
-                <div class="assignees-hint">Описание — короткое название, значение — номер приказа / путь</div>
+                <div class="assignees-hint">Тип, описание и путь к файлу на общем ресурсе / номер / ссылка</div>
             </div>
             <div class="form-group">
                 <label>🔗 Ссылки</label>

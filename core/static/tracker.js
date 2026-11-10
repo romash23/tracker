@@ -1276,6 +1276,8 @@ function trkMapTableHtml(tasks) {
             var par = t.parent_task_id ? (state.tasks || []).find(function(x) { return x.id === t.parent_task_id; }) : null;
             sub = '<div class="kp-sub">' + escapeHtml(TRK_OTHER_SUB[t.other_subkind] || TRK_OTHER_SUB.other) + (par ? ' · ' + escapeHtml(par.name) : '') + '</div>';
         } else if (extras[t.id]) sub = '<div class="kp-sub">🧩 доп. задач: ' + extras[t.id].length + '</div>';
+        var _docs = Array.isArray(t.orders) ? t.orders.filter(function(o) { return o && (o.value || o.description); }) : [];
+        if (_docs.length) sub += '<div class="kp-sub kp-docs" title="' + escapeHtml(_docs.map(function(o) { return window.trkDocTypeLabel(o) + ': ' + (o.description || o.value); }).join('\n')) + '">📄 документов: ' + _docs.length + '</div>';
         var prs = _trkTaskPeriods(t);
         var term = prs.length > 1
             ? prs.map(function(p) { return formatDateShort(p.start) + '–' + formatDateShort(p.end); }).join(' + ')
@@ -1785,12 +1787,33 @@ function renderCompletedFull() {
         return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
     });
     if (!tasks.length) { list.innerHTML = '<div class="dict-empty">Завершённых проверок нет</div>'; return; }
-    var html = '<div class="cmp-simple-head"><span>Проверка</span><span>Дата завершения</span></div>';
+    /* Баллы по банкам — ДЕМО: псевдослучайное 1–5, стабильное для пары (проверка, банк). Логики нет. */
+    function demoScore(tid, bid) {
+        var s = String(tid) + '|' + String(bid), h = 2166136261;
+        for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+        return 1 + ((h >>> 0) % 5);
+    }
+    var deps = state.departments || [];
+    var depName = function(id) { var x = deps.find(function(d) { return d.id === id; }); return x ? x.name : id; };
+    var used = {};
+    tasks.forEach(function(t) { (t.department_ids || []).forEach(function(b) { if (b) used[b] = true; }); });
+    var banks = Object.keys(used).sort(function(a, b) { return String(depName(a)).localeCompare(String(depName(b)), 'ru'); });
+    var html = '<table class="cmp-table"><thead><tr><th class="cmp-th-name">Проверка</th><th class="cmp-th-date">Завершена</th>';
+    banks.forEach(function(b) { html += '<th class="cmp-th-bank" title="' + escapeHtml(depName(b)) + '">' + escapeHtml(depName(b)) + '</th>'; });
+    html += '</tr></thead><tbody>';
     tasks.forEach(function(t) {
         var d = t.completed_at ? String(t.completed_at).slice(0, 10).split('-').reverse().join('.') : '—';
-        html += '<div class="cmp-simple-row"><span class="cmp-simple-name" title="' + escapeHtml(t.name || '') + '">' + escapeHtml(t.name || '') + '</span>'
-            + '<span class="cmp-simple-date">' + escapeHtml(d) + '</span></div>';
+        var tb = t.department_ids || [];
+        html += '<tr><td class="cmp-td-name" title="' + escapeHtml(t.name || '') + '">' + escapeHtml(t.name || '') + '</td>'
+            + '<td class="cmp-td-date">' + escapeHtml(d) + '</td>';
+        banks.forEach(function(b) {
+            if (tb.indexOf(b) < 0) { html += '<td class="cmp-td-sc cmp-sc-none">·</td>'; return; }
+            var sc = demoScore(t.id, b), lead = (t.lead_department === b);
+            html += '<td class="cmp-td-sc"><span class="cmp-sc cmp-sc-' + sc + '" title="Демо-балл' + (lead ? ' · банк-руководитель' : '') + '">' + sc + (lead ? '<sup>👑</sup>' : '') + '</span></td>';
+        });
+        html += '</tr>';
     });
+    html += '</tbody></table><div class="cmp-demo-hint">Баллы 1–5 — демонстрационные (случайные), для наглядности. Логика выставления баллов появится позже.</div>';
     list.innerHTML = html;
 }
 window.renderCompletedFull = renderCompletedFull;
@@ -12911,6 +12934,20 @@ setTimeout(function(){
    PATCH v1.0.32 — приказы/распоряжения как список + перестановка блоков
    ============================================================ */
 var _taskOrdersDraft = [];
+/* Документы: тип записи (хранится только путь/номер/ссылка, сам файл — на общем ресурсе) */
+window.TRK_DOC_TYPES = [['order','Приказ'],['directive','Распоряжение'],['sz','СЗ'],['other','Другое']];
+window.trkDocType = function(o) { var t = o && o.type; return (t === 'directive' || t === 'sz' || t === 'other') ? t : 'order'; };
+window.trkDocTypeLabel = function(o) { var t = window.trkDocType(o); var r = window.TRK_DOC_TYPES.find(function(x) { return x[0] === t; }); return r ? r[1] : 'Приказ'; };
+window.trkDocTypeSelect = function(o, disabled) {
+    var cur = window.trkDocType(o);
+    return '<select class="task-order-type" title="Тип документа"' + (disabled ? ' disabled' : '') + '>'
+        + window.TRK_DOC_TYPES.map(function(x) { return '<option value="' + x[0] + '"' + (x[0] === cur ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('')
+        + '</select>';
+};
+window.trkDocBindType = function(row, arr, i) {
+    var s = row.querySelector('.task-order-type');
+    if (s) s.addEventListener('change', function() { if (arr && arr[i]) arr[i].type = this.value; });
+};
 function _isExtUrl2(u) { return /^(https?|ftp):\/\//i.test(String(u || '')); }
 function _escAttr2(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
@@ -12921,15 +12958,16 @@ function renderTaskOrdersDraft() {
     var box = document.getElementById('taskOrdersList');
     if (!box) return;
     if (!_taskOrdersDraft.length) {
-        box.innerHTML = '<div class="task-links-empty">Пока нет распоряжений</div>';
+        box.innerHTML = '<div class="task-links-empty">Пока нет документов</div>';
         return;
     }
     var h = '';
     _taskOrdersDraft.forEach(function(o, i) {
         var desc = (o && o.description) || '';
         var val = (o && o.value) || '';
-        h += '<div class="task-link-row" data-i="' + i + '">'
-          +  '<input type="text" class="task-order-desc" placeholder="Описание (Приказ № 235 о переносе)" value="' + _escAttr2(desc) + '" maxlength="200">'
+        h += '<div class="task-link-row task-doc-row" data-i="' + i + '">'
+          +  window.trkDocTypeSelect(o)
+          +  '<input type="text" class="task-order-desc" placeholder="Описание (СЗ о переносе сроков)" value="' + _escAttr2(desc) + '" maxlength="200">'
           +  '<input type="text" class="task-order-val" placeholder="Номер / путь / URL" value="' + _escAttr2(val) + '" maxlength="1000">'
           +  '<button type="button" class="task-link-del" title="Удалить">×</button>'
           +  '</div>';
@@ -12941,6 +12979,7 @@ function renderTaskOrdersDraft() {
         var vEl = row.querySelector('.task-order-val');
         if (dEl) dEl.addEventListener('input', function() { _taskOrdersDraft[i].description = this.value; });
         if (vEl) vEl.addEventListener('input', function() { _taskOrdersDraft[i].value = this.value; });
+        window.trkDocBindType(row, _taskOrdersDraft, i);
         var xb = row.querySelector('.task-link-del');
         if (xb) xb.addEventListener('click', function() {
             _taskOrdersDraft.splice(i, 1);
@@ -12957,7 +12996,7 @@ function renderTaskOrdersDraft() {
         if (e.target.closest('#taskOrderAddBtn')) {
             e.preventDefault();
             _taskOrdersDraft = _taskOrdersDraft || [];
-            _taskOrdersDraft.push({ description: '', value: '' });
+            _taskOrdersDraft.push({ type: 'sz', description: '', value: '' });
             renderTaskOrdersDraft();
         }
     }, true);
@@ -13107,7 +13146,7 @@ function _renderAll(){
 
         // Приказы / распоряжения
         if(data.orders.length){
-            h += '<div class="tfl-sec"><div class="tfl-head">📄 Приказы / распоряжения (' + data.orders.length + ')</div>';
+            h += '<div class="tfl-sec"><div class="tfl-head">📄 Документы (' + data.orders.length + ')</div>';
             data.orders.forEach(function(o){
                 var d = o.description || '';
                 var v = o.value || '';
@@ -13115,7 +13154,7 @@ function _renderAll(){
                 h += '<div class="tfl-row" data-lu="' + _esc(v) + '" data-ext="' + (ext?'1':'0') + '">'
                    +    '<span class="tfl-ico">' + (ext?'🌐':'📄') + '</span>'
                    +    '<div class="tfl-body">'
-                   +      (d ? '<div class="tfl-desc">' + _esc(d) + '</div>' : '')
+                   +      '<div class="tfl-desc"><span class="tfl-doc-type">' + _esc(window.trkDocTypeLabel(o)) + '</span>' + _esc(d) + '</div>'
                    +      (v ? '<div class="tfl-url">' + _esc(v) + '</div>' : '')
                    +    '</div>'
                    +  '</div>';
@@ -13547,7 +13586,8 @@ function _renderOrders(){
     }
     var h = '';
     _ordersDraft.forEach(function(item, i){
-        h += '<div class="task-link-row" data-i="' + i + '">'
+        h += '<div class="task-link-row task-doc-row" data-i="' + i + '">'
+          +    window.trkDocTypeSelect(item)
           +    '<input type="text" class="task-order-desc" placeholder="Описание" value="' + _esc(item.description || '') + '" maxlength="200">'
           +    '<input type="text" class="task-order-val" placeholder="Номер / путь" value="' + _esc(item.value || '') + '" maxlength="1000">'
           +    '<button type="button" class="task-link-del" title="Удалить">×</button>'
@@ -13560,6 +13600,7 @@ function _renderOrders(){
         var v = row.querySelector('.task-order-val');
         if (d) d.addEventListener('input', function(){ _ordersDraft[i].description = this.value; });
         if (v) v.addEventListener('input', function(){ _ordersDraft[i].value = this.value; });
+        window.trkDocBindType(row, _ordersDraft, i);
         var xb = row.querySelector('.task-link-del');
         if (xb) xb.addEventListener('click', function(){ _ordersDraft.splice(i, 1); _renderOrders(); });
     });
@@ -13609,7 +13650,7 @@ function _renderRO(entry){
         var or = Array.isArray(entry.orders) ? entry.orders : [];
         boxO.innerHTML = or.length
             ? or.map(function(x){
-                return '<div class="task-link-row"><input type="text" value="' + _esc((x&&x.description)||'') + '" disabled><input type="text" value="' + _esc((x&&x.value)||'') + '" disabled></div>';
+                return '<div class="task-link-row task-doc-row task-doc-ro">' + window.trkDocTypeSelect(x, true) + '<input type="text" value="' + _esc((x&&x.description)||'') + '" disabled><input type="text" value="' + _esc((x&&x.value)||'') + '" disabled></div>';
               }).join('')
             : '<div class="task-links-empty">— нет —</div>';
     }
@@ -13645,7 +13686,7 @@ document.addEventListener('click', function(e){
     }
     if (e.target.closest('#logOrderAddBtn')) {
         e.preventDefault();
-        _ordersDraft.push({ description: '', value: '' });
+        _ordersDraft.push({ type: 'sz', description: '', value: '' });
         _renderOrders();
         var box2 = document.getElementById('logOrdersList');
         if (box2) { var last2 = box2.querySelector('.task-link-row:last-child input'); if (last2) last2.focus(); }
@@ -13714,7 +13755,7 @@ setTimeout(function(){ var o = window.__trkOpenLogModal; if (o && !o._v104) { va
                 if (!Array.isArray(_body.orders) && _ordersDraft.length) {
                     _body.orders = _ordersDraft
                         .filter(function(x){ return (x.value || '').trim(); })
-                        .map(function(x){ return { description: (x.description||'').trim(), value: (x.value||'').trim() }; });
+                        .map(function(x){ return { type: window.trkDocType(x), description: (x.description||'').trim(), value: (x.value||'').trim() }; });
                 }
                 if (!Array.isArray(_body.links) && _linksDraft.length) {
                     _body.links = _linksDraft
@@ -14578,7 +14619,7 @@ function _renderOrders(items){
     if (!box) return;
     items = Array.isArray(items) ? items : [];
     if (!items.length) {
-        box.innerHTML = '<div class="task-links-empty">Пока нет распоряжений</div>';
+        box.innerHTML = '<div class="task-links-empty">Пока нет документов</div>';
         return;
     }
     var h = '';
@@ -14586,7 +14627,8 @@ function _renderOrders(items){
         var desc = (o && o.description) || '';
         var val = (o && o.value) || '';
         var added = (o && o.added_by) ? (o.added_by + ((o.added_at)? ' · '+o.added_at : '')) : '';
-        h += '<div class="task-link-row" data-i="' + i + '" data-v108-owned="1">'
+        h += '<div class="task-link-row task-doc-row" data-i="' + i + '" data-v108-owned="1">'
+          +   window.trkDocTypeSelect(o)
           +   '<input type="text" class="task-order-desc" value="' + _esc(desc) + '" placeholder="Описание">'
           +   '<input type="text" class="task-order-val" value="' + _esc(val) + '" placeholder="Номер / путь">'
           +   '<button type="button" class="task-link-del" title="Удалить">×</button>'
@@ -14600,6 +14642,7 @@ function _renderOrders(items){
         var v = row.querySelector('.task-order-val');
         if (d) d.addEventListener('input', function(){ if (window._taskOrdersDraft && window._taskOrdersDraft[i]) window._taskOrdersDraft[i].description = this.value; });
         if (v) v.addEventListener('input', function(){ if (window._taskOrdersDraft && window._taskOrdersDraft[i]) window._taskOrdersDraft[i].value = this.value; });
+        window.trkDocBindType(row, window._taskOrdersDraft, i);
         var xb = row.querySelector('.task-link-del');
         if (xb) xb.addEventListener('click', function(){
             if (Array.isArray(window._taskOrdersDraft)) window._taskOrdersDraft.splice(i, 1);
@@ -15980,7 +16023,8 @@ function _renderEditableOrders(items){
     }
     var h = '';
     items.forEach(function(o, i){
-        h += '<div class="task-link-row" data-i="' + i + '">'
+        h += '<div class="task-link-row task-doc-row" data-i="' + i + '">'
+          +    window.trkDocTypeSelect(o)
           +    '<input type="text" class="task-order-desc" value="' + _esc(o.description || '') + '" maxlength="200">'
           +    '<input type="text" class="task-order-val" value="' + _esc(o.value || '') + '" maxlength="1000">'
           +    '<button type="button" class="task-link-del" title="Удалить">×</button>'
@@ -15993,6 +16037,7 @@ function _renderEditableOrders(items){
         var v = row.querySelector('.task-order-val');
         if (d) d.addEventListener('input', function(){ window.__trkLogOrdersDraft[i].description = this.value; });
         if (v) v.addEventListener('input', function(){ window.__trkLogOrdersDraft[i].value = this.value; });
+        window.trkDocBindType(row, window.__trkLogOrdersDraft, i);
         var xb = row.querySelector('.task-link-del');
         if (xb) xb.addEventListener('click', function(){
             window.__trkLogOrdersDraft.splice(i, 1);
@@ -16050,7 +16095,7 @@ function _populateFromEntryPlusTask(entry){
         }
         if (Array.isArray(window.__trkLogOrdersDraft)) {
             window.__trkLogOrdersDraft.length = 0;
-            (merged.orders || []).forEach(function(x){ window.__trkLogOrdersDraft.push({ description: x.description || '', value: x.value || '' }); });
+            (merged.orders || []).forEach(function(x){ window.__trkLogOrdersDraft.push({ type: window.trkDocType(x), description: x.description || '', value: x.value || '' }); });
         }
         if (Array.isArray(window.__trkLogLinksDraft)) {
             window.__trkLogLinksDraft.length = 0;
@@ -16149,7 +16194,7 @@ setTimeout(function(){
                     : []);
                 _body.orders = (Array.isArray(window.__trkLogOrdersDraft)
                     ? window.__trkLogOrdersDraft.filter(function(x){ return (x.value || '').trim(); })
-                        .map(function(x){ return { description: (x.description||'').trim(), value: (x.value||'').trim() }; })
+                        .map(function(x){ return { type: window.trkDocType(x), description: (x.description||'').trim(), value: (x.value||'').trim() }; })
                     : []);
                 _body.links = (Array.isArray(window.__trkLogLinksDraft)
                     ? window.__trkLogLinksDraft.filter(function(x){ return (x.url || '').trim(); })
@@ -16360,7 +16405,8 @@ function _renderOrders(items){
     if (!items.length) { box.innerHTML = '<div class="task-links-empty">— нет —</div>'; return; }
     var h = '';
     items.forEach(function(o, i){
-        h += '<div class="task-link-row" data-i="' + i + '">'
+        h += '<div class="task-link-row task-doc-row" data-i="' + i + '">'
+          +    window.trkDocTypeSelect(o)
           +    '<input type="text" class="task-order-desc" value="' + _esc(o.description || '') + '" maxlength="200">'
           +    '<input type="text" class="task-order-val" value="' + _esc(o.value || '') + '" maxlength="1000">'
           +    '<button type="button" class="task-link-del" title="Удалить">×</button>'
@@ -16373,6 +16419,7 @@ function _renderOrders(items){
         var v = row.querySelector('.task-order-val');
         if (d) d.addEventListener('input', function(){ if (window.__trkLogOrdersDraft && window.__trkLogOrdersDraft[i]) window.__trkLogOrdersDraft[i].description = this.value; });
         if (v) v.addEventListener('input', function(){ if (window.__trkLogOrdersDraft && window.__trkLogOrdersDraft[i]) window.__trkLogOrdersDraft[i].value = this.value; });
+        window.trkDocBindType(row, window.__trkLogOrdersDraft, i);
         var xb = row.querySelector('.task-link-del');
         if (xb) xb.addEventListener('click', function(){
             if (Array.isArray(window.__trkLogOrdersDraft)) {
@@ -18004,7 +18051,8 @@ function _collectOrders(){
         var d = row.querySelector('.task-order-desc');
         var v = row.querySelector('.task-order-val');
         var vv = v ? (v.value || '').trim() : '';
-        if (vv) out.push({ description: d ? (d.value || '').trim() : '', value: vv });
+        var ty = row.querySelector('.task-order-type');
+        if (vv) out.push({ type: ty ? ty.value : 'order', description: d ? (d.value || '').trim() : '', value: vv });
     });
     return out;
 }
@@ -18094,7 +18142,8 @@ function _collectOrders(){
         var d = row.querySelector('.task-order-desc');
         var v = row.querySelector('.task-order-val');
         var vv = v ? (v.value || '').trim() : '';
-        if (vv) out.push({ description: d ? (d.value || '').trim() : '', value: vv });
+        var ty = row.querySelector('.task-order-type');
+        if (vv) out.push({ type: ty ? ty.value : 'order', description: d ? (d.value || '').trim() : '', value: vv });
     });
     return out;
 }
@@ -18559,21 +18608,30 @@ function openTaskFromUrl(){
       if (exp){
         (b.rows||[]).forEach(function(r){
           if (!dirVisible(r.kind)) return;
-          h += '<tr class="hm-emp-row"><td class="hm-emp-name hm-emp-sub">'
-             + dirEmoji(r.kind)+' '+esc(r.name)+' <span class="hm-emp-dir">('+dirLabel(r.kind)+')</span></td>';
+          var _tc = +r.task_count || 0;
+          h += '<tr class="hm-emp-row"><td class="hm-emp-name hm-emp-sub" title="Проверок и задач с нагрузкой за период: '+_tc+'">'
+             + dirEmoji(r.kind)+' '+esc(r.name)+' <span class="hm-emp-dir">('+dirLabel(r.kind)+')</span>'
+             + '<span class="hm-emp-cnt">· '+_tc+' '+(_tc%10===1&&_tc%100!==11?'проверка':(_tc%10>=2&&_tc%10<=4&&(_tc%100<10||_tc%100>=20)?'проверки':'проверок'))+'</span></td>';
           (r.cells||[]).forEach(function(c, i){
             var hot = (Number(c)||0) >= 1.5 ? ' hm-cell-hot' : '';
             var meta = (r.cell_flags && r.cell_flags[i]) || null;
-            var extra = '';
-            if (meta && meta.holiday) extra = ' hm-cell-off';
-            else if (meta && meta.absent) extra = ' hm-cell-absent';
-            h += '<td class="hm-emp-cell'+hot+extra+'">'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
+            var inf = (r.cell_info && r.cell_info[i]) || {};
+            var extra = '', tip = [];
+            var fmt = function(x){ return String(Math.round((+x) * 100) / 100).replace('.', ','); };
+            if (c) tip.push('Нагрузка: ' + fmt(c));
+            if (meta && meta.holiday) { extra = ' hm-cell-off'; tip.push('Выходной / праздник'); }
+            else if (meta && meta.absent) { extra = ' hm-cell-absent'; tip.push('Отсутствие (отпуск / больничный / командировка)'); }
+            else if (HM.mode === 'week' && (+inf.abs || 0) >= 0.999) { extra = ' hm-cell-absent'; tip.push('Отсутствует всю неделю'); }
+            else if (HM.mode === 'week' && (+inf.abs || 0) > 0) { extra = ' hm-cell-abs-part'; tip.push('Отсутствует ' + Math.round(inf.abs * 100) + '% рабочих дней недели'); }
+            if ((+inf.ext || 0) > 0) { extra += ' hm-cell-extra'; tip.push('в т.ч. доп. задачи в проверке: ' + fmt(inf.ext)); }
+            h += '<td class="hm-emp-cell'+hot+extra+'"'+(tip.length?' title="'+esc(tip.join('\n'))+'"':'')+'>'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
           });
           h += '</tr>';
         });
       }
     });
     h += '</tbody></table>';
+    h += '<div class="hm-legend-mini"><span><i class="lg-abs"></i>отсутствие (штриховка; бледнее — часть недели)</span><span><i class="lg-ext"></i>есть нагрузка от доп. задач в проверке</span><span>Число проверок — рядом с ФИО, при наведении — подробности</span></div>';
     wrap.innerHTML = h;
     wrap.querySelectorAll('.hm-bank-row, .hm-bank-row2').forEach(function(tr){
       tr.onclick = function(){ var id=tr.getAttribute('data-bank'); HM.expanded[id]=!HM.expanded[id]; hmRender(); };

@@ -69,8 +69,20 @@ def _heatmap_compute(data, d1, d2, mode):
     def _ov(a, b, ps, pe):
         return a is not None and b is not None and a <= pe and b >= ps
 
+    _today_iso = date.today().strftime('%Y-%m-%d')
+
+    def _zeroed(t, ps):
+        # Завершённые/отменённые не дают нагрузку (как в «Текущей загрузке»)
+        zf = _g_zero_from(t, _today_iso)
+        return bool(zf) and ps.strftime('%Y-%m-%d') >= zf
+
+    def _is_extra(t):
+        return (t.get('task_kind') == 'other') and (t.get('other_subkind') or '') == 'audit_extra'
+
     def audit_weight(t, ps, pe):
         # Вес активного на периоде этапа проверки (как в плане проверок).
+        if _zeroed(t, ps):
+            return 0.0
         w = 0.0
         for s in t.get('stages') or []:
             if not s.get('start'):
@@ -82,6 +94,8 @@ def _heatmap_compute(data, d1, d2, mode):
         return w
 
     def other_active(t, ps, pe):
+        if _zeroed(t, ps):
+            return False
         _prs = _g_periods(t)
         if _prs:
             return any(_ov(_d(p['start']), _d(p.get('end') or p['start']), ps, pe) for p in _prs)
@@ -144,6 +158,10 @@ def _heatmap_compute(data, d1, d2, mode):
             for t in tasks:
                 if dep not in (t.get('department_ids') or []):
                     continue
+                if _is_extra(t):
+                    if other_active(t, ps, pe):
+                        bl += float(t.get('load_coef') or 0)
+                    continue
                 if (t.get('task_kind') or 'audit') != 'audit':
                     continue
                 w = audit_weight(t, ps, pe)
@@ -157,6 +175,8 @@ def _heatmap_compute(data, d1, d2, mode):
             dc = float(e.get('dir_corp') or 0)
             cells = []
             cell_flags = []
+            cell_info = []   # по каждой ячейке: abs — доля отсутствия, ext — вклад доп. задач
+            emp_tasks = set()  # проверки/задачи сотрудника с нагрузкой в периоде
             for pi, (ps, pe, _lab) in enumerate(periods):
                 cell_meta = _day_meta(e, ps) if mode != 'week' else None
                 emp_av = _absence_availability(e, ps, pe)
@@ -164,6 +184,7 @@ def _heatmap_compute(data, d1, d2, mode):
                 eff_dc = dc * emp_av
                 if eff_dr <= 0 and eff_dc <= 0:
                     cells.append(0.0)
+                    cell_info.append({'abs': round(1 - emp_av, 2) if (dr > 0 or dc > 0) else 0, 'ext': 0})
                     if mode != 'week':
                         cell_flags.append(cell_meta)
                     continue
@@ -172,6 +193,9 @@ def _heatmap_compute(data, d1, d2, mode):
                 lr = 0.0
                 lc = 0.0
                 oth = 0.0
+                xr = 0.0  # доп. задачи в проверке без назначенных — делятся как проверка
+                xc = 0.0
+                x_own = 0.0  # доп. задачи, где сотрудник назначен
                 for t in tasks:
                     if dep not in (t.get('department_ids') or []):
                         continue
@@ -181,25 +205,51 @@ def _heatmap_compute(data, d1, d2, mode):
                         if w <= 0:
                             continue
                         contrib = w * lead_coef(t, dep)
+                        if t.get('task_type') == 'розничная' and eff_dr > 0:
+                            emp_tasks.add(t['id'])
+                        elif t.get('task_type') == 'корпоративная' and eff_dc > 0:
+                            emp_tasks.add(t['id'])
                         if t.get('task_type') == 'розничная':
                             lr += contrib
                         elif t.get('task_type') == 'корпоративная':
                             lc += contrib
+                    elif _is_extra(t) and not (t.get('assignees') or []):
+                        if not other_active(t, ps, pe):
+                            continue
+                        lcf = float(t.get('load_coef') or 0)
+                        if t.get('task_type') == 'корпоративная':
+                            xc += lcf
+                            if eff_dc > 0:
+                                emp_tasks.add(t['id'])
+                        else:
+                            xr += lcf
+                            if eff_dr > 0:
+                                emp_tasks.add(t['id'])
                     else:
                         if e['id'] in (t.get('assignees') or []) and other_active(t, ps, pe):
-                            oth += float(t.get('load_coef') or 0) * emp_av
-                val = (eff_dr * (lr / r_av if r_av > 0 else 0)
-                       + eff_dc * (lc / c_av if c_av > 0 else 0)
+                            v_ = float(t.get('load_coef') or 0) * emp_av
+                            oth += v_
+                            emp_tasks.add(t['id'])
+                            if _is_extra(t):
+                                x_own += v_
+                ext = (eff_dr * (xr / r_av if r_av > 0 else 0)
+                       + eff_dc * (xc / c_av if c_av > 0 else 0)
+                       + x_own)
+                val = (eff_dr * ((lr + xr) / r_av if r_av > 0 else 0)
+                       + eff_dc * ((lc + xc) / c_av if c_av > 0 else 0)
                        + oth)
                 if mode != 'week' and cell_meta and cell_meta['holiday']:
                     val = 0.0
+                    ext = 0.0
                 cells.append(round(val, 2))
+                cell_info.append({'abs': round(1 - emp_av, 2), 'ext': round(ext, 2)})
                 if mode != 'week':
                     cell_flags.append(cell_meta)
             kind = ('hybrid' if (dr > 0 and dc > 0)
                     else ('retail' if dr > 0 else ('corp' if dc > 0 else 'none')))
             row = {'id': e['id'], 'name': e.get('name', ''),
-                   'kind': kind, 'cells': cells}
+                   'kind': kind, 'cells': cells, 'cell_info': cell_info,
+                   'task_count': len(emp_tasks)}
             if mode != 'week':
                 row['cell_flags'] = cell_flags
             rows.append(row)

@@ -10863,3 +10863,43 @@ body:not(.trk-theme-light) .kp-table tr.kp-row:hover td { background:rgba(245,21
 .kp-table td.kp-probs { white-space:normal; }
 .kp-table td.kp-probs .trk-prob-chip { white-space:normal; max-width:100%; display:inline-block; }
 .kp-table td.dict-actions { white-space:nowrap; display:table-cell !important; vertical-align:top; }
+
+/* ===== Завершенные: плашка «Планируется» + таблица с демо-баллами ===== */
+.cmp-plan { margin: 0 0 12px; padding: 10px 16px; border: 1px solid rgba(126,87,194,0.45); border-left: 4px solid #7e57c2; border-radius: 10px; background: rgba(126,87,194,0.10); color: var(--trk-text, #e8e8e8); font-size: 0.86rem; }
+.cmp-plan-title { font-weight: 700; margin-bottom: 4px; }
+.cmp-plan ul { margin: 0; padding-left: 20px; }
+.cmp-plan li { margin: 2px 0; }
+body.trk-theme-light .cmp-plan { background: #f4effb; color: #3b2a63; }
+.cmp-wrap { overflow-x: auto; }
+.cmp-table { border-collapse: collapse; font-size: 0.86rem; min-width: 480px; }
+.cmp-table th, .cmp-table td { padding: 6px 10px; border-bottom: 1px solid var(--trk-border-soft, rgba(255,255,255,0.08)); white-space: nowrap; }
+.cmp-table th { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--trk-meta, #a0a0a0); text-align: left; border-bottom: 1px solid var(--trk-border, rgba(255,255,255,0.14)); }
+.cmp-th-bank { text-align: center !important; white-space: normal !important; min-width: 96px; max-width: 130px; line-height: 1.2; }
+.cmp-td-name { max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+.cmp-td-date { font-variant-numeric: tabular-nums; color: var(--trk-meta, #a0a0a0); }
+.cmp-td-sc { text-align: center; }
+.cmp-sc-none { color: var(--trk-meta, #999); opacity: .8; }
+.cmp-sc { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 24px; padding: 0 5px; border-radius: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #1b1b1b; }
+.cmp-td-sc { position: relative; }
+.cmp-sc sup { position: absolute; top: -7px; right: -9px; font-size: 0.7rem; }
+.cmp-sc { position: relative; }
+.cmp-sc-1 { background: #f28b82; } .cmp-sc-2 { background: #f7b267; } .cmp-sc-3 { background: #f5d76e; }
+.cmp-sc-4 { background: #a8d5a2; } .cmp-sc-5 { background: #5cb85c; color: #fff; }
+.cmp-demo-hint { margin-top: 8px; font-size: 0.76rem; color: var(--trk-meta, #a0a0a0); font-style: italic; }
+body.trk-theme-light .cmp-wrap { background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 10px; padding: 4px 6px; }
+body.trk-theme-light .cmp-table th, body.trk-theme-light .cmp-table td { border-bottom-color: rgba(0,0,0,0.08); }
+/* ===== Документы: тип записи ===== */
+.task-link-row.task-doc-row { grid-template-columns: 128px minmax(0,1fr) minmax(0,1.2fr) 30px; }
+.task-link-row.task-doc-row.task-doc-ro { grid-template-columns: 128px minmax(0,1fr) minmax(0,1.2fr); }
+.task-link-row select.task-order-type { padding: 6px 8px; border: 1px solid var(--trk-input-border); border-radius: 8px; background: var(--trk-input-bg); color: var(--trk-text); font-size: 0.82rem; font-family: inherit; width: 100%; }
+@media (max-width: 600px) { .task-link-row.task-doc-row { grid-template-columns: 1fr; } }
+.tfl-doc-type { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; background: rgba(245,215,110,0.18); color: var(--trk-text, #e8e8e8); }
+.kp-docs { white-space: nowrap; }
+/* ===== Тепловая карта: частичное отсутствие и доп. задачи ===== */
+.hm-emp-cell.hm-cell-abs-part { background-image: repeating-linear-gradient(135deg, rgba(148,163,184,.28) 0 4px, transparent 4px 9px); }
+.hm-emp-cell.hm-cell-extra { position: relative; box-shadow: inset 0 -3px 0 #7e57c2; }
+.hm-emp-name .hm-emp-cnt { margin-left: 6px; font-size: 0.74rem; color: #6b7280; font-weight: 500; }
+.hm-legend-mini { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 2px 0; font-size: 0.78rem; color: var(--trk-meta, #6b7280); }
+.hm-legend-mini i { display: inline-block; width: 18px; height: 12px; vertical-align: -2px; margin-right: 5px; border: 1px solid rgba(148,163,184,.5); }
+.hm-legend-mini .lg-abs { background: repeating-linear-gradient(135deg, rgba(148,163,184,.45) 0 4px, transparent 4px 9px); }
+.hm-legend-mini .lg-ext { box-shadow: inset 0 -3px 0 #7e57c2; }
