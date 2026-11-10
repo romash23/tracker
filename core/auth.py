@@ -14,77 +14,72 @@ PERMISSION_GROUPS = [
     {
         'title': 'Вкладки',
         'items': [
-            ('tab.calendar', '📅 Календарь'),
-            ('tab.tasks',    '🗺️ Карта проверок'),
-            ('tab.heatmap',  '🔥 Тепловая карта нагрузки'),
-            ('tab.summary',  '📊 Свод'),
-            ('tab.stats',    '📈 Статистика'),
-            ('tab.dicts',    '⚙️ Справочники'),
-            ('tab.updater',  '⬆ Обновления (просмотр)'),
-            ('tab.settings', '🛠 Настройки'),
+            ('tab.tasks',        '🗺️ Карта проверок и ✅ Завершенные'),
+            ('plugin.gantt.use', '📊 Текущая загрузка (Нагрузка по ТБ, Проверки)'),
+            ('tab.calendar',     '🗓️ Планирование проверок'),
+            ('tab.heatmap',      '🔥 Сотрудники: тепловая карта нагрузки'),
+            ('tab.dicts',        '⚙️ Сотрудники: справочники'),
+            ('tab.stats',        '📈 Статистика (меню)'),
+            ('tab.summary',      '📊 Статистика: Свод'),
+            ('tab.updater',      '⬆ Обновления (просмотр)'),
+            ('tab.settings',     '🛠 Админ-панель'),
         ],
     },
     {
-        'title': 'Блоки внутри вкладок',
+        'title': 'Статистика и отчёты',
         'items': [
-            ('block.calendar.dept_filter',      'Календарь: фильтр по отделам'),
-            ('block.calendar.team_filter',      'Календарь: фильтр по командам'),
-            ('block.calendar.employee_filter',  'Календарь: фильтр по сотрудникам'),
-            ('block.calendar.other_employees',  'Календарь: записи других сотрудников'),
-            ('block.summary.full_view',         'Свод: подробный режим'),
-            ('block.summary.grid_view',         'Свод: сетка по задачам'),
-            ('block.summary.day_totals',        'Свод: итоги за день'),
-            ('block.summary.other_employees',   'Свод: данные других сотрудников'),
-            ('block.stats.other_employees',     'Статистика: данные других сотрудников'),
-            ('block.stats.overdue',             'Статистика: блок просроченных'),
-            ('block.heatmap.other_employees',   'Тепловая карта: данные других сотрудников'),
-            ('block.dicts.employees',           'Справочник: сотрудники'),
-            ('block.dicts.departments',         'Справочник: отделы'),
-            ('block.dicts.teams',               'Справочник: команды'),
-            ('block.dicts.tasks',               'Справочник: задачи'),
+            ('plugin.pulse.use',      '💓 Пульс проекта'),
+            ('plugin.week_ach.use',   '🏆 Достижения недели'),
+            ('plugin.weekly.use',     '📥 Недельные отчёты'),
+            ('plugin.my_profile.use', '👤 Мой профиль'),
         ],
     },
     {
-        'title': 'Плагины',
+        'title': 'Видимость данных',
         'items': [
-            ('plugin.pulse.use',       '💓 Пульс проекта'),
-            ('plugin.stats_teams.use', '👥 Статистика по командам'),
-            ('plugin.gantt.use',       '📊 Диаграмма Ганта'),
-            ('plugin.weekly.use',      '📥 Недельные отчёты'),
-            ('plugin.my_profile.use',  '👤 Мой профиль'),
-            ('plugin.week_ach.use',    '🏆 Достижения недели'),
-            ('plugin.capacity.use',    '⚖ Загрузка сотрудников'),
+            ('block.calendar.other_employees', 'Планирование: записи других сотрудников'),
+            ('block.summary.other_employees',  'Свод: данные других сотрудников'),
+            ('block.stats.other_employees',    'Статистика: данные других сотрудников'),
+            ('block.stats.overdue',            'Статистика: блок просроченных'),
         ],
     },
     {
-        'title': 'Действия',
+        'title': 'Действия (только администратор и пользователь с правами)',
         'items': [
-            ('action.log.create',            'Создавать отметки'),
-            ('action.load.override',         'Нагрузка по ТБ: ручная правка загрузки'),
-            ('action.log.edit.own',          'Редактировать свои отметки'),
-            ('action.log.edit.any',          'Редактировать любые отметки'),
-            ('action.log.delete.own',        'Удалять свои отметки'),
-            ('action.log.delete.any',        'Удалять любые отметки'),
-            ('action.task.create',           'Создавать задачи'),
-            ('action.task.edit',             'Редактировать задачи'),
-            ('action.task.delete',           'Удалять задачи'),
-            ('action.employee.create',       'Создавать сотрудников'),
-            ('action.employee.edit',         'Редактировать сотрудников'),
-            ('action.employee.delete',       'Удалять сотрудников'),
-            ('action.employee.vacation.edit','Редактировать отпуска/больничные/командировки'),
-            ('action.department.create',     'Создавать отделы'),
-            ('action.department.edit',       'Редактировать отделы'),
-            ('action.department.delete',     'Удалять отделы'),
-            ('action.team.create',           'Создавать команды'),
-            ('action.team.edit',             'Редактировать команды'),
-            ('action.team.delete',           'Удалять команды'),
-            ('action.updater.apply',         'Применять обновления (apply/rollback)'),
-            ('action.mask.use',              'Использовать маскирование ФИО'),
+            ('action.task.create',            'Создавать проверки и задачи'),
+            ('action.task.edit',              'Редактировать проверки и задачи'),
+            ('action.task.delete',            'Удалять проверки и задачи'),
+            ('action.load.override',          'Текущая загрузка: ручная правка нагрузки по проверке'),
+            ('action.log.create',             'Создавать отметки'),
+            ('action.log.edit.own',           'Редактировать свои отметки'),
+            ('action.log.edit.any',           'Редактировать любые отметки'),
+            ('action.log.delete.own',         'Удалять свои отметки'),
+            ('action.log.delete.any',         'Удалять любые отметки'),
+            ('action.employee.create',        'Создавать сотрудников'),
+            ('action.employee.edit',          'Редактировать сотрудников'),
+            ('action.employee.delete',        'Удалять сотрудников'),
+            ('action.employee.vacation.edit', 'Редактировать отсутствия'),
+            ('action.department.create',      'Создавать банки/отделы'),
+            ('action.department.edit',        'Редактировать банки/отделы'),
+            ('action.department.delete',      'Удалять банки/отделы'),
+            ('action.team.create',            'Создавать команды'),
+            ('action.team.edit',              'Редактировать команды'),
+            ('action.team.delete',            'Удалять команды'),
+            ('action.updater.apply',          'Применять обновления'),
+            ('action.mask.use',               'Маскирование ФИО'),
         ],
     },
 ]
 
-ALL_PERMISSIONS = set()
+# Ключи, которые ещё проверяет код скрытых/старых экранов (старый свод часов,
+# «Загрузка сотрудников», «Статистика по командам»). В настройках прав не
+# показываются, но остаются валидными, чтобы старый код не ломался.
+LEGACY_PERMISSIONS = {
+    'block.summary.full_view', 'block.summary.grid_view', 'block.summary.day_totals',
+    'plugin.stats_teams.use', 'plugin.capacity.use',
+}
+
+ALL_PERMISSIONS = set(LEGACY_PERMISSIONS)
 for grp in PERMISSION_GROUPS:
     for k, _ in grp['items']:
         ALL_PERMISSIONS.add(k)
@@ -93,24 +88,32 @@ for grp in PERMISSION_GROUPS:
 DEFAULT_USER_PERMISSIONS = {
     'tab.calendar',
     'tab.updater',
-    'block.calendar.dept_filter',
-    'block.calendar.team_filter',
-    'block.calendar.employee_filter',
     'block.calendar.other_employees',
     'action.log.create',
     'action.log.edit.own',
     'plugin.my_profile.use',
     'plugin.pulse.use',
     'plugin.gantt.use',
-    'plugin.stats_teams.use',
     'plugin.week_ach.use',
-    'plugin.capacity.use',
 }
+
+# Гость: вход без пароля, всё видит, ничего не меняет.
+GUEST_ROLE = 'guest'
+GUEST_PERMISSIONS = {
+    k for k in ALL_PERMISSIONS
+    if not k.startswith('action.') and k not in ('tab.settings', 'tab.updater', 'plugin.my_profile.use')
+}
+
+
+def _is_action(k):
+    return k.startswith('action.')
 
 
 def default_permissions_for(role):
     if role == 'admin':
         return set(ALL_PERMISSIONS)
+    if role == GUEST_ROLE:
+        return set(GUEST_PERMISSIONS)
     return set(DEFAULT_USER_PERMISSIONS)
 
 
@@ -119,6 +122,8 @@ def user_has(db, user, perm_key):
         return False
     if user.get('role') == 'admin':
         return True
+    if user.get('role') == GUEST_ROLE and _is_action(perm_key):
+        return False
     perms = db.user_permissions(user['id'])
     if perm_key in perms:
         return perms[perm_key]
@@ -131,9 +136,11 @@ def effective_permissions(db, user):
     if user.get('role') == 'admin':
         return {k: True for k in ALL_PERMISSIONS}
     perms = db.user_permissions(user['id'])
+    defaults = default_permissions_for(user.get('role'))
+    is_guest = user.get('role') == GUEST_ROLE
     out = {}
     for k in ALL_PERMISSIONS:
-        out[k] = perms.get(k, k in DEFAULT_USER_PERMISSIONS)
+        out[k] = False if (is_guest and _is_action(k)) else bool(perms.get(k, k in defaults))
     return out
 
 

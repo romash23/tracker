@@ -13,8 +13,8 @@
             <select name="username" required autofocus>
                 <option value="">— выберите сотрудника —</option>
                 {% for u in users %}
-                <option value="{{ u.username }}">
-                    {{ u.display_name or u.username }}{% if u.role == 'admin' %} · администратор{% endif %}
+                <option value="{{ u.username }}" data-role="{{ u.role }}">
+                    {{ u.display_name or u.username }}{% if u.role == 'admin' %} · администратор{% elif u.role == 'guest' %} · только просмотр{% endif %}
                 </option>
                 {% endfor %}
             </select>
@@ -32,9 +32,10 @@
         </label>
         {% endif %}
 
-        <label class="login-label">parol
-            <input type="kody" name="kody" required autocomplete="current-kody">
+        <label class="login-label" id="loginPwdWrap">Пароль
+            <input type="password" name="kody" id="loginPwd" required autocomplete="current-password">
         </label>
+        <div class="login-guest-note" id="loginGuestNote" style="display:none;font-size:0.8rem;opacity:.75;margin:-4px 0 10px;">👁 Гость входит без пароля и может только просматривать данные</div>
 
         <button type="submit" class="login-btn">Войти</button>
     </form>
@@ -46,6 +47,20 @@
     var wrap = document.getElementById('loginManualWrap');
     var inp = document.getElementById('loginManualInput');
     var sel = document.querySelector('select[name="username"]');
+    var pwd = document.getElementById('loginPwd');
+    var pwdWrap = document.getElementById('loginPwdWrap');
+    var note = document.getElementById('loginGuestNote');
+    function syncGuest(){
+        var guest = false;
+        if (sel && !sel.disabled && sel.selectedIndex >= 0) {
+            var o = sel.options[sel.selectedIndex];
+            guest = !!(o && o.getAttribute('data-role') === 'guest');
+        }
+        if (pwdWrap) pwdWrap.style.display = guest ? 'none' : '';
+        if (pwd) { pwd.required = !guest; if (guest) pwd.value = ''; }
+        if (note) note.style.display = guest ? '' : 'none';
+    }
+    if (sel) { sel.addEventListener('change', syncGuest); syncGuest(); }
     if (!toggleBtn || !wrap || !inp) return;
     var manual = false;
     toggleBtn.addEventListener('click', function(){
@@ -57,9 +72,11 @@
             inp.value = '';
             inp.focus();
             toggleBtn.textContent = 'Вернуться к списку';
+            if (pwdWrap) pwdWrap.style.display = ''; if (pwd) pwd.required = true; if (note) note.style.display = 'none';
         } else {
             if (sel) sel.focus();
             toggleBtn.textContent = 'Войти под другим логином';
+            syncGuest();
         }
     });
 })();

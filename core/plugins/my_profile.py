@@ -1138,7 +1138,7 @@ def _create_employee_from_import(db, fio, role, dept_id, all_employees):
         db.upsert_employee(emp_id, fio, '#00897b', (role or '')[:50], dept_id, False, '', '')
     except Exception as e:
         return None, str(e)
-    # PATCH v1.0.18: пользовательский профиль с базовыми правами и parol 123456
+    # PATCH v1.0.18: пользовательский профиль с базовыми правами и пароль 123456
     try:
         existing_user = db.query_one('SELECT id FROM users WHERE employee_id=?', (emp_id,))
         if not existing_user:

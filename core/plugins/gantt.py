@@ -3511,7 +3511,7 @@ def register(app, db, hooks):
     except Exception as _e:
         print('[gantt] не удалось создать gantt_task_load_overrides:', _e)
 
-    def _auth_post(perm):
+    def _auth_post(perm, read_only=False):
         try:
             from auth import current_user, user_has, check_csrf
             u = current_user(db)
@@ -3519,6 +3519,10 @@ def register(app, db, hooks):
                 return None, (jsonify({'success': False, 'error': 'auth'}), 401)
             if not check_csrf():
                 return None, (jsonify({'success': False, 'error': 'csrf'}), 403)
+            if read_only:   # выгрузка: достаточно права на просмотр
+                if not user_has(db, u, perm):
+                    return None, (jsonify({'success': False, 'error': 'forbidden'}), 403)
+                return u, None
             if not user_has(db, u, perm) or (u or {}).get('role') != 'admin':
                 return None, (jsonify({'success': False, 'error': 'Редактирование доступно только администратору'}), 403)
             return u, None
@@ -3631,7 +3635,7 @@ def register(app, db, hooks):
 
     @app.route('/api/plugins/gantt/export', methods=['POST'])
     def _g_export():
-        u, err = _auth_post('plugin.gantt.use')
+        u, err = _auth_post('plugin.gantt.use', read_only=True)
         if err:
             return err
         import re as _re

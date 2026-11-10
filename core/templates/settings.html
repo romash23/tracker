@@ -6,6 +6,10 @@
         <a href="{{ url_for('index') }}" class="tracker-back-btn">← К трекеру</a>
         <div class="settings-title">🛠 Настройки</div>
         <div class="user-menu">
+            <button type="button" class="theme-toggle-btn" id="setThemeToggle" title="Переключить тему">
+                <span id="setThemeIcon">☀️</span>
+                <span id="setThemeLabel">Светлая</span>
+            </button>
             <span class="user-chip"><span class="user-avatar">{{ (current_user.display_name or current_user.username)[:1]|upper }}</span>
                 <span class="user-name">{{ current_user.display_name or current_user.username }}</span>
                 {% if current_user.role == 'admin' %}<span class="user-role">admin</span>{% endif %}
@@ -20,7 +24,7 @@
         <button class="settings-tab" data-tab="audit">📜 Журнал</button>
         <button class="settings-tab" data-tab="plugins">🧩 Плагины</button>
         {# PATCH: текст кнопки без подчёркивания #}
-        <button class="settings-tab" data-tab="kody">🔑 Сменить parol</button>
+        <button class="settings-tab" data-tab="kody">🔑 Сменить пароль</button>
         <button class="settings-tab" data-tab="about">ℹ️ О системе</button>
     </div>
     <div class="settings-panel active" id="sp-users">
@@ -159,11 +163,11 @@
     <div class="settings-panel" id="sp-kody">
         <div class="settings-toolbar"><div class="dict-section-title">Смена пароля</div></div>
         <div class="pwd-form">
-            {# PATCH: type="kody" был невалидным — браузер рендерил поле как text, parol был виден глазами. Теперь type="kody" (стандарт браузера), id — кириллица, как ждёт settings.js #}
-            <label>Текущий parol<input type="kody" id="pwd_old"></label>
-            <label>Новый parol<input type="kody" id="pwd_new"></label>
-            <label>Повторите<input type="kody" id="pwd_new2"></label>
-            <button class="dict-add-btn" id="pwdSaveBtn">💾 Сменить parol</button>
+            {# PATCH: type="password" был невалидным — браузер рендерил поле как text, пароль был виден глазами. Теперь type="password" (стандарт браузера), id — кириллица, как ждёт settings.js #}
+            <label>Текущий пароль<input type="password" id="pwd_old"></label>
+            <label>Новый пароль<input type="password" id="pwd_new"></label>
+            <label>Повторите<input type="password" id="pwd_new2"></label>
+            <button class="dict-add-btn" id="pwdSaveBtn">💾 Сменить пароль</button>
         </div>
     </div>
     <div class="settings-panel" id="sp-about">
@@ -176,16 +180,17 @@
     <input type="hidden" id="user_id">
     <div class="form-row">
         <div class="form-group"><label>Логин *</label><input type="text" id="user_username" maxlength="50" autocomplete="off"></div>
-        <div class="form-group"><label>parol <span id="pwd_hint" style="font-size:0.7rem;color:var(--trk-meta);"></span></label>
-            {# PATCH: type="kody" -> "kody"; id остался кириллицей, как ждёт settings.js: $('user_kody') #}
-            <input type="kody" id="user_kody" autocomplete="new-kody"></div>
+        <div class="form-group" id="userPwdGroup"><label>Пароль <span id="pwd_hint" style="font-size:0.7rem;color:var(--trk-meta);"></span></label>
+            {# PATCH: type="password" -> "kody"; id остался кириллицей, как ждёт settings.js: $('user_kody') #}
+            <input type="password" id="user_kody" autocomplete="new-password"></div>
     </div>
     <div class="form-row">
         <div class="form-group"><label>Отображаемое имя</label><input type="text" id="user_display_name" maxlength="100"></div>
         <div class="form-group"><label>Роль</label>
             <select id="user_role">
-                <option value="user">Обычный пользователь</option>
                 <option value="admin">Администратор</option>
+                <option value="guest">Гость (без пароля, только просмотр)</option>
+                <option value="user">Обычный пользователь</option>
             </select>
         </div>
     </div>
@@ -201,7 +206,7 @@
     <div class="form-group" id="permsWrap">
         <label>Права доступа</label>
         <div id="permsTree" class="perms-tree"></div>
-        <div class="assignees-hint">Для роли «Администратор» права выдаются автоматически.</div>
+        <div class="assignees-hint">Для роли «Администратор» права выдаются автоматически. Гость не может ничего изменять, даже если отметить действия.</div>
     </div>
     <div class="modal-actions">
         <button class="btn btn-secondary" data-close="userModal">Отмена</button>

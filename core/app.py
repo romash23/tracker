@@ -19,6 +19,7 @@ from flask import (Flask, render_template, request, jsonify, session,
 
 from db import TrackerDB
 from auth import (PERMISSION_GROUPS, ALL_PERMISSIONS, DEFAULT_USER_PERMISSIONS,
+                  GUEST_ROLE, GUEST_PERMISSIONS, default_permissions_for,
                   user_has, effective_permissions,
                   hash_kody, verify_kody,
                   login_user, logout_user, current_user, ensure_csrf, check_csrf,
@@ -1045,9 +1046,30 @@ def create_app():
         )
         db.user_permissions_set(uid, {k: True for k in ALL_PERMISSIONS})
         print('=' * 60)
-        print(f'[INIT] Создан пользователь admin, parol: {admin_pwd}')
-        print('[INIT] Смените parol после первого входа!')
+        print(f'[INIT] Создан пользователь admin, пароль: {admin_pwd}')
+        print('[INIT] Смените пароль после первого входа!')
         print('=' * 60)
+
+    # 10.11.2026: роль «Гость» (вход без пароля, только просмотр).
+    # Пользователь «Гость»/guest с ролью user переводится в guest; если гостя нет — создаётся.
+    try:
+        _g = db.query_one("SELECT * FROM users WHERE role=?", (GUEST_ROLE,))
+        if not _g:
+            _g = next((x for x in db.users_list()
+                       if (x.get('username') or '').strip().lower() in ('гость', 'guest')), None)
+            if _g:
+                _dn = (_g.get('display_name') or '').strip()
+                if not _dn or _dn.lower() == 'guest':
+                    _dn = 'Гость'
+                db.exec("UPDATE users SET role=?, display_name=? WHERE id=?", (GUEST_ROLE, _dn, _g['id']))
+                db.user_permissions_set(_g['id'], {k: (k in GUEST_PERMISSIONS) for k in ALL_PERMISSIONS})
+                print(f"[INIT] пользователь {_g['username']} переведён в роль «Гость»")
+            else:
+                _gid = db.user_create('Гость', hash_kody(secrets.token_urlsafe(16)), GUEST_ROLE, 'Гость', '')
+                db.user_permissions_set(_gid, {k: (k in GUEST_PERMISSIONS) for k in ALL_PERMISSIONS})
+                print('[INIT] создан пользователь «Гость» (вход без пароля, только просмотр)')
+    except Exception as _e:
+        print(f'[INIT] guest migration: {_e}')
 
     if not db.query('SELECT 1 FROM holidays LIMIT 1'):
         today = date.today()
@@ -1240,6 +1262,11 @@ def create_app():
     app.config['DB'] = db
     app.config['APP_CONFIG'] = cfg
 
+    _GUEST_POST_OK = {
+        '/api/plugins/gantt/export',
+        '/api/notifications/read', '/api/notifications/read_all',
+    }
+
     @app.before_request
     def _bind_db_and_csrf():
         g.db = db
@@ -1257,6 +1284,15 @@ def create_app():
         if _need_csrf and request.method not in ('GET', 'HEAD', 'OPTIONS'):
             if not check_csrf():
                 return jsonify({'success': False, 'error': 'csrf'}), 400
+            # Гость: только просмотр. Разрешены выгрузки и отметки уведомлений.
+            if request.path.startswith('/api/') and session.get('uid'):
+                try:
+                    _gu = current_user(db)
+                except Exception:
+                    _gu = None
+                if _gu and _gu.get('role') == GUEST_ROLE and request.path not in _GUEST_POST_OK:
+                    return jsonify({'success': False, 'error': 'Гость может только просматривать данные',
+                                    'code': 'guest_readonly'}), 403
         return None
 
     @app.after_request
@@ -1316,11 +1352,12 @@ def create_app():
         # PATCH v2: кириллица — форма отдаёт name="kody", но внутренняя переменная наша
         kody = data.get('kody') or ''
         u = db.user_get_by_name(username)
-        # PATCH v2: verify_kody (кириллица)
-        if not u or not u.get('is_active') or not verify_kody((u.get('password_hash') or u.get('kody_hash') or ''), kody if 'kody' in dir() else password):
+        # Гость входит без пароля (только просмотр, см. _guest_readonly)
+        _is_guest = bool(u) and u.get('role') == GUEST_ROLE
+        if not u or not u.get('is_active') or (not _is_guest and not verify_kody((u.get('password_hash') or u.get('kody_hash') or ''), kody)):
             return render_template(
                 'login.html',
-                error='Неверный логин или parol',
+                error='Неверный логин или пароль',
                 users=_active_users_for_login(),
             ), 401
         login_user(u['id'])
@@ -1462,11 +1499,14 @@ def create_app():
         created = db.upsert_employee(emp_id, name, color, role, department_id, fired, fired_date, hired_date, dir_corp, dir_retail)
         _audit(db, u, 'create' if created else 'update', 'employee', emp_id, {'name': name})
 
+        # Пользователь под нового сотрудника больше не создаётся автоматически:
+        # в системе пока только администраторы и гость (решение 10.11.2026).
+        _AUTO_USER_FOR_EMPLOYEE = False
         try:
             existing_user = db.query_one(
                 'SELECT id FROM users WHERE employee_id=?', (emp_id,)
             )
-            if not existing_user:
+            if _AUTO_USER_FOR_EMPLOYEE and not existing_user:
                 base = _translit_username(name)
                 uname = base
                 i = 1
@@ -4300,8 +4340,10 @@ def create_app():
             if r['role'] == 'admin':
                 perms_full = {k: True for k in ALL_PERMISSIONS}
             else:
+                _defs = default_permissions_for(r['role'])
                 perms_full = {
-                    k: raw.get(k, k in DEFAULT_USER_PERMISSIONS)
+                    k: (False if (r['role'] == GUEST_ROLE and k.startswith('action.'))
+                        else raw.get(k, k in _defs))
                     for k in ALL_PERMISSIONS
                 }
             out.append({
@@ -4323,6 +4365,7 @@ def create_app():
                 'items': [{'key': k, 'label': v} for k, v in g['items']],
             } for g in PERMISSION_GROUPS],
             'default_user': sorted(DEFAULT_USER_PERMISSIONS),
+            'default_guest': sorted(GUEST_PERMISSIONS),
             'current_user_id': u['id'],
             'is_admin': u['role'] == 'admin',
         })
@@ -4339,8 +4382,11 @@ def create_app():
         # PATCH v2: кириллица — settings.js отправляет 'kody'
         kody = body.get('kody') or ''
         role = body.get('role', 'user')
-        if role not in ('user', 'admin'):
+        if role not in ('user', 'admin', GUEST_ROLE):
             role = 'user'
+        # Гостю пароль не нужен: ставим случайный, вход идёт без проверки пароля
+        if role == GUEST_ROLE and not kody and not body.get('id'):
+            kody = secrets.token_urlsafe(16)
         display_name = str(body.get('display_name', '')).strip()[:100]
         employee_id = str(body.get('employee_id', '')).strip()
         is_active = bool(body.get('is_active', True))
@@ -4357,7 +4403,7 @@ def create_app():
         if not uid and not username:
             return jsonify({'success': False, 'error': 'Логин обязателен'}), 400
         if not uid and not kody:
-            return jsonify({'success': False, 'error': 'parol обязателен'}), 400
+            return jsonify({'success': False, 'error': 'Пароль обязателен'}), 400
 
         existing = db.user_get_by_name(username) if username else None
         if existing and existing['id'] != uid:
@@ -4383,8 +4429,10 @@ def create_app():
         if role == 'admin':
             db.user_permissions_set(uid, {k: True for k in ALL_PERMISSIONS})
         else:
-            clean = {k: bool(perms.get(k, k in DEFAULT_USER_PERMISSIONS))
-                     for k in ALL_PERMISSIONS}
+            _defs = default_permissions_for(role)
+            clean = {k: bool(perms.get(k, k in _defs)) for k in ALL_PERMISSIONS}
+            if role == GUEST_ROLE:
+                clean = {k: (False if k.startswith('action.') else v) for k, v in clean.items()}
             db.user_permissions_set(uid, clean)
         return jsonify({'success': True, 'id': uid})
 
@@ -4421,10 +4469,10 @@ def create_app():
         old = body.get('old_kody') or ''
         new = body.get('new_kody') or ''
         if len(new) < 6:
-            return jsonify({'success': False, 'error': 'parol минимум 6 символов'}), 400
+            return jsonify({'success': False, 'error': 'Пароль минимум 6 символов'}), 400
         # PATCH v2: verify_kody / hash_kody (кириллица), поле kody_hash латиница
-        if not verify_kody((u.get('password_hash') or u.get('kody_hash') or ''), kody if 'kody' in dir() else password):
-            return jsonify({'success': False, 'error': 'Неверный текущий parol'}), 400
+        if not verify_kody((u.get('password_hash') or u.get('kody_hash') or ''), old):
+            return jsonify({'success': False, 'error': 'Неверный текущий пароль'}), 400
         db.user_update(
             u['id'], u['role'], u.get('display_name', ''),
             u.get('employee_id', ''), True, pwd_hash=hash_kody(new)

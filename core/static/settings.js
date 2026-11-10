@@ -13,6 +13,27 @@ var state = {
 };
 
 function $(id){ return document.getElementById(id); }
+
+/* Тема: тот же ключ localStorage, что и в трекере (reestr_tracker_theme) */
+function applySetTheme(theme){
+    if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+    document.body.classList.remove('trk-theme-dark', 'trk-theme-light');
+    document.body.classList.add('trk-theme-' + theme);
+    document.documentElement.setAttribute('data-trk-theme', theme);
+    try { localStorage.setItem('reestr_tracker_theme', theme); } catch (e) {}
+    var ic = document.getElementById('setThemeIcon'), lb = document.getElementById('setThemeLabel');
+    if (ic) ic.textContent = theme === 'dark' ? '☀️' : '🌙';
+    if (lb) lb.textContent = theme === 'dark' ? 'Светлая' : 'Тёмная';
+}
+(function(){
+    var t = 'dark';
+    try { t = localStorage.getItem('reestr_tracker_theme') || 'dark'; } catch (e) {}
+    applySetTheme(t);
+    var b = document.getElementById('setThemeToggle');
+    if (b) b.addEventListener('click', function(){
+        applySetTheme(document.body.classList.contains('trk-theme-light') ? 'dark' : 'light');
+    });
+})();
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function notify(msg, kind){
@@ -74,6 +95,7 @@ function loadUsers(){
         state.users = d.users || [];
         state.permission_groups = d.permission_groups || [];
         state.default_user = d.default_user || [];
+        state.default_guest = d.default_guest || [];
         state.current_user_id = d.current_user_id;
         state.is_admin = !!d.is_admin;
         state.loaded = true;
@@ -87,7 +109,7 @@ function renderUsers(){
     var html = '';
     state.users.forEach(function(u){
         var roleCls = u.role === 'admin' ? 'admin' : 'user';
-        var roleLbl = u.role === 'admin' ? 'ADMIN' : 'USER';
+        var roleLbl = u.role === 'admin' ? 'ADMIN' : (u.role === 'guest' ? 'ГОСТЬ' : 'USER');
         var canEdit = state.is_admin;
         var canDelete = state.is_admin && u.id !== state.current_user_id;
         var empName = u.employee_id
@@ -124,7 +146,8 @@ function renderUsers(){
 function renderPermsTree(selected){
     var tree = $('permsTree'); if (!tree) return;
     selected = selected || {};
-    var defaults = (state.default_user || []);
+    var _r = $('user_role') ? $('user_role').value : 'user';
+    var defaults = (_r === 'guest' ? state.default_guest : state.default_user) || [];
     var html = '';
     (state.permission_groups || []).forEach(function(grp){
         html += '<div class="perms-group">'
@@ -156,7 +179,7 @@ function openUserModal(u){
     $('user_kody').value = '';
     $('pwd_hint').textContent = u ? '(оставьте пустым — не менять)' : '(обязательно)';
     $('user_display_name').value = u ? (u.display_name || '') : '';
-    $('user_role').value = u ? u.role : 'user';
+    $('user_role').value = u ? u.role : 'guest';
     $('user_is_active').checked = u ? u.is_active : true;
     $('user_username').disabled = !!u;
 
@@ -178,9 +201,19 @@ function openUserModal(u){
 function syncRoleUI(){
     var role = $('user_role').value;
     $('permsWrap').style.display = (role === 'admin') ? 'none' : '';
+    var pg = $('userPwdGroup'); if (pg) pg.style.display = (role === 'guest') ? 'none' : '';
+    /* у гостя действия недоступны: блокируем галочки action.* */
+    $('permsTree').querySelectorAll('input[data-perm^="action."]').forEach(function(cb){
+        cb.disabled = (role === 'guest');
+        if (role === 'guest') cb.checked = false;
+    });
 }
 
-$('user_role').addEventListener('change', syncRoleUI);
+$('user_role').addEventListener('change', function(){
+    /* новый пользователь: при смене роли подставляем права по умолчанию для роли */
+    if (!$('user_id').value) renderPermsTree({});
+    syncRoleUI();
+});
 
 function collectPerms(){
     var out = {};
@@ -202,7 +235,7 @@ function saveUser(){
         permissions: collectPerms(),
     };
     if (!payload.username) { notify('❌ Укажите логин', 'error'); return; }
-    if (!payload.id && !payload.kody) { notify('❌ Укажите parol для нового пользователя', 'error'); return; }
+    if (!payload.id && !payload.kody && payload.role !== 'guest') { notify('❌ Укажите пароль для нового пользователя', 'error'); return; }
     api('/api/settings/users/save', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify(payload),
@@ -521,13 +554,13 @@ $('pwdSaveBtn').addEventListener('click', function(){
     var oldp = $('pwd_old').value, np = $('pwd_new').value, np2 = $('pwd_new2').value;
     if (!oldp || !np) { notify('❌ Заполните все поля', 'error'); return; }
     if (np !== np2) { notify('❌ Пароли не совпадают', 'error'); return; }
-    if (np.length < 6) { notify('❌ parol минимум 6 символов', 'error'); return; }
+    if (np.length < 6) { notify('❌ Пароль минимум 6 символов', 'error'); return; }
     api('/api/settings/kody', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ old_kody: oldp, new_kody: np })
     }).then(function(d){
         if (!d.success) throw new Error(d.error || 'Ошибка');
-        notify('✅ parol изменён', 'success');
+        notify('✅ Пароль изменён', 'success');
         $('pwd_old').value = $('pwd_new').value = $('pwd_new2').value = '';
     }).catch(function(e){ notify('❌ ' + e.message, 'error'); });
 });
