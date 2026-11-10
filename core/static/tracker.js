@@ -187,7 +187,8 @@ window.__trkBuildStatsMenu = function(){
             html += '<button type="button" class="spm-item" data-plugin-idx="' + i + '"><span>' + (p.icon || '🔗') + '</span><span>' + p.name + '</span></button>';
         }
     }
-    if (perms['tab.settings']) {
+    var _lp = window.REESTR_PLUGINS;
+    if (perms['tab.settings'] && (!Array.isArray(_lp) || _lp.indexOf('weekly_report') >= 0)) {
         html += '<a class="spm-item" href="/plugins/weekly_report/"><span>📥</span><span>Недельные отчёты</span></a>';
     }
     menu.innerHTML = html;
@@ -12895,6 +12896,7 @@ window.__trkMyProfileMenuV129 = true;
 function _ensure() {
     var dd = document.getElementById('userDropdown');
     if (!dd) return;
+    if (Array.isArray(window.REESTR_PLUGINS) && window.REESTR_PLUGINS.indexOf('my_profile') < 0) return;
     if (dd.querySelector('a[href="/plugins/my_profile/"]')) return;
     var link = document.createElement('a');
     link.className = 'ud-item';

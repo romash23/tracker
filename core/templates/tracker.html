@@ -31,7 +31,7 @@
                 <span class="user-caret">▾</span>
             </button>
             <div class="user-dropdown" id="userDropdown">
-                {% if current_user and current_user.employee_id %}
+                {% if current_user and current_user.employee_id and 'my_profile' in (loaded_plugins or []) %}
                 <a class="ud-item" href="/plugins/my_profile/">
                     <span class="ud-icon">👤</span>
                     <span class="ud-label">Мой профиль</span>
@@ -819,14 +819,12 @@
 {% block scripts %}
 <script>window.REESTR_PERMS = {{ perms|tojson }};</script>
 <script src="{{ url_for('static', filename='tracker.js') }}?v={{ static_version }}"></script>
-<script src="/plugins-assets/updater.js"></script>
-<script src="/plugins-assets/task_audit.js"></script>
-<script src="/plugins-assets/my_week.js"></script>
-<script src="/plugins-assets/pulse.js"></script>
-<script src="/plugins-assets/gantt.js"></script>
+{% set LP = loaded_plugins or [] %}
+<script>window.REESTR_PLUGINS = {{ LP|tojson }};</script>
+{# Скрипты плагинов подключаются, только если плагин загружен — иначе 404 #}
+{% for _pl in ['updater', 'task_audit', 'my_week', 'pulse', 'gantt'] %}{% if _pl in LP %}
+<script src="/plugins-assets/{{ _pl }}.js"></script>{% endif %}{% endfor %}
 {# «Загрузка сотрудников» (capacity) и «Статистика по командам» (stats_teams) убраны из меню «Статистика»; страницы плагинов остались #}
-<script src="/plugins-assets/svod.js"></script>
-<script src="/plugins-assets/week_achievements.js"></script>
-<script src="/plugins-assets/excel_export.js"></script>
-<script src="/plugins-assets/reminders.js"></script>
+{% for _pl in ['svod', 'week_achievements', 'excel_export', 'reminders'] %}{% if _pl in LP %}
+<script src="/plugins-assets/{{ _pl }}.js"></script>{% endif %}{% endfor %}
 {% endblock %}

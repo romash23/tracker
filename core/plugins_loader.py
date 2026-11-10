@@ -28,6 +28,23 @@ from pathlib import Path
 
 STATE_FILE_NAME = '.plugins_state.json'
 
+# Плагины, отключённые по умолчанию (разово, см. load_plugins)
+DEFAULTS_MARKER = '_defaults_v2_applied'
+DEFAULT_DISABLED = (
+    'auto_close_overdue',   # переводит просроченные в несуществующие статусы
+    'backfill_task_deps',   # разовая миграция, уже выполнена
+    'pull_task_summary',    # разовая миграция + агрегаты по часам
+    'my_profile',           # личный кабинет, пользователей-сотрудников нет
+    'capacity',             # убран из меню
+    'stats_teams',          # убран из меню
+    'pulse',                # считает по часам из отметок
+    'week_achievements',
+    'weekly_summary_widget',
+    'my_week',
+    'weekly_report',
+    'excel_export',
+)
+
 # PATCH: сериализация записи state, чтобы параллельные toggle не теряли данные
 _STATE_LOCK = threading.RLock()
 
@@ -129,6 +146,22 @@ def load_plugins(plugins_dir, app, db, registry):
     if isinstance(state, dict) and state.get('_read_error'):
         print('[plugins] state-файл повреждён, использую дефолты')
         state = {}
+
+    # Разовая миграция: отключаем плагины, которые не используются в модели
+    # «проверки / банки». Админ может включить любой обратно во вкладке «Плагины».
+    if isinstance(state, dict) and not state.get(DEFAULTS_MARKER):
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        for _n in DEFAULT_DISABLED:
+            _i = state.get(_n, {}) or {}
+            _i['enabled'] = False
+            _i['updated_at'] = now
+            state[_n] = _i
+        state[DEFAULTS_MARKER] = True
+        try:
+            write_plugin_state(plugins_dir, state)
+            print('[plugins] отключены по умолчанию: ' + ', '.join(sorted(DEFAULT_DISABLED)))
+        except Exception as _e:
+            print(f'[plugins] не удалось записать state: {_e}')
 
     loaded = []
     for f in sorted(plugins_dir.glob('*.py')):

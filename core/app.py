@@ -1311,6 +1311,7 @@ def create_app():
         return {
             'csrf_token': ensure_csrf(),
             'static_version': _compute_static_version(),
+            'loaded_plugins': [p.get('name') for p in (app.config.get('LOADED_PLUGINS') or [])],
             'current_user': user,
             'perms': effective_permissions(db, user) if user else {},
             'PERMISSION_GROUPS': PERMISSION_GROUPS,

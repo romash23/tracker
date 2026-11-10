@@ -26,15 +26,6 @@ PERMISSION_GROUPS = [
         ],
     },
     {
-        'title': 'Статистика и отчёты',
-        'items': [
-            ('plugin.pulse.use',      '💓 Пульс проекта'),
-            ('plugin.week_ach.use',   '🏆 Достижения недели'),
-            ('plugin.weekly.use',     '📥 Недельные отчёты'),
-            ('plugin.my_profile.use', '👤 Мой профиль'),
-        ],
-    },
-    {
         'title': 'Видимость данных',
         'items': [
             ('block.calendar.other_employees', 'Планирование: записи других сотрудников'),
@@ -77,6 +68,8 @@ PERMISSION_GROUPS = [
 LEGACY_PERMISSIONS = {
     'block.summary.full_view', 'block.summary.grid_view', 'block.summary.day_totals',
     'plugin.stats_teams.use', 'plugin.capacity.use',
+    # плагины отключены по умолчанию (plugins_loader.DEFAULT_DISABLED)
+    'plugin.pulse.use', 'plugin.week_ach.use', 'plugin.weekly.use', 'plugin.my_profile.use',
 }
 
 ALL_PERMISSIONS = set(LEGACY_PERMISSIONS)

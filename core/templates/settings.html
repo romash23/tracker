@@ -128,6 +128,7 @@
             Изменения вступают в силу после перезапуска сервера:
             закройте окно Flask (Ctrl+C) и снова запустите <code>START.bat</code>.
         </div>
+        {% if 'weekly_report' in (loaded_plugins or []) %}
         <div class="settings-toolbar" style="margin-top:24px;">
             <div class="dict-section-title">📊 Недельные отчёты</div>
         </div>
@@ -138,6 +139,7 @@
             Отчёты генерируются автоматически в пятницу в 18:00. Хранятся в share/reports/.
             Параметры расписания — в plugins/weekly_report.json.
         </div>
+        {% endif %}
     </div>
     <div class="settings-panel" id="sp-audit">
         <div class="settings-toolbar">
