@@ -1003,10 +1003,14 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
 #ganttBox .gg-sau { position: absolute; top: 50%; transform: translateY(-50%); height: 18px; border-radius: 7px; overflow: hidden; display: flex; z-index: 2; cursor: default;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 4px rgba(0,0,0,0.3); }
 body.gg-can-ov #ganttBox .gg-sau { cursor: cell; }
-#ganttBox .gg-sau-col { display: flex; height: 100%; }
-#ganttBox .gg-sau-col.gg-sau-sep { box-shadow: inset 1px 0 0 rgba(0,0,0,0.45); }
-#ganttBox .gg-sau-col > i { flex: 1 1 0; height: 100%; display: block; position: relative; }
-#ganttBox .gg-sau-col > i + i { box-shadow: inset 1px 0 0 rgba(0,0,0,0.18); }
+/* Блоки разделены настоящими просветами: светлая подложка колбаски видна в зазорах */
+#ganttBox .gg-sau { background: #15181a; gap: 2px; padding: 1px; }
+body.trk-theme-light #ganttBox .gg-sau { background: #8a9096; box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.18); }
+#ganttBox .gg-sau-col { display: flex; height: 100%; gap: 1px; min-width: 0; }
+#ganttBox .gg-sau-col > i { flex: 1 1 0; min-width: 0; height: 100%; display: block; position: relative; }
+#ganttBox .gg-sau-col > i:first-child { border-top-left-radius: 0; }
+#ganttBox .gg-sau.gg-sau-day { height: 14px; border-radius: 5px; }
+#ganttBox .gg-sau-col > i.gg-sau-off { opacity: 0.45; }
 #ganttBox .gg-sau-col > i.gg-sau-gap { background: repeating-linear-gradient(135deg, rgba(160,160,160,0.35) 0 4px, rgba(160,160,160,0.15) 4px 8px); }
 .gg-sau-gapchip { background: repeating-linear-gradient(135deg, rgba(160,160,160,0.55) 0 3px, rgba(160,160,160,0.2) 3px 6px) !important; }
 #ganttBox .gg-sau-col > i.gg-man { box-shadow: inset 0 0 0 2px #3949ab; }
@@ -1371,15 +1375,24 @@ function participantRowsHtml(t, periods, mode, trackW, cellW) {
         html +=   '</div>';
         html +=   '<div class="gg-track" style="width:' + trackW + 'px">';
         periods.forEach(function(p, i) {
-            var mon = (mode === 'week') ? p.mon : p;
-            var v = taskBankLoadAtMonday(t, did, mon);
+            var v, _isMan, _note = '';
+            if (mode === 'month') {
+                var _ms = p.mons || [], _sum = 0;
+                _isMan = false;
+                _ms.forEach(function(mn) { _sum += taskBankLoadAtMonday(t, did, mn); if (ggTovGet(t.id, did, mn) != null) _isMan = true; });
+                v = _ms.length ? _sum / _ms.length : 0;
+                _note = ' (среднее за ' + _ms.length + ' нед.)';
+            } else {
+                var mon = (mode === 'week') ? p.mon : p;
+                v = taskBankLoadAtMonday(t, did, mon);
+                _isMan = ggTovGet(t.id, did, mondayOf(mon)) != null;
+            }
             if (v <= 0) return;
-            var txt = round2(v).toString();
+            var txt = round2(v).toString().replace('.', ',');
             var lvl = v >= 3 ? 3 : (v < 2 ? 1 : 2);
-            var _isMan = ggTovGet(t.id, did, mondayOf(mon)) != null;
             html += '<div class="gg-bank-cell lvl' + lvl + (_isMan ? ' gg-man' : '') + '" style="left:' + (i * cellW + 2) +
                     'px;width:' + (cellW - 4) + 'px" title="' + esc(nm) +
-                    (isLead ? ' 👑' : '') + ' · нагрузка ' + txt + (_isMan ? ' · ✎ задано вручную' : '') + '">' + txt + '</div>';
+                    (isLead ? ' 👑' : '') + ' · нагрузка ' + txt + _note + (_isMan ? ' · ✎ задано вручную' : '') + '">' + txt + '</div>';
         });
         html +=   '</div>';
         html += '</div>';
@@ -1782,30 +1795,14 @@ function renderDay(d) {
         html +=     '<span class="gg-dot gg-dot-' + cls + '"></span>';
         html +=     '<span class="gg-ico">' + esc(t.icon || '📋') + '</span>';
         html +=     '<span class="gg-task-name gg-expandable" data-exp-tid="' + esc(t.id) + '" title="Показать банки-участники">' +
-                      '<span class="gg-caret">\u25b8</span>' + esc(t.name) + '</span>';
+                      '<span class="gg-caret">' + (ggExpanded[t.id] ? '\u25be' : '\u25b8') + '</span>' + esc(t.name) + '</span>';
         html +=     '<button type="button" class="gg-edit" data-edit-tid="' + esc(t.id) + '" title="Редактировать" aria-label="Редактировать">\u270f\ufe0f</button>';
         html +=   '</div>';
         html +=   '<div class="gg-track" style="width:' + trackW + 'px">';
-        html +=     '<div class="gg-bar gg-bar-' + cls + '" style="left:' + barLeft + 'px;width:' + barWidth + 'px" title="' + esc(title) + '">';
-        // Цветные сегменты этапов внутри бара
-        if (t.stages && t.stages.length) {
-            t.stages.forEach(function(st) {
-                if (!st.start) return;
-                var ssi = dayIndex(st.start);
-                if (ssi < 0) return;
-                var sei = st.end ? dayIndex(st.end) : eIdx;
-                if (sei < 0) sei = eIdx;
-                if (sei < ssi) sei = ssi;
-                var segLeft = (ssi - sIdx) * DAY_W;
-                var segWidth = (sei - ssi + 1) * DAY_W;
-                if (segLeft < 0) { segWidth += segLeft; segLeft = 0; }
-                if (segWidth <= 0) return;
-                var col = STAGE_COLORS[st.key] || '#888';
-                var stTitle = (STAGE_LABELS[st.key] || st.key) + ': ' + st.start + (st.end ? ' — ' + st.end : '');
-                html += '<div class="gg-stage-seg" style="left:' + segLeft + 'px;width:' + segWidth + 'px;background:' + col + '" title="' + esc(stTitle) + '"></div>';
-            });
-        }
-        html +=     '</div>';
+        /* Колбаска без подписи: блок на каждый день, цвет = этап, активный в этот день */
+        var _ds = ggSausageHtml(t, days.map(function(dk) { return [dk]; }), DAY_W, STAGE_COLORS, STAGE_LABELS, function(i) { return fmtD(days[i]) + (isOffDay(days[i]) ? ' (выходной)' : ''); }, true);
+        if (!_ds) _ds = '<div class="gg-sau gg-sau-day" style="left:' + barLeft + 'px;width:' + barWidth + 'px" title="' + esc(title) + '"><span class="gg-sau-col" style="flex:1 1 auto"><i class="gg-sau-gap"></i></span></div>';
+        html += _ds;
         html +=   '</div>';
         html += '</div>';
         /* П.3: раскрытые банки-участники под задачей (дневной режим) */
@@ -1896,7 +1893,7 @@ function renderWeek(d) {
         html +=     '<span class="gg-dot gg-dot-' + (t.overdue ? 'overdue' : (t.status||'active')) + '"></span>';
         html +=     '<span class="gg-ico">' + esc(t.icon || '📋') + '</span>';
         html +=     '<span class="gg-task-name gg-expandable" data-exp-tid="' + esc(t.id) + '" title="Показать банки-участники">' +
-                      '<span class="gg-caret">\u25b8</span>' + esc(t.name) + '</span>';
+                      '<span class="gg-caret">' + (ggExpanded[t.id] ? '\u25be' : '\u25b8') + '</span>' + esc(t.name) + '</span>';
         html +=     '<button type="button" class="gg-edit" data-edit-tid="' + esc(t.id) + '" title="Редактировать" aria-label="Редактировать">\u270f\ufe0f</button>';
         html +=   '</div>';
         html +=   '<div class="gg-track" style="width:' + trackW + 'px">';
@@ -1938,7 +1935,7 @@ function ggFitMonthW(n) {
 /* Колбаска проверки для «Недель» и «Месяцев»: сплошная полоса от первой до последней
    активной недели, внутри — блоки по неделям цвета этапа. Подписей нет.
    groups[i] — список понедельников, попадающих в колонку i (неделя: 1, месяц: 4–5). */
-function ggSausageHtml(t, groups, cellW, COLORS, LABELS, perLbl) {
+function ggSausageHtml(t, groups, cellW, COLORS, LABELS, perLbl, isDay) {
     var first = -1, last = -1;
     groups.forEach(function(mons, i) {
         var any = mons.some(function(mn) { return !!stageAtMonday(t.stages, mn) || ggTaskCalcAt(t, '', mn) > 0; });
@@ -1946,16 +1943,17 @@ function ggSausageHtml(t, groups, cellW, COLORS, LABELS, perLbl) {
     });
     if (first < 0) return '';
     var left = first * cellW + 2, width = (last - first + 1) * cellW - 4;
-    var h = '<div class="gg-sau" style="left:' + left + 'px;width:' + width + 'px">';
+    var h = '<div class="gg-sau' + (isDay ? ' gg-sau-day' : '') + '" style="left:' + left + 'px;width:' + width + 'px">';
     for (var i = first; i <= last; i++) {
         var mons = groups[i] || [], n = Math.max(1, mons.length);
-        h += '<span class="gg-sau-col' + (i > first ? ' gg-sau-sep' : '') + '" style="flex:0 0 ' + (cellW - ((i === first ? 2 : 0) + (i === last ? 2 : 0))) + 'px">';
+        h += '<span class="gg-sau-col" style="flex:0 1 ' + (cellW - ((i === first ? 2 : 0) + (i === last ? 2 : 0))) + 'px">';
         mons.forEach(function(mn) {
             var st = stageAtMonday(t.stages, mn);
             var col = st ? (COLORS[st.key] || '#888') : ((t.task_kind === 'other' && ggTaskCalcAt(t, '', mn) > 0) ? '#8FA9C9' : '');
-            var man = ggTovAny(t.id, mn);
-            var ttl = perLbl(i) + ' · ' + fmtD(mn) + ': ' + (st ? (LABELS[st.key] || st.key) : 'нет активного этапа') + (man ? ' · ✎ нагрузка задана вручную' : '');
-            h += '<i class="' + (col ? '' : 'gg-sau-gap') + (man ? ' gg-man' : '') + '"' + (col ? ' style="background:' + col + '"' : '') + ' title="' + esc(ttl) + '"></i>';
+            var man = ggTovAny(t.id, isDay ? mondayOf(mn) : mn);
+            var off = isDay && isOffDay(mn);
+            var ttl = perLbl(i) + (isDay ? '' : ' · ' + fmtD(mn)) + ': ' + (st ? (LABELS[st.key] || st.key) : 'нет активного этапа') + (man ? ' · ✎ нагрузка задана вручную' : '');
+            h += '<i class="' + (col ? '' : 'gg-sau-gap') + (man ? ' gg-man' : '') + (off ? ' gg-sau-off' : '') + '"' + (col ? ' style="background:' + col + '"' : '') + ' title="' + esc(ttl) + '"></i>';
         });
         if (!mons.length) h += '<i class="gg-sau-gap"></i>';
         h += '</span>';
@@ -2007,11 +2005,12 @@ function renderMonth(d) {
         html += '<div class="gg-row gg-task-row" data-tid="' + esc(t.id) + '"><div class="gg-name">';
         html += '<span class="gg-dot gg-dot-' + (t.overdue ? 'overdue' : (t.status || 'active')) + '"></span>';
         html += '<span class="gg-ico">' + esc(t.icon || '📋') + '</span>';
-        html += '<span class="gg-task-name" title="' + esc(t.name) + '">' + esc(t.name) + '</span>';
+        html += '<span class="gg-task-name gg-expandable" data-exp-tid="' + esc(t.id) + '" title="Показать банки-участники"><span class="gg-caret">' + (ggExpanded[t.id] ? '\u25be' : '\u25b8') + '</span>' + esc(t.name) + '</span>';
         html += '<button type="button" class="gg-edit" data-edit-tid="' + esc(t.id) + '" title="Редактировать" aria-label="Редактировать">✏️</button>';
         html += '</div><div class="gg-track" style="width:' + trackW + 'px">';
         html += ggSausageHtml(t, months.map(function(p) { return p.mons; }), MONTH_W, STAGE_COLORS, SL, function(i) { return MONTH_NAMES[months[i].mi] + ' ' + months[i].yr; });
         html += '</div></div>';
+        html += participantRowsHtml(t, months, 'month', trackW, MONTH_W);
     });
     html += '</div></div>';
     html += '<div class="gg-stage-legend">';
