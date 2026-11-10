@@ -940,13 +940,10 @@ body.trk-theme-light .gg-neg { color: #c62828; }
 }
 
 /* ===== Этап 3: панель управления нагрузкой, KPI, ручные правки ===== */
-.gg-load-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 4px 6px; }
-.gg-plan-tgl { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: var(--pg-meta, #a0a0a0); cursor: pointer; user-select: none; }
-.gg-plan-tgl input { accent-color: #7e57c2; width: 15px; height: 15px; cursor: pointer; }
+.gg-load-row { margin-top: 8px; }
 .gg-xls-btn { margin-left: auto; border: 1px solid rgba(46,204,113,0.55); background: rgba(46,204,113,0.10); color: var(--pg-text, #e8e8e8); border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
 .gg-xls-btn:hover { background: rgba(46,204,113,0.22); }
 .gg-xls-btn:disabled { opacity: .6; cursor: wait; }
-body.trk-theme-light .gg-plan-tgl { color: #4b5563; }
 body.trk-theme-light .gg-xls-btn { color: #14532d; background: #ecfdf3; border-color: #86d6a6; }
 /* плашка статистики видна во всех режимах */
 .gg-kpi { margin: 0 4px 8px; }
@@ -1080,14 +1077,6 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
             <select id="fTeam"><option value="">Все команды</option></select>
             <label>С <input type="date" id="fFrom"></label>
             <label>По <input type="date" id="fTo"></label>
-            <select id="fStatus" style="display:none;" aria-hidden="true">
-                <option value="">Все</option>
-                <option value="planning">Планирование</option>
-                <option value="approved">Утверждена</option>
-                <option value="active">Активна</option>
-                <option value="done">Завершена</option>
-                <option value="cancelled">Отменена</option>
-            </select>
             <select id="fView" style="display:none;" aria-hidden="true">
                 <option value="week">Недели</option>
                 <option value="day">Дни</option>
@@ -1112,28 +1101,24 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
                 <button type="button" data-v="week">Недели</button>
                 <button type="button" data-v="month">Месяцы</button>
             </div>
-            <div class="gg-seg" id="ggStatusSeg" role="group" aria-label="Статус">
-                <button type="button" data-v="">Все</button>
+        </div>
+        <div class="gg-seg-row gg-load-row" id="ggLoadBar">
+            <div class="gg-seg" id="ggMetricSeg" role="group" aria-label="Показатель">
+                <button type="button" data-v="load">Загрузка</button>
+                <button type="button" data-v="free">Свободно</button>
+                <button type="button" data-v="pct">%</button>
+            </div>
+            <div class="gg-seg" id="ggHcSeg" role="group" aria-label="Численность">
+                <button type="button" data-v="norm" title="Ёмкость = экспертный коэффициент × нормативная численность">Нормативная</button>
+                <button type="button" data-v="fact" title="Ёмкость = экспертный коэффициент × фактическая численность (работающие сотрудники)">Фактическая</button>
+            </div>
+            <div class="gg-seg gg-seg-multi" id="ggStatusSeg" role="group" aria-label="Статус" title="Можно выбрать несколько статусов">
                 <button type="button" data-v="planning">Планирование</button>
                 <button type="button" data-v="approved">Утверждена</button>
                 <button type="button" data-v="active">Активна</button>
-                <button type="button" data-v="done">Завершена</button>
-                <button type="button" data-v="cancelled">Отменена</button>
             </div>
+            <button type="button" class="gg-xls-btn" id="ggXlsBtn" title="Выгрузить таблицу в Excel">⬇ Excel</button>
         </div>
-    </div>
-    <div class="gg-load-bar" id="ggLoadBar">
-        <div class="gg-seg" id="ggMetricSeg" role="group" aria-label="Показатель">
-            <button type="button" data-v="load">Загрузка</button>
-            <button type="button" data-v="free">Свободно</button>
-            <button type="button" data-v="pct">%</button>
-        </div>
-        <div class="gg-seg" id="ggHcSeg" role="group" aria-label="Численность">
-            <button type="button" data-v="norm" title="Ёмкость = экспертный коэффициент × нормативная численность">Нормативная</button>
-            <button type="button" data-v="fact" title="Ёмкость = экспертный коэффициент × фактическая численность (работающие сотрудники)">Фактическая</button>
-        </div>
-        <label class="gg-plan-tgl" title="Учитывать проверки в статусе «Планирование»"><input type="checkbox" id="ggPlanChk"> с предварительными</label>
-        <button type="button" class="gg-xls-btn" id="ggXlsBtn" title="Выгрузить таблицу в Excel">⬇ Excel</button>
     </div>
     <div class="gg-kpi" id="ggKpi" style="display:none;"></div>
     <div class="gg-slider-wrap" id="ggSliderWrap" style="display:none;">
@@ -1314,6 +1299,7 @@ function leadCoef(task, bankId) {
 }
 /* Нагрузка задачи в неделю для КОНКРЕТНОГО банка (с учётом коэффициента). */
 function taskBankLoadAtMonday(task, bankId, mon) {
+    if (ggZeroAt(task, mon)) return 0;
     var _ov = ggTovGet(task.id, bankId, mondayOf(mon));
     if (_ov != null) return _ov;
     var st = stageAtMonday(task.stages, mon);
@@ -1333,6 +1319,7 @@ function ggTovGet(tid, did, mon) { var k = tid + '|' + did + '|' + mon; return g
 function ggTovAny(tid, mon) { return !!ggTaskOvAny[tid + '|' + mon]; }
 /* Расчётная нагрузка проверки на банк в неделю (без ручной правки) */
 function ggTaskCalcAt(t, did, mon) {
+    if (ggZeroAt(t, mon)) return 0;
     if ((t.task_kind || 'audit') === 'other') {
         var lc = (t.load_coef != null ? +t.load_coef : 0) || 0;
         if (lc <= 0) return 0;
@@ -1645,8 +1632,7 @@ function load() {
     });
     var team = document.getElementById('fTeam').value;
     if (team) q += '&team=' + encodeURIComponent(team);
-    var sts = document.getElementById('fStatus').value;
-    if (sts) q += '&status=' + encodeURIComponent(sts);
+    q += '&status=' + encodeURIComponent(ggStatusSel.join(','));
     msGetSelected('kind').forEach(function(v) {
         q += '&task_kind=' + encodeURIComponent(v);
     });
@@ -2055,7 +2041,18 @@ var GG_STATUS_LBL = { planning:'Планирование', approved:'Утвер�
 var GG_STATUS_COL = { planning:'#7e57c2', approved:'#d68910', active:'#2874a6', done:'#239b56', cancelled:'#7f8c8d', paused:'#7f8c8d', archived:'#7f8c8d' };
 var ggMetric = (function() { try { var v = localStorage.getItem('gg.metric'); return ['load', 'free', 'pct'].indexOf(v) >= 0 ? v : 'load'; } catch (e) { return 'load'; } })();
 var ggHcMode = (function() { try { return localStorage.getItem('gg.hc') === 'fact' ? 'fact' : 'norm'; } catch (e) { return 'norm'; } })();
-var ggIncPlan = (function() { try { return localStorage.getItem('gg.plan') !== '0'; } catch (e) { return true; } })();
+/* «с предварительными» убрано: какие статусы учитывать, решает фильтр статусов */
+var ggIncPlan = true;
+var GG_STATUS_ALL = ['planning', 'approved', 'active'];
+var ggStatusSel = (function() {
+    try {
+        var v = JSON.parse(localStorage.getItem('gg.status3') || 'null');
+        if (Array.isArray(v)) { v = v.filter(function(x) { return GG_STATUS_ALL.indexOf(x) >= 0; }); if (v.length) return v; }
+    } catch (e) {}
+    return GG_STATUS_ALL.slice();
+})();
+/* Завершённые и отменённые проверки не дают нагрузку: с даты zero_from вес = 0 */
+function ggZeroAt(t, day) { return !!(t && t.zero_from && day >= t.zero_from); }
 var ggFill = null, ggSuppressClick = false, ggKeepScroll = null;
 var MONTH_W = 64;
 var ggLoadModel = null;      /* данные последней отрисовки для подсказки и панели */
@@ -2146,6 +2143,7 @@ function renderBanks(d, periods, mode, cellW, STAGE_COLORS, STAGE_LABELS) {
     });
     /* вклад проверки в банк на дату day (понедельник недели / день) */
     function ggContribAt(t, did, day) {
+        if (ggZeroAt(t, day)) return null;
         var _ov = ggTovGet(t.id, did, (isWeek || isMonth) ? day : mondayOf(day));
         if (_ov != null) {
             var _st = stageAtMonday(t.stages, day);
@@ -2346,7 +2344,6 @@ function ggShowLoadBar(on) {
 function ggLoadBarSync() {
     ggSegMark('ggMetricSeg', ggMetric);
     ggSegMark('ggHcSeg', ggHcMode);
-    var ch = document.getElementById('ggPlanChk'); if (ch) ch.checked = ggIncPlan;
 }
 /* KPI: горизонт 12 недель (или 3 месяца / 30 дней) от текущего периода */
 function ggRenderKpi() {
@@ -2651,7 +2648,7 @@ function ggExportXls() {
     var payload = { include_load: !!(wantLoad && m), tasks: tasksPart };
     if (wantLoad && m) {
         payload.title = 'Нагрузка по ТБ · ' + segTxt('ggTypeSeg') + ' · численность: ' + segTxt('ggHcSeg').toLowerCase()
-            + (ggIncPlan ? ' · с предварительными' : ' · без предварительных') + ' · ' + document.getElementById('fFrom').value + ' — ' + document.getElementById('fTo').value;
+            + ' · статусы: ' + ggStatusSel.map(function(v) { return (GG_STATUS_LBL[v] || v).toLowerCase(); }).join(', ') + ' · ' + document.getElementById('fFrom').value + ' — ' + document.getElementById('fTo').value;
         payload.periods = m.pinfo.map(function(p) { return p.short || p.label.replace(/^неделя /, ''); });
         payload.rows = m.rows.map(function(r) {
             return { name: r.name, cap: r.cap, total: r.total,
@@ -2866,7 +2863,6 @@ document.addEventListener('keydown', function(ev) {
 /* --- Запуск --- */
 document.getElementById('fApply').addEventListener('click', load);
 document.getElementById('fTeam').addEventListener('change', load);
-document.getElementById('fStatus').addEventListener('change', load);
 document.getElementById('fView').addEventListener('change', function() {
     ggSegMark('ggViewSeg', this.value);
     /* «Месяцы»: период = сегодня … сегодня + 360 дней, конец округляется вверх до воскресенья */
@@ -2952,9 +2948,6 @@ document.getElementById('ggHcSeg').addEventListener('click', function(ev) {
     var b = ev.target.closest('button[data-v]'); if (!b) return;
     ggHcMode = b.getAttribute('data-v'); ggLsSet('gg.hc', ggHcMode); ggRerender();
 });
-document.getElementById('ggPlanChk').addEventListener('change', function() {
-    ggIncPlan = this.checked; ggLsSet('gg.plan', ggIncPlan ? '1' : '0'); ggRerender();
-});
 document.getElementById('ggXlsBtn').addEventListener('click', ggExportXls);
 (function() {
     var tm = null, lastW = window.innerWidth;
@@ -2972,10 +2965,14 @@ ggSetType(ggLsGet('gg.fType') || '', true);
 ggSetShow(ggLsGet('gg.show2') || 'banks');
 /* Шаг и статус — колбаски поверх скрытых select (их значения читает load()) */
 (function() {
-    var fs = document.getElementById('fStatus');
-    var sv = ggLsGet('gg.status') || '';
-    if (Array.from(fs.options).some(function(o) { return o.value === sv; })) fs.value = sv;
-    ggSegMark('ggStatusSeg', fs.value);
+    function stMark() {
+        document.querySelectorAll('#ggStatusSeg button').forEach(function(b) {
+            var on = ggStatusSel.indexOf(b.getAttribute('data-v')) >= 0;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+    stMark();
     ggSegMark('ggViewSeg', document.getElementById('fView').value);
     document.getElementById('ggViewSeg').addEventListener('click', function(ev) {
         var b = ev.target.closest('button[data-v]'); if (!b || b.classList.contains('active')) return;
@@ -2983,12 +2980,20 @@ ggSetShow(ggLsGet('gg.show2') || 'banks');
         fv.value = b.getAttribute('data-v');
         fv.dispatchEvent(new Event('change'));
     });
+    /* Статусы: мультивыбор, хотя бы один должен остаться */
     document.getElementById('ggStatusSeg').addEventListener('click', function(ev) {
-        var b = ev.target.closest('button[data-v]'); if (!b || b.classList.contains('active')) return;
-        fs.value = b.getAttribute('data-v');
-        ggSegMark('ggStatusSeg', fs.value);
-        ggLsSet('gg.status', fs.value);
-        fs.dispatchEvent(new Event('change'));
+        var b = ev.target.closest('button[data-v]'); if (!b) return;
+        var v = b.getAttribute('data-v'), k = ggStatusSel.indexOf(v);
+        if (k >= 0) {
+            if (ggStatusSel.length === 1) { ggFlash('Нужен хотя бы один статус', true); return; }
+            ggStatusSel.splice(k, 1);
+        } else {
+            ggStatusSel.push(v);
+            ggStatusSel.sort(function(a, c) { return GG_STATUS_ALL.indexOf(a) - GG_STATUS_ALL.indexOf(c); });
+        }
+        stMark();
+        ggLsSet('gg.status3', JSON.stringify(ggStatusSel));
+        load();
     });
 })();
 
@@ -3021,6 +3026,22 @@ document.addEventListener('click', function(ev) {
 # ============================================================
 # Регистрация в приложении
 # ============================================================
+def _g_zero_from(t, today=None):
+    """Дата, с которой проверка перестаёт давать нагрузку (вес этапов = 0).
+    Завершена — с min(дата завершения, сегодня): оставшиеся этапы не считаются
+    (если даты завершения нет — полностью).
+    Отменена — полностью. Остальные статусы — None (считаются как обычно)."""
+    st = (t.get('status') or '').strip()
+    if st == 'done':
+        ca = (t.get('completed_at') or '').strip()[:10]
+        if len(ca) != 10:
+            return '0000-00-00'
+        return min(ca, today) if today else ca
+    if st == 'cancelled':
+        return '0000-00-00'
+    return None
+
+
 def register(app, db, hooks):
     print('[gantt] v' + __version__ + ' · ' + __description__)
 
@@ -3111,7 +3132,7 @@ def register(app, db, hooks):
             return out_v
         dept_sel = _multi('department')      # список выбранных банков (пусто = все)
         team = request.args.get('team', '').strip()
-        status = request.args.get('status', '').strip()
+        status_sel = set(_multi('status'))   # мультивыбор статусов (пусто = все)
         f_type = request.args.get('task_type', '').strip()
         ov_scope = f_type if f_type in _OV_SCOPES else 'oam'
         # «Розничная без ПВР»: розничные проверки, кроме кармана ПВР
@@ -3170,7 +3191,7 @@ def register(app, db, hooks):
 
         out = []
         for t in data.get('tasks', []):
-            if status and t.get('status') != status:
+            if status_sel and (t.get('status') or 'active') not in status_sel:
                 continue
             if ((t.get('task_kind') or 'audit')) not in kind_set:
                 continue
@@ -3225,6 +3246,7 @@ def register(app, db, hooks):
                 'name': t.get('name', ''),
                 'icon': t.get('icon', '📋'),
                 'status': t.get('status', 'active'),
+                'zero_from': _g_zero_from(t, today),
                 'start_date': sd or d1_iso,
                 'deadline': dl or d2_iso,
                 'overdue': overdue,

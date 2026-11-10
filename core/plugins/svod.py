@@ -349,6 +349,13 @@ def svod_compute(data, d1, d2, scope, overrides=None, extensions=None, today=Non
 
     def weight_at(t, mon):
         iso = mon.strftime('%Y-%m-%d')
+        # завершённые (с даты завершения) и отменённые проверки нагрузку не дают
+        if t.get('status') == 'cancelled':
+            return 0.0
+        if t.get('status') == 'done':
+            ca = (t.get('completed_at') or '')[:10]
+            if len(ca) < 10 or iso >= min(ca, date.today().isoformat()):
+                return 0.0
         for s in t.get('stages') or []:
             if s.get('start') and s['start'] <= iso <= (s.get('end') or s['start']):
                 return float(s.get('weight') if s.get('weight') is not None else 1)

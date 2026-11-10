@@ -19335,6 +19335,16 @@ function renderBankStatsPanel(bank){
         return Math.round(n * c * 100) / 100;
     }
     function calcAuditWeight(t, ps, pe){
+        /* Завершённые (с даты завершения) и отменённые проверки не дают нагрузку */
+        if (t && (t.status === 'cancelled' || t.status === 'archived')) return 0;
+        if (t && t.status === 'done') {
+            var ca = String(t.completed_at || '').slice(0, 10);
+            if (ca.length < 10) return 0;
+            var cd = parse(ca), now0 = new Date(); now0.setHours(0,0,0,0);
+            if (cd && cd > now0) cd = now0;
+            if (!cd || cd <= ps) return 0;
+            if (cd < pe) pe = new Date(cd.getTime() - 1);
+        }
         var stages = (t && Array.isArray(t.stages)) ? t.stages.filter(function(s){ return s && s.start; }) : [];
         if (!stages.length) {
             var a0 = parse(t && t.start_date), b0 = parse((t && t.deadline) || (t && t.start_date));
