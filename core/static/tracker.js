@@ -1259,7 +1259,7 @@ function trkMapTableHtml(tasks) {
     (state.tasks || []).forEach(function(x) { if (x.task_kind === 'other' && x.other_subkind === 'audit_extra' && x.parent_task_id) (extras[x.parent_task_id] = extras[x.parent_task_id] || []).push(x); });
     var canDel = hasPerm('action.task.delete') && !!(state.currentUser && state.currentUser.role === 'admin');
     var h = '<table class="kp-table"><thead><tr>'
-        + '<th>Проверка</th><th>Куратор</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
+        + '<th>Проверка</th><th>Описание</th><th>Куратор ЦА</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
         + (canDel ? '<th></th>' : '') + '</tr></thead><tbody>';
     tasks.forEach(function(t) {
         var sv = t.status || 'active';
@@ -1270,6 +1270,7 @@ function trkMapTableHtml(tasks) {
         var c = _kpLastComment(t.folder);
         var com = c ? ('<span class="kp-com-date">' + escapeHtml(c.date) + '</span> ' + escapeHtml(c.text) + (c.n > 1 ? ' <span class="kp-sub">(' + c.n + ')</span>' : '')) : '<span class="kp-muted">—</span>';
         var nm = escapeHtml(t.name || '');
+        var desc = String(t.description || '').trim();
         var sub = '';
         if (isOther) {
             var par = t.parent_task_id ? (state.tasks || []).find(function(x) { return x.id === t.parent_task_id; }) : null;
@@ -1282,7 +1283,8 @@ function trkMapTableHtml(tasks) {
         var probs = window.trkTaskProblemsBadge ? window.trkTaskProblemsBadge(t, { soft: true }) : '';
         h += '<tr class="dict-item kp-row st-' + escapeHtml(sv) + (t.overdue ? ' kp-row--overdue' : '') + '" data-id="' + escapeHtml(t.id) + '">'
             + '<td class="kp-name"><span class="dict-item-name">' + nm + '</span>' + sub + '</td>'
-            + '<td>' + cur + '</td><td>' + lead + '</td>'
+            + '<td class="kp-desc"' + (desc ? ' title="' + escapeHtml(desc) + '"' : '') + '>' + (desc ? '<div class="kp-desc-txt">' + escapeHtml(desc) + '</div>' : '<span class="kp-muted">—</span>') + '</td>'
+            + '<td class="kp-cur">' + cur + '</td><td>' + lead + '</td>'
             + '<td>' + (parts.length ? escapeHtml(parts.join(', ')) : '<span class="kp-muted">—</span>') + '</td>'
             + '<td><span class="task-card-badge status-' + escapeHtml(sv) + '">' + escapeHtml(stMap[sv] || sv) + '</span></td>'
             + '<td class="kp-term' + (t.overdue ? ' tsk-row-overdue' : '') + '">' + escapeHtml(term || '—') + '</td>'
@@ -3551,6 +3553,7 @@ function _applyOtherSubUI(sub, parentId) {
 /* Показ/скрытие полей карточки по виду задачи: 'audit' | 'other'. */
 function applyTaskKindUI(kind) {
     var isOther = (kind === 'other');
+    var _tm = document.getElementById('taskModal'); if (_tm) _tm.classList.toggle('tk-kind-other', isOther);
     document.querySelectorAll('#taskModal .tk-audit-only').forEach(function(el) {
         el.style.display = isOther ? 'none' : '';
     });
@@ -13122,7 +13125,7 @@ function _renderAll(){
 
         // Дополнительные данные (бывшие «папки»)
         if(data.folders.length){
-            h += '<div class="tfl-sec"><div class="tfl-head">📁 Дополнительные данные (' + data.folders.length + ')</div>';
+            h += '<div class="tfl-sec"><div class="tfl-head">📁 Комментарии (' + data.folders.length + ')</div>';
             data.folders.forEach(function(f){
                 h += '<div class="tfl-row" data-lu="' + _esc(f) + '" data-ext="0">'
                    +    '<span class="tfl-ico">📁</span>'

@@ -168,7 +168,7 @@
                 <button type="button" data-v="розничная">Розничное</button>
                 <button type="button" data-v="корпоративная">Корпоративное</button>
             </div>
-            <label class="sum-filter tsk-search-wrap" title="Поиск по названию, описанию, приказу и доп. данным">
+            <label class="sum-filter tsk-search-wrap" title="Поиск по названию, описанию, приказу и комментариям">
                 <span>🔍</span>
                 <input type="text" id="tskSearchInput" placeholder="Поиск…" autocomplete="off">
                 <button type="button" class="tsk-search-clear" id="tskSearchClear" title="Очистить (Esc)" style="display:none;">×</button>
@@ -505,7 +505,7 @@
     </div>
     <div class="form-row task-row-2" id="taskDescFolderRow">
         <div class="form-group"><label>Описание</label><textarea id="task_description" rows="4"></textarea></div>
-        <div class="form-group"><label>📁 Дополнительные данные (по одной записи на строку)</label><textarea id="task_folder" rows="4" maxlength="2000" placeholder="Текущий комментарий по статусу. Дата добавится автоматически при сохранении."></textarea><div class="assignees-hint">Новая строка сохраняется с датой: «10.11.2026 — скинуть первый драфт». Последняя запись видна в колонке «Комментарий».</div></div>
+        <div class="form-group"><label>📁 Комментарии</label><textarea id="task_folder" rows="4" maxlength="2000" placeholder="Текущий комментарий по статусу. Дата добавится автоматически при сохранении."></textarea><div class="assignees-hint">Новая строка сохраняется с датой: «10.11.2026 — скинуть первый драфт». Последняя запись видна в колонке «Комментарий».</div></div>
     </div>
     <div class="form-group" id="taskOrdersGroup">
         <label>📄 Приказы / распоряжения</label>
@@ -743,10 +743,10 @@
         </div>
         <div class="log-multifields" id="logMultiFields">
             <div class="form-group">
-                <label>📁 Дополнительные данные</label>
+                <label>📁 Комментарии</label>
                 <div id="logExtraDataList" class="task-links-list"></div>
                 <button type="button" class="btn btn-secondary log-add-btn" id="logExtraAddBtn">➕ Добавить</button>
-                <div class="assignees-hint">Строки добавятся в карточку задачи как «Дополнительные данные»</div>
+                <div class="assignees-hint">Строки добавятся в карточку задачи как «Комментарии»</div>
             </div>
             <div class="form-group">
                 <label>📄 Приказы / распоряжения</label>

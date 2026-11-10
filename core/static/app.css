@@ -10777,3 +10777,89 @@ body.trk-theme-light .cmp-simple { border-color: rgba(0,0,0,0.14); background: #
 .tk-period-n { width:20px; text-align:center; font-weight:700; color:var(--text-muted,#6b7280); }
 .tk-period-del { border:0; background:transparent; cursor:pointer; color:#e53935; font-size:1rem; }
 .tk-period-add { padding:6px 12px !important; font-size:.85rem; }
+
+/* ============================================================
+   PATCH 2026-11-10 — Карта проверок: список на всю ширину,
+   компактное окно «Другое», короткий поиск
+   ============================================================ */
+#tasksFullList.kp-wrap { display:block !important; width:100%; }
+#tasksFullList.kp-wrap > .kp-table { width:100%; }
+.kp-table .kp-com { min-width:240px; max-width:none; width:24%; }
+.kp-table .kp-desc { min-width:130px; max-width:260px; }
+.kp-desc-txt { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
+.kp-table .kp-cur { white-space:nowrap; }
+
+/* Окно задач вида «Другое»: уже и без прокрутки */
+#taskModal.tk-kind-other .modal-content { max-width:780px !important; width:min(780px, 96vw) !important; padding:12px 18px 10px !important; max-height:96vh !important; }
+#taskModal.tk-kind-other .modal-content > h2 { margin:0 0 6px !important; padding-bottom:6px !important; font-size:1.1rem; }
+#taskModal.tk-kind-other .tk-audit-only { display:none !important; }
+#taskModal.tk-kind-other .task-modal-scroll { display:grid !important; grid-template-columns:1fr 1fr; gap:8px 14px; align-items:start;
+    grid-template-areas:"info info" "name name" "desc desc" "status cur" "per load" "ord link" "dept asg"; }
+#taskModal.tk-kind-other .task-modal-scroll > * { margin:0 !important; min-width:0; }
+#taskModal.tk-kind-other .task-modal-scroll > .tk-other-info { grid-area:info; padding:5px 10px !important; font-size:.8rem; }
+#taskModal.tk-kind-other .task-modal-scroll > .task-row-icon-name { grid-area:name; }
+#taskModal.tk-kind-other .task-modal-scroll > #taskDescFolderRow { grid-area:desc; }
+#taskModal.tk-kind-other .task-modal-scroll > .task-row-4col { grid-area:status; grid-template-columns:1fr 1fr !important; gap:0 10px !important; }
+#taskModal.tk-kind-other .task-modal-scroll > #taskCuratorCompletedRow { grid-area:cur; grid-template-columns:1fr !important; }
+#taskModal.tk-kind-other .task-modal-scroll > #taskPeriodsGroup { grid-area:per; }
+#taskModal.tk-kind-other .task-modal-scroll > #taskLoadCoefGroup { grid-area:load; }
+#taskModal.tk-kind-other .task-modal-scroll > #taskOrdersGroup { grid-area:ord; }
+#taskModal.tk-kind-other .task-modal-scroll > #taskLinksGroup { grid-area:link; }
+#taskModal.tk-kind-other .task-modal-scroll > .form-group:has(#taskDepartmentsList) { grid-area:dept; }
+#taskModal.tk-kind-other .task-modal-scroll > .form-group:has(#taskAssigneesList) { grid-area:asg; }
+#taskModal.tk-kind-other .assignees-hint { display:none !important; }
+#taskModal.tk-kind-other .form-group > label { margin-bottom:3px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#taskModal.tk-kind-other .dept-multi-item, #taskModal.tk-kind-other .assignees-item { text-transform:none !important; letter-spacing:normal !important; font-weight:500; font-size:.8rem !important; color:var(--trk-text) !important; }
+#taskModal.tk-kind-other .form-group { gap:0 !important; }
+#taskModal.tk-kind-other textarea { min-height:50px !important; height:50px !important; resize:vertical; }
+#taskModal.tk-kind-other #taskDescFolderRow > .form-group { gap:0 !important; }
+#taskModal.tk-kind-other #taskOrdersGroup .btn,
+#taskModal.tk-kind-other #taskLinksGroup .btn,
+#taskModal.tk-kind-other .tk-period-add { padding:3px 10px !important; font-size:.74rem !important; margin-top:3px !important; align-self:flex-start !important; width:auto !important; }
+#taskModal.tk-kind-other .task-links-list { font-size:.78rem; }
+#taskModal.tk-kind-other .tk-periods { gap:4px !important; }
+#taskModal.tk-kind-other .tk-period-row input[type=date] { min-width:0; flex:1 1 0; }
+#taskModal.tk-kind-other .dept-multi-list { display:grid !important; grid-template-columns:repeat(2, minmax(0,1fr)) !important; gap:3px 8px !important; max-height:none !important; overflow:visible !important; }
+#taskModal.tk-kind-other .dept-multi-item { padding:3px 6px !important; font-size:.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#taskModal.tk-kind-other .assignees-list { max-height:96px !important; height:auto !important; overflow-y:auto !important; display:block !important; }
+#taskModal.tk-kind-other .assignees-list .assignees-group { display:grid !important; grid-template-columns:repeat(2, minmax(0,1fr)) !important; gap:3px 8px !important; padding:0 !important; }
+#taskModal.tk-kind-other .assignees-search-wrap { height:auto !important; min-height:0 !important; padding:0 !important; margin:0 0 4px !important; }
+#taskModal.tk-kind-other .assignees-group-title { grid-column:1 / -1; margin:0 !important; }
+#taskModal.tk-kind-other .assignees-item { padding:2px 6px !important; font-size:.8rem; }
+#taskModal.tk-kind-other .modal-actions { margin-top:8px !important; padding-top:8px !important; }
+
+#taskModal.tk-kind-other .dept-multi-item input[type=checkbox],
+#taskModal.tk-kind-other .assignees-item input[type=checkbox] { width:14px !important; height:14px !important; min-height:0 !important; padding:0 !important; margin:0 4px 0 0 !important; flex:0 0 auto; }
+#taskModal.tk-kind-other .dept-multi-item, #taskModal.tk-kind-other .assignees-item { display:flex !important; align-items:center; min-height:0 !important; line-height:1.25; }
+#taskModal.tk-kind-other .assignees-search { height:28px !important; min-height:0 !important; padding:3px 8px !important; font-size:.78rem !important; margin-bottom:4px !important; }
+#taskModal.tk-kind-other input[type=text], #taskModal.tk-kind-other input[type=number], #taskModal.tk-kind-other input[type=date], #taskModal.tk-kind-other select { height:32px !important; min-height:0 !important; padding-top:4px !important; padding-bottom:4px !important; }
+
+#taskModal.tk-kind-other .dept-multi-item > span:last-child, #taskModal.tk-kind-other .assignees-name { white-space:nowrap !important; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+#taskModal.tk-kind-other .dept-multi-item { height:26px !important; padding:2px 6px !important; }
+#taskModal.tk-kind-other .dept-multi-dot, #taskModal.tk-kind-other .assignees-dot { flex:0 0 auto; }
+
+#taskModal.tk-kind-other #taskAssigneesList { max-height:132px !important; height:auto !important; }
+#taskModal.tk-kind-other .assignees-item { height:26px !important; }
+#taskModal.tk-kind-other .assignees-search-wrap input { height:28px !important; }
+
+/* Поиск в «Карте проверок»: коротко, статусы в одной строке с фильтрами */
+#panel-tasks .tsk-search-wrap { flex:0 1 170px; min-width:130px; max-width:170px; }
+#panel-tasks > .sum-toolbar { flex-wrap:nowrap; gap:6px; }
+#panel-tasks > .sum-toolbar > * { flex-shrink:0; }
+#panel-tasks > .sum-toolbar > .sum-filter:not(.tsk-search-wrap) { flex-shrink:1; min-width:0; }
+#panel-tasks > .sum-toolbar > .sum-filter:not(.tsk-search-wrap) { min-width:96px; }
+#panel-tasks > .sum-toolbar > .sum-filter select { max-width:130px; min-width:0; width:100%; text-overflow:ellipsis; }
+#panel-tasks #tskViewMode { margin-left:auto !important; }
+#panel-tasks #tskViewMode button, #panel-tasks #tskDirSeg button, #panel-tasks #tskViewSeg button { padding:4px 7px !important; font-size:.72rem !important; white-space:nowrap; }
+@media (max-width: 1440px) { #panel-tasks > .sum-toolbar { flex-wrap:wrap; } }
+.kp-table .kp-probs { max-width:200px; }
+
+/* Карта проверок: таблица в тёмной теме (тема задаётся классом body) */
+body:not(.trk-theme-light) .kp-table { background:#1f2326; color:var(--trk-text,#e6e6e6); }
+body:not(.trk-theme-light) .kp-table th { background:#262b2f; color:#9aa4ab; border-bottom-color:rgba(255,255,255,.08); }
+body:not(.trk-theme-light) .kp-table td { border-bottom-color:rgba(255,255,255,.06); color:var(--trk-text,#e6e6e6); }
+body:not(.trk-theme-light) .kp-table tr.kp-row:hover td { background:rgba(245,215,110,.06); }
+.kp-table td { vertical-align:top; }
+.kp-table td.kp-probs { white-space:normal; }
+.kp-table td.kp-probs .trk-prob-chip { white-space:normal; max-width:100%; display:inline-block; }
+.kp-table td.dict-actions { white-space:nowrap; display:table-cell !important; vertical-align:top; }
