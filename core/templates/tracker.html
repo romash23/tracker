@@ -122,6 +122,7 @@
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
             <button class="plan-dashboards-btn" id="openDashboardsInlineBtn" type="button">Дашборды</button>
+            {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-dashboards-btn" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ">🗂 Карманы</button>{% endif %}
             <div class="export-menu-wrap" style="position:relative;display:inline-block;">
                 <button class="dict-add-btn" id="exportMenuBtn" style="background:linear-gradient(135deg,#27ae60,#229954);">📥 Экспорт ▾</button>
                 <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
@@ -437,6 +438,9 @@
     <div class="form-group"><label>👥 Штатная численность (розничное направление)</label>
         <input type="number" id="dep_headcount_retail" min="0" step="0.5" placeholder="например: 2.5">
     </div>
+    <div class="form-group"><label>🔤 Короткое название (для узких таблиц)</label>
+        <input type="text" id="dep_short_name" maxlength="8" placeholder="например: ПБ">
+    </div>
     <div class="form-group"><label>🏢 Штатная численность (корпоративное направление)</label>
         <input type="number" id="dep_headcount_corp" min="0" step="0.5" placeholder="например: 3.5">
         <small style="color:#64748b;">Общая штатная численность = розн + корп и должна быть целой. Пусто — не задано.</small>
@@ -575,9 +579,8 @@
             </select>
         </div>
         <div class="form-group"><label>👝 Карман</label>
-            <input type="text" id="task_pocket" list="taskPocketOptions" maxlength="200" autocomplete="off" placeholder="например: Ипотека">
-            <datalist id="taskPocketOptions"></datalist>
-            <div class="assignees-hint">Свободный текст. Подсказки — из уже использованных карманов.</div>
+            <select id="task_pocket"><option value="">— вне кармана —</option></select>
+            <div class="assignees-hint" id="taskPocketHint">Список открытых карманов выбранного направления. Новые карманы задаются в «Планирование → 🗂 Карманы».</div>
         </div>
     </div>
     <div class="form-group tk-audit-only" id="taskStagesGroup">
@@ -825,6 +828,6 @@
 {% for _pl in ['updater', 'task_audit', 'my_week', 'pulse', 'gantt'] %}{% if _pl in LP %}
 <script src="/plugins-assets/{{ _pl }}.js"></script>{% endif %}{% endfor %}
 {# «Загрузка сотрудников» (capacity) и «Статистика по командам» (stats_teams) убраны из меню «Статистика»; страницы плагинов остались #}
-{% for _pl in ['svod', 'week_achievements', 'excel_export', 'reminders'] %}{% if _pl in LP %}
+{% for _pl in ['svod', 'week_achievements', 'excel_export', 'reminders', 'pockets'] %}{% if _pl in LP %}
 <script src="/plugins-assets/{{ _pl }}.js"></script>{% endif %}{% endfor %}
 {% endblock %}

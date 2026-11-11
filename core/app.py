@@ -1201,6 +1201,45 @@ def create_app():
                 print('[INIT] tasks.%s добавлено' % _sc)
     except Exception as _e:
         print(f'[INIT] migration task stages: {_e}')
+    # Карманы: справочник по направлениям + годовые планы. Перед первой
+    # миграцией делаем резервную копию файла БД рядом с ним.
+    try:
+        _have = {r['name'] for r in db.query("SELECT name FROM sqlite_master WHERE type='table'")}
+        _dcols = [r['name'] for r in db.query('PRAGMA table_info(departments)')]
+        if 'pockets' not in _have or 'pocket_plans' not in _have or 'short_name' not in _dcols:
+            try:
+                import shutil as _sh
+                _src = Path(db.path)
+                if _src.exists():
+                    _dst = _src.with_name(_src.stem + '.before_pockets_' + datetime.now().strftime('%Y%m%d_%H%M%S') + _src.suffix)
+                    _sh.copy2(str(_src), str(_dst))
+                    print(f'[INIT] резервная копия БД перед миграцией карманов: {_dst.name}')
+            except Exception as _be:
+                print(f'[INIT] backup before pockets failed: {_be}')
+        db.exec("""CREATE TABLE IF NOT EXISTS pockets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sort INTEGER DEFAULT 0,
+            comment TEXT DEFAULT '',
+            created_at TEXT DEFAULT '',
+            updated_at TEXT DEFAULT '',
+            UNIQUE(name, direction))""")
+        db.exec("""CREATE TABLE IF NOT EXISTS pocket_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pocket_id INTEGER NOT NULL,
+            date_from TEXT NOT NULL,
+            date_to TEXT NOT NULL,
+            plan_count INTEGER DEFAULT 0,
+            comment TEXT DEFAULT '',
+            created_at TEXT DEFAULT '',
+            updated_at TEXT DEFAULT '')""")
+        if 'short_name' not in _dcols:
+            db.exec("ALTER TABLE departments ADD COLUMN short_name TEXT DEFAULT ''")
+            print('[INIT] departments.short_name добавлено')
+    except Exception as _e:
+        print(f'[INIT] migration pockets: {_e}')
     # PATCH tasks-lead — миграция: руководитель проверки (банк + сотрудник) в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
@@ -1695,6 +1734,12 @@ def create_app():
                      expert_coef_retail, expert_coef_corp, dep_id))
         except Exception as _e:
             print(f'[dept save] headcount_dir update: {_e}')
+        if 'short_name' in body:
+            try:
+                db.exec('UPDATE departments SET short_name=? WHERE id=?',
+                        (str(body.get('short_name') or '').strip()[:8], dep_id))
+            except Exception as _e:
+                print(f'[dept save] short_name: {_e}')
         _audit(db, u, 'create' if created else 'update', 'department', dep_id,
                {'name': name, 'head_employee_id': head_employee_id})
         return jsonify({'success': True, 'id': dep_id, 'created': created})
@@ -1796,6 +1841,22 @@ def create_app():
         if task_type not in _TASK_TYPES:
             task_type = ''
         pocket = str(body.get('pocket', '')).strip()[:200]
+        # Карман — строго из справочника карманов выбранного направления.
+        # Старое значение проверки (до справочника) сохраняется, пока его не поменяли.
+        if pocket:
+            try:
+                _old_pk = db.query_one('SELECT pocket, task_type FROM tasks WHERE id=?',
+                                       (str(body.get('id', '')).strip(),)) or {}
+                _keep_old = ((_old_pk.get('pocket') or '').strip() == pocket
+                             and (_old_pk.get('task_type') or '') == task_type)
+                if not _keep_old:
+                    if not task_type:
+                        return jsonify({'success': False, 'error': 'Сначала выберите направление, затем карман'}), 400
+                    if not db.query_one('SELECT id FROM pockets WHERE name=? AND direction=? AND is_active=1',
+                                        (pocket, task_type)):
+                        return jsonify({'success': False, 'error': 'Карман «%s» не найден среди открытых карманов направления «%s». Выберите из списка или добавьте его в «🗂 Карманы»' % (pocket, task_type)}), 400
+            except Exception as _pe:
+                print(f'[task_save] pocket check: {_pe}')
         curator = str(body.get('curator', '')).strip()[:100]
         # Вид задачи: 'audit' (аудиторская проверка) | 'other' (другое) + коэф. нагрузки
         task_kind = str(body.get('task_kind', 'audit')).strip()

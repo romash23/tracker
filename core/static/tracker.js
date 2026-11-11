@@ -2754,6 +2754,7 @@ function openDepartmentModal(dep) {
     g('dep_color', (dep && dep.color) || '#00897b');
     g('dep_headcount_retail', (dep && dep.headcount_retail !== null && dep.headcount_retail !== undefined) ? dep.headcount_retail : '');
     g('dep_headcount_corp', (dep && dep.headcount_corp !== null && dep.headcount_corp !== undefined) ? dep.headcount_corp : '');
+    g('dep_short_name', (dep && dep.short_name) || '');
     var headSel = $('dep_head');
     if (headSel) {
         headSel.innerHTML = '<option value="">— не указан —</option>'
@@ -2785,6 +2786,7 @@ function saveDepartment() {
         head_employee_id: $('dep_head') ? ($('dep_head').value || '') : '',
         headcount_retail: _hr,
         headcount_corp: _hc,
+        short_name: $('dep_short_name') ? $('dep_short_name').value.trim() : '',
     };
     apiJson('/api/tracker/department/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -3349,16 +3351,27 @@ function _stageEnd(idx) {
     return dl || '';
 }
 function _fillPocketOptions() {
-    var dl = $('taskPocketOptions');
-    if (!dl) return;
-    var seen = {}, opts = [];
-    (state.tasks || []).forEach(function(t){
-        var p = (t.pocket || '').trim();
-        if (p && !seen[p]) { seen[p] = 1; opts.push(p); }
-    });
-    opts.sort();
-    dl.innerHTML = opts.map(function(p){ return '<option value="' + escapeHtml(p) + '">'; }).join('');
+    var sel = $('task_pocket');
+    if (!sel || sel.tagName !== 'SELECT') return;
+    var dir = $('task_type') ? $('task_type').value : '';
+    var cur = sel.getAttribute('data-cur');
+    if (cur === null) cur = sel.value || '';
+    var list = (window.__trkPocketList || state.pockets || []).filter(function(p) { return p.direction === dir && p.is_active; });
+    var h = '<option value="">— вне кармана —</option>', found = !cur;
+    list.forEach(function(p) { if (p.name === cur) found = true; h += '<option value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</option>'; });
+    // Старое значение проверки, которого нет в справочнике, показываем, чтобы не потерять его молча
+    if (!found) h += '<option value="' + escapeHtml(cur) + '">' + escapeHtml(cur) + ' (нет в справочнике)</option>';
+    sel.innerHTML = h;
+    sel.value = cur;
+    sel.removeAttribute('data-cur');
+    sel.disabled = !dir || !!($('task_type') && $('task_type').disabled);
+    var hint = $('taskPocketHint');
+    if (hint) hint.textContent = !dir ? 'Сначала выберите направление.'
+        : (list.length ? 'Открытые карманы направления «' + dir + '». Новые задаются в «Планирование → 🗂 Карманы».'
+                       : 'Для направления «' + dir + '» карманов нет — добавьте их в «Планирование → 🗂 Карманы».');
 }
+window.trkFillPocketOptions = _fillPocketOptions;
+document.addEventListener('change', function(e) { if (e.target && e.target.id === 'task_type') { var s = $('task_pocket'); if (s) s.setAttribute('data-cur', ''); _fillPocketOptions(); } });
 
 // Нижняя граница для начала этапа idx: начало ближайшего ЗАПОЛНЕННОГО
 // предыдущего этапа (этап не может идти раньше предшественника),
@@ -3604,6 +3617,7 @@ function applyTaskKindUI(kind) {
     });
 }
 /* Открывает карточку проверки по id (сводка, колокольчик). Окно «Карточка (статистика)» больше не используется. */
+window.openTaskModal = function(t, k) { return openTaskModal(t, k); };
 window.trkOpenTaskById = function(id) {
     var t = (state.tasks || []).find(function(x) { return String(x.id) === String(id); });
     if (!t) { notify('Задача не найдена', 'error'); return; }
@@ -3652,7 +3666,7 @@ function openTaskModal(task, forceKind) {
     renderTaskOrdersDraft();
     // PATCH tasks-stages: тип задачи, карман, этапы
     g('task_type', (task && task.task_type) || '');
-    g('task_pocket', (task && task.pocket) || '');
+    var _pkSel = $('task_pocket'); if (_pkSel) _pkSel.setAttribute('data-cur', (task && task.pocket) || '');
     _fillPocketOptions();
     _taskStagesDraft = {};
     if (task && Array.isArray(task.stages)) {
@@ -19867,11 +19881,12 @@ function renderBankStatsPanel(bank){
         var defName = 'Новая проверка ' + (existingCount + 1);
         var defDir = stateDash.dir === 'corp' ? 'corp' : 'retail';
         // Список существующих карманов
-        var seen = {}, pockets = [];
-        (st().tasks || []).forEach(function(t){ var pk=(t.pocket||'').trim(); if(pk && !seen[pk]){ seen[pk]=1; pockets.push(pk);} });
-        pockets.sort();
-        var pocketOpts = ['<option value="">— Без кармана —</option>'];
-        pockets.forEach(function(pk){ pocketOpts.push('<option value="'+escapeHtml(pk)+'">'+escapeHtml(pk)+'</option>'); });
+        function pocketOptsFor(dir){
+            var tt = dirTaskType(dir), o = ['<option value="">— Вне кармана —</option>'];
+            (window.__trkPocketList || []).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
+            return o.join('');
+        }
+        var pocketOpts = [pocketOptsFor(defDir)];
 
         var ov = document.createElement('div');
         ov.id = 'dashCreateModal';
@@ -19905,6 +19920,7 @@ function renderBankStatsPanel(bank){
             if (!b) return;
             dirSel = b.getAttribute('data-dir');
             seg.querySelectorAll('[data-dir]').forEach(function(x){ x.classList.toggle('active', x===b); });
+            var ps = byId('dashCmPocket'); if (ps) ps.innerHTML = pocketOptsFor(dirSel);
         });
         ov.addEventListener('mousedown', function(e){ if (e.target === ov) dashCloseCreateModal(); });
         byId('dashCmCancel').addEventListener('click', dashCloseCreateModal);
