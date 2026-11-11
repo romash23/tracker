@@ -19088,10 +19088,10 @@ function renderBanks(){
   var s = st();
   var banks = Object.values(s.departments||{}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
   var emps  = Object.values(s.employees||{}).filter(function(e){return !e.fired;});
-  var activeBankId = selEmp ? selEmp.department_id : '';
+  var activeBankId = selEmp ? selEmp.department_id : (bankStatsBankId || '');
   sb.innerHTML = '';
   banks.forEach(function(b){
-    var item=document.createElement('div'); item.className='vac-bank-item';
+    var item=document.createElement('div'); item.className='vac-bank-item'; item.setAttribute('data-bank-id', String(b.id));
     var title=document.createElement('div'); title.className='vac-bank-title';
     var titleMain=document.createElement('div'); titleMain.className='vac-bank-title-main';
     var caret=document.createElement('span'); caret.className='vac-caret'; caret.textContent='▸';
@@ -19108,23 +19108,37 @@ function renderBanks(){
     var list=document.createElement('div'); list.className='vac-emp-list';
     var mine=emps.filter(function(e){return e.department_id===b.id;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
     mine.forEach(function(e){
-      var row=document.createElement('div'); row.className='vac-emp-row'; row.textContent=e.name;
+      var row=document.createElement('div'); row.className='vac-emp-row'; row.textContent=e.name; row.setAttribute('data-emp-id', String(e.id));
       if(selEmp && selEmp.id===e.id) row.classList.add('active');
-      row.onclick=function(){ selEmp=e; renderBanks(); renderForm(); };
+      row.onclick=function(){
+        selEmp=e;
+        if(bankStatsBankId && String(bankStatsBankId)!==String(e.department_id)) bankStatsBankId='';
+        renderBanks(); renderForm();
+      };
       list.appendChild(row);
     });
     if(!mine.length){ var em=document.createElement('div'); em.className='vac-emp-empty'; em.textContent='нет сотрудников'; list.appendChild(em); }
-    titleMain.onclick=function(){ item.classList.toggle('expanded'); caret.textContent=item.classList.contains('expanded')?'▾':'▸'; };
+    // Клик по банку: раскрыть список и сразу показать статистику банка (сотрудник не выбирается)
+    titleMain.onclick=function(){
+      var willExpand = !item.classList.contains('expanded');
+      item.classList.toggle('expanded'); caret.textContent=willExpand?'▾':'▸';
+      if(willExpand && String(bankStatsBankId)!==String(b.id)){
+        bankStatsBankId = b.id;
+        if(selEmp && String(selEmp.department_id||'')!==String(b.id)) selEmp = null;
+        markStatsBtns(); renderForm();
+      }
+    };
+    // 📊 — переключатель статистики банка, без автоподстановки сотрудника
     statsBtn.onclick=function(ev){
       ev.stopPropagation();
-      var isSameBank = selEmp && String(selEmp.department_id||'')===String(b.id);
-      if(!isSameBank){
-        var firstEmp = mine[0] || null;
-        if(firstEmp) selEmp = firstEmp;
+      if(bankStatsBankId && String(bankStatsBankId)===String(b.id)){
+        bankStatsBankId = '';
+      } else {
+        bankStatsBankId = b.id;
+        if(selEmp && String(selEmp.department_id||'')!==String(b.id)) selEmp = null;
+        if(!item.classList.contains('expanded')){ item.classList.add('expanded'); caret.textContent='▾'; }
       }
-      bankStatsBankId = (bankStatsBankId && String(bankStatsBankId)===String(b.id)) ? '' : b.id;
-      renderBanks();
-      renderForm();
+      markStatsBtns(); renderForm();
     };
     if(activeBankId && activeBankId===b.id){ item.classList.add('expanded'); caret.textContent='▾'; }
     if(bankStatsBankId && String(bankStatsBankId)===String(b.id)) statsBtn.classList.add('active');
@@ -19137,6 +19151,25 @@ function renderBanks(){
     return p.length===3 ? (p[2]+'.'+p[1]+'.'+p[0]) : iso;
   }
 
+function markStatsBtns(){
+  document.querySelectorAll('#vacBanksList .vac-bank-item').forEach(function(it){
+    var btn = it.querySelector('.vac-bank-stat-btn'); if(!btn) return;
+    btn.classList.toggle('active', !!bankStatsBankId && it.getAttribute('data-bank-id')===String(bankStatsBankId));
+  });
+  document.querySelectorAll('#vacBanksList .vac-emp-row').forEach(function(r){
+    r.classList.toggle('active', !!selEmp && r.getAttribute('data-emp-id')===String(selEmp.id));
+  });
+}
+function bindBankStats(wa){
+  if(!wa || wa.__vacStatsBound) return;
+  wa.__vacStatsBound = true;
+  wa.addEventListener('click', function(ev){
+    var t = ev.target;
+    if(t.closest('.vac-bank-collapse')){ bankStatsBankId=''; markStatsBtns(); renderForm(); return; }
+    if(t.closest('.vacBankYPrev')){ bankStatsYear--; renderForm(); return; }
+    if(t.closest('.vacBankYNext')){ bankStatsYear++; renderForm(); return; }
+  });
+}
 function bankColor(bank){
   return (bank && bank.color) || '#60a5fa';
 }
@@ -19235,6 +19268,7 @@ function renderBankStatsPanel(bank){
 }
   function renderForm(){
     var wa = document.getElementById('vacWorkArea'); if(!wa) return;
+    bindBankStats(wa);
     if(!selEmp){
       if(bankStatsBankId){
         var statsBank = Object.values(st().departments||{}).find(function(x){ return String(x.id)===String(bankStatsBankId); });

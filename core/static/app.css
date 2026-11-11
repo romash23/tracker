@@ -10954,3 +10954,11 @@ html:has(body.trk-theme-light) { background-color: #cfd8dc; }
 /* 11.11: отключённая карточка плагина не гасит подписи целиком, приглушено только имя */
 .plugin-card.off { opacity: 1; }
 .plugin-card.off .plugin-name b, .plugin-card.off .plugin-icon { opacity: 0.6; }
+
+/* Отсутствия: рабочая область всегда справа от списка банков при любом масштабе */
+#panel-vacations .vac-container{flex-wrap:nowrap !important;}
+#panel-vacations .vac-sidebar{flex:0 0 300px;min-width:240px;}
+#panel-vacations .vac-workarea{flex:1 1 0% !important;min-width:0 !important;overflow-x:auto;}
+#panel-vacations .vac-bank-stats-body{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);}
+#panel-vacations .vac-bank-stats{margin-bottom:16px;}
+@media (max-width: 1100px){#panel-vacations .vac-bank-stats-body{grid-template-columns:minmax(0,1fr);}}
