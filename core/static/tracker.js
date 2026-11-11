@@ -19238,6 +19238,36 @@ function sparklinePath(values, w, h, pad){
   var area = 'M' + pts[0][0].toFixed(2) + ' ' + (h-pad).toFixed(2) + ' ' + pts.map(function(p){ return 'L' + p[0].toFixed(2) + ' ' + p[1].toFixed(2); }).join(' ') + ' L' + pts[pts.length-1][0].toFixed(2) + ' ' + (h-pad).toFixed(2) + ' Z';
   return { line: line, area: area, min: min, max: max, last: values[values.length-1] };
 }
+/* График фактической численности: шкала от 0 до максимума (целые), сетка, подписи месяцев прямо под осью X */
+function vacHeadcountChartHtml(values, color, mNames){
+  if(!values || !values.length) return '<div class="vac-list-empty">Нет данных для графика</div>';
+  var W = 860, H = 190, PT = 10, PB = 2;
+  var vmin = Math.min.apply(null, values), vmax = Math.max.apply(null, values), last = values[values.length-1];
+  var top = Math.max(1, vmax), step = top <= 6 ? 1 : Math.ceil(top / 5);
+  top = Math.ceil(top / step) * step;
+  var innerH = H - PT - PB;
+  var yOf = function(v){ return PT + (1 - v / top) * innerH; };
+  var n = values.length;
+  var pts = values.map(function(v, i){ return [(n === 1 ? W/2 : i * W / (n - 1)), yOf(v)]; });
+  var line = pts.map(function(p, i){ return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+  var area = 'M0 ' + yOf(0).toFixed(1) + ' ' + pts.map(function(p){ return 'L' + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ') + ' L' + W + ' ' + yOf(0).toFixed(1) + ' Z';
+  var grid = '', labels = '';
+  for(var v = 0; v <= top; v += step){
+    var y = yOf(v);
+    grid += '<line x1="0" x2="' + W + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" class="vac-hc-grid' + (v === 0 ? ' zero' : '') + '" vector-effect="non-scaling-stroke"></line>';
+    labels += '<span style="top:' + (y / H * 100).toFixed(2) + '%">' + v + '</span>';
+  }
+  var months = '';
+  for(var m = 1; m < 12; m++){ months += '<line x1="' + (m * W / 12).toFixed(1) + '" x2="' + (m * W / 12).toFixed(1) + '" y1="' + PT + '" y2="' + yOf(0).toFixed(1) + '" class="vac-hc-mline" vector-effect="non-scaling-stroke"></line>'; }
+  return '<div class="vac-hc">'
+    + '<div class="vac-hc-y" title="Человек"><em>чел.</em>' + labels + '</div>'
+    + '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-label="Фактическая численность банка">' + grid + months
+    + '<path d="' + area + '" fill="' + color + '" opacity="0.18"></path>'
+    + '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path></svg>'
+    + '<div class="vac-bank-chart-months">' + ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'].map(function(name, i){ return '<span title="' + (mNames[i] || name) + '">' + name + '</span>'; }).join('') + '</div>'
+    + '</div>'
+    + '<div class="vac-bank-chart-meta">Мин: ' + vmin + ' · Макс: ' + vmax + ' · На конец года: ' + last + '</div>';
+}
 function renderBankStatsPanel(bank){
   if(!bank) return '';
   var rows = bankVacations(bank.id), color = bankColor(bank), values = countBankActiveHeadcount(bank.id, bankStatsYear), spark = sparklinePath(values, 860, 190, 16);
@@ -19258,12 +19288,8 @@ function renderBankStatsPanel(bank){
   html += '</div></div>';
   html += '<div class="vac-bank-chart-wrap"><div class="vac-year-head"><span class="vac-year-title">Фактическая численность банка</span><div class="vac-year-ctrl"><button type="button" class="vacBankYPrev">◀</button><span class="vac-year-num">' + bankStatsYear + '</span><button type="button" class="vacBankYNext">▶</button></div></div>';
   html += '<div class="vac-bank-chart">';
-  if(spark){
-    html += '<svg viewBox="0 0 860 190" preserveAspectRatio="none" aria-label="Фактическая численность банка"><path d="' + spark.area + '" fill="' + color + '" opacity="0.18"></path><path d="' + spark.line + '" fill="none" stroke="' + color + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></path></svg><div class="vac-bank-chart-meta">Мин: ' + spark.min + ' · Макс: ' + spark.max + ' · На конец года: ' + spark.last + '</div>';
-  } else {
-    html += '<div class="vac-list-empty">Нет данных для графика</div>';
-  }
-  html += '<div class="vac-bank-chart-months">' + mNames.map(function(name){ return '<span>' + name + '</span>'; }).join('') + '</div></div></div></div></div>';
+  html += vacHeadcountChartHtml(values, color, mNames);
+  html += '</div></div></div></div>';
   return html;
 }
   function renderForm(){

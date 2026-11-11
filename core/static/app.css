@@ -10962,3 +10962,70 @@ html:has(body.trk-theme-light) { background-color: #cfd8dc; }
 #panel-vacations .vac-bank-stats-body{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);}
 #panel-vacations .vac-bank-stats{margin-bottom:16px;}
 @media (max-width: 1100px){#panel-vacations .vac-bank-stats-body{grid-template-columns:minmax(0,1fr);}}
+
+/* ===== Отсутствия: график численности со шкалой 0..max, месяцы под осью X ===== */
+#panel-vacations .vac-hc{margin-top:14px;display:grid;grid-template-columns:30px minmax(0,1fr);grid-template-rows:190px auto;column-gap:6px;row-gap:4px;position:relative}
+#panel-vacations .vac-hc-y{grid-column:1;grid-row:1;position:relative;font-size:11px;color:#64748b;font-variant-numeric:tabular-nums}
+#panel-vacations .vac-hc-y span{position:absolute;right:0;transform:translateY(-50%);line-height:1}
+#panel-vacations .vac-hc-y em{position:absolute;right:0;top:-14px;font-style:normal;font-size:10px;color:#94a3b8;line-height:1}
+#panel-vacations .vac-hc svg{grid-column:2;grid-row:1;width:100%;height:190px;display:block;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);border-radius:0;overflow:visible}
+#panel-vacations .vac-hc .vac-bank-chart-months{grid-column:2;grid-row:2;gap:0;color:#64748b}
+#panel-vacations .vac-hc .vac-bank-chart-months span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+#panel-vacations .vac-hc-grid{stroke:#e2e8f0;stroke-width:1}
+#panel-vacations .vac-hc-grid.zero{stroke:#94a3b8;stroke-width:1.5}
+#panel-vacations .vac-hc-mline{stroke:#f1f5f9;stroke-width:1}
+#panel-vacations .vac-bank-chart{gap:6px}
+
+/* ===== Отсутствия: тёмная тема (раньше вкладка оставалась светлой) ===== */
+body:not(.trk-theme-light) #panel-vacations .vac-title{color:var(--trk-text,#e6e6e6)}
+body:not(.trk-theme-light) #panel-vacations .vac-workarea,
+body:not(.trk-theme-light) #panel-vacations .vac-bank-item,
+body:not(.trk-theme-light) .vac-bank-stats{background:#1f2326;border-color:rgba(255,255,255,.09);color:#e6e6e6;box-shadow:none}
+body:not(.trk-theme-light) #panel-vacations .vac-bank-title,
+body:not(.trk-theme-light) .vac-bank-stats-title,
+body:not(.trk-theme-light) #panel-vacations .vac-form-head,
+body:not(.trk-theme-light) #panel-vacations .vac-year-title,
+body:not(.trk-theme-light) #panel-vacations .vac-year-num{color:#e6e6e6}
+body:not(.trk-theme-light) #panel-vacations .vac-bank-title:hover{background:rgba(255,255,255,.05)}
+body:not(.trk-theme-light) #panel-vacations .vac-caret,
+body:not(.trk-theme-light) #panel-vacations .vac-fld,
+body:not(.trk-theme-light) #panel-vacations .vac-list-title{color:#aab4bc}
+body:not(.trk-theme-light) #panel-vacations .vac-emp-row{color:#cfd6dc}
+body:not(.trk-theme-light) #panel-vacations .vac-emp-row:hover{background:rgba(99,102,241,.18)}
+body:not(.trk-theme-light) #panel-vacations .vac-emp-row.active{background:#6366f1;color:#fff}
+body:not(.trk-theme-light) #panel-vacations .vac-emp-empty,
+body:not(.trk-theme-light) #panel-vacations .vac-empty,
+body:not(.trk-theme-light) #panel-vacations .vac-list-empty{color:#8a949c}
+body:not(.trk-theme-light) #panel-vacations .vac-type-btn{background:#262b2f;border-color:rgba(255,255,255,.14);color:#dfe5ea}
+body:not(.trk-theme-light) #panel-vacations .vac-type-btn.active{background:#6366f1;border-color:#6366f1;color:#fff}
+body:not(.trk-theme-light) #panel-vacations .vac-fld input,
+body:not(.trk-theme-light) #panel-vacations input[type=date],
+body:not(.trk-theme-light) #panel-vacations textarea{background:#2a2f33;border-color:rgba(255,255,255,.16);color:#e6e6e6;color-scheme:dark}
+body:not(.trk-theme-light) #panel-vacations .vac-fld input::placeholder{color:#7d878f}
+body:not(.trk-theme-light) #panel-vacations .vac-list-wrap,
+body:not(.trk-theme-light) #panel-vacations .vac-year-wrap{border-top-color:rgba(255,255,255,.08)}
+body:not(.trk-theme-light) #panel-vacations .vac-list-item{background:#262b2f;border-color:rgba(255,255,255,.08);color:#e6e6e6}
+body:not(.trk-theme-light) #panel-vacations .vac-list-item.past{background:#22262a;color:#8a949c}
+body:not(.trk-theme-light) #panel-vacations .vac-list-dates{color:#cfd6dc}
+body:not(.trk-theme-light) #panel-vacations .vac-list-cm,
+body:not(.trk-theme-light) .vac-bank-stat-emp{color:#aab4bc}
+body:not(.trk-theme-light) #panel-vacations .vac-year-ctrl{background:#262b2f;border-color:rgba(255,255,255,.1)}
+body:not(.trk-theme-light) #panel-vacations .vac-year-ctrl button{color:#a5b4fc}
+body:not(.trk-theme-light) #panel-vacations .vac-year-ctrl button:hover{background:rgba(99,102,241,.2)}
+body:not(.trk-theme-light) #panel-vacations .vac-mcell{background:rgba(255,255,255,.05)}
+body:not(.trk-theme-light) #panel-vacations .vac-mcell.has-em{background:rgba(99,102,241,.18);border-color:rgba(129,140,248,.4)}
+body:not(.trk-theme-light) #panel-vacations .vac-mcell.out-month{background:transparent}
+body:not(.trk-theme-light) #panel-vacations .vac-mlabel{color:#aab4bc}
+body:not(.trk-theme-light) .vac-bank-stat-btn{background:rgba(59,130,246,.16);color:#93c5fd}
+body:not(.trk-theme-light) .vac-bank-stat-btn:hover,body:not(.trk-theme-light) .vac-bank-stat-btn.active{background:rgba(59,130,246,.32)}
+body:not(.trk-theme-light) .vac-bank-collapse{background:rgba(59,130,246,.16);color:#93c5fd}
+body:not(.trk-theme-light) .vac-bank-chart-wrap{background:#22262a;border-color:rgba(255,255,255,.08)}
+body:not(.trk-theme-light) #panel-vacations .vac-hc svg{background:#1b1f22}
+body:not(.trk-theme-light) #panel-vacations .vac-hc-grid{stroke:rgba(255,255,255,.08)}
+body:not(.trk-theme-light) #panel-vacations .vac-hc-grid.zero{stroke:rgba(255,255,255,.35)}
+body:not(.trk-theme-light) #panel-vacations .vac-hc-mline{stroke:rgba(255,255,255,.04)}
+body:not(.trk-theme-light) #panel-vacations .vac-hc-y,
+body:not(.trk-theme-light) #panel-vacations .vac-hc .vac-bank-chart-months,
+body:not(.trk-theme-light) .vac-bank-chart-meta{color:#aab4bc}
+body:not(.trk-theme-light) #panel-vacations .vac-sidebar{border-right-color:rgba(255,255,255,.08)}
+body:not(.trk-theme-light) #panel-vacations .vac-emp-list{border-left-color:rgba(255,255,255,.1)}
