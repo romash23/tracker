@@ -1715,7 +1715,7 @@ function renderTasksFull() {
         return 0;
     });
 
-    if (!tasks.length) { list.innerHTML = '<div class="dict-empty">Нет задач по фильтру</div>'; return; }
+    if (!tasks.length) { list.innerHTML = '<div class="dict-empty trk-empty">Нет проверок по фильтру · <a href="#" class="trk-empty-reset">сбросить фильтры</a></div>'; return; }
     var html = '';
     tasks.forEach(function(t) { html += taskCardRowGrid(t); });
     // PATCH 1.0.9: три режима — плитка / компактно / список
@@ -5711,8 +5711,9 @@ loadState().then(function() {
         }
 
         if (!query) {
-            for (var i = 0; i < cards.length; i++) cards[i].style.display = '';
+            for (var i = 0; i < cards.length; i++) { cards[i].style.display = ''; cards[i].classList.remove('trk-search-hidden'); }
             if (countEl) countEl.textContent = '';
+            _searchEmpty(false);
             return;
         }
 
@@ -5722,16 +5723,36 @@ loadState().then(function() {
             var c = cards[j];
             var id = c.getAttribute('data-id');
             var t = map[id];
+            /* класс с !important: в плитке .task-card имеет display:flex !important и перебивает inline-стиль */
             if (matches(haystack(t), query)) {
                 c.style.display = '';
+                c.classList.remove('trk-search-hidden');
                 shown++;
             } else {
                 c.style.display = 'none';
+                c.classList.add('trk-search-hidden');
             }
         }
         if (countEl) {
             countEl.textContent = shown + ' из ' + total;
             countEl.classList.toggle('no-match', shown === 0);
+        }
+        _searchEmpty(shown === 0);
+    }
+
+    /* 11.11: пустое состояние, когда поиск скрыл все проверки */
+    function _searchEmpty(on) {
+        if (!list) return;
+        var ex = list.querySelector('.trk-empty-search');
+        var tbl = list.querySelector('table.kp-table');
+        if (tbl) tbl.style.display = on ? 'none' : '';
+        if (on && !ex) {
+            var d = document.createElement('div');
+            d.className = 'dict-empty trk-empty trk-empty-search';
+            d.innerHTML = 'Нет проверок по фильтру · <a href="#" class="trk-empty-reset">сбросить фильтры</a>';
+            list.appendChild(d);
+        } else if (!on && ex) {
+            ex.parentNode.removeChild(ex);
         }
     }
 
@@ -12007,7 +12028,7 @@ function _setupFilter(listId) {
     box.className = 'assignees-search-wrap';
     box.innerHTML =
         '<span class="assignees-search-icon">🔍</span>' +
-        '<input type="text" class="assignees-search" placeholder="Поиск по ФИО…" autocomplete="off">' +
+        '<input type="text" class="assignees-search" placeholder="' + (/dep/i.test(String(listId)) ? 'Поиск по банку…' : 'Поиск по ФИО…') + '" autocomplete="off">' +
         '<button type="button" class="assignees-search-clear" style="display:none;" title="Очистить">×</button>';
     wrap.insertBefore(box, list);
     list._searchBox = box;
@@ -18626,7 +18647,7 @@ function openTaskFromUrl(){
             else if (HM.mode === 'week' && (+inf.abs || 0) >= 0.999) { extra = ' hm-cell-absent'; tip.push('Отсутствует всю неделю'); }
             else if (HM.mode === 'week' && (+inf.abs || 0) > 0) { extra = ' hm-cell-abs-part'; tip.push('Отсутствует ' + Math.round(inf.abs * 100) + '% рабочих дней недели'); }
             if ((+inf.ext || 0) > 0) { extra += ' hm-cell-extra'; tip.push('в т.ч. доп. задачи в проверке: ' + fmt(inf.ext)); }
-            h += '<td class="hm-emp-cell'+hot+extra+'"'+(tip.length?' title="'+esc(tip.join('\n'))+'"':'')+'>'+(c? (+c).toFixed(2).replace(/\.00$/,'') : '')+'</td>';
+            h += '<td class="hm-emp-cell'+hot+extra+'"'+(tip.length?' title="'+esc(tip.join('\n'))+'"':'')+'>'+(c? fmt(c) : '')+'</td>';
           });
           h += '</tr>';
         });
@@ -21090,4 +21111,29 @@ document.addEventListener('click', function(e) {
         sync();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+
+/* === 10.11: сброс фильтров из пустого состояния «Карты проверок» === */
+(function(){
+    document.addEventListener('click', function(ev){
+        var a = ev.target.closest && ev.target.closest('.trk-empty-reset');
+        if (!a) return;
+        ev.preventDefault();
+        var si = document.getElementById('tskSearchInput');
+        if (si) { si.value = ''; si.dispatchEvent(new Event('input', { bubbles: true })); }
+        document.querySelectorAll('#panel-tasks select').forEach(function(s){ if (s.id !== 'tskSortSel' && s.options.length && s.selectedIndex !== 0) { s.selectedIndex = 0; s.dispatchEvent(new Event('change', { bubbles: true })); } });
+        var b = document.querySelector('#tskDirSeg button[data-v=""]'); if (b) b.click();
+        var m = document.querySelector('#tskViewMode button[data-mode="all"]'); if (m) m.click();
+    });
+    /* Узкие экраны: статусы «Карты проверок» — выпадающим списком */
+    function buildStatusSelect(){
+        var seg = document.getElementById('tskViewMode'); if (!seg || document.getElementById('tskViewModeSel')) return;
+        var sel = document.createElement('select'); sel.id = 'tskViewModeSel'; sel.className = 'tsk-mode-sel'; sel.title = 'Статус';
+        seg.querySelectorAll('button[data-mode]').forEach(function(b){ var o = document.createElement('option'); o.value = b.getAttribute('data-mode'); o.textContent = b.textContent.trim(); sel.appendChild(o); });
+        function sync(){ var a = seg.querySelector('button.active'); if (a) sel.value = a.getAttribute('data-mode'); }
+        sel.addEventListener('change', function(){ var b = seg.querySelector('button[data-mode="' + sel.value + '"]'); if (b) b.click(); });
+        seg.addEventListener('click', function(){ setTimeout(sync, 0); });
+        seg.parentNode.insertBefore(sel, seg.nextSibling); sync();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildStatusSelect); else buildStatusSelect();
 })();

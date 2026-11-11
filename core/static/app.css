@@ -10903,3 +10903,54 @@ body.trk-theme-light .cmp-table th, body.trk-theme-light .cmp-table td { border-
 .hm-legend-mini i { display: inline-block; width: 18px; height: 12px; vertical-align: -2px; margin-right: 5px; border: 1px solid rgba(148,163,184,.5); }
 .hm-legend-mini .lg-abs { background: repeating-linear-gradient(135deg, rgba(148,163,184,.45) 0 4px, transparent 4px 9px); }
 .hm-legend-mini .lg-ext { box-shadow: inset 0 -3px 0 #7e57c2; }
+
+/* ================= 10.11: визуальные правки ================= */
+/* Сообщения — внизу справа, не поверх ячеек */
+.tracker-notification { top: auto !important; bottom: 20px; right: 20px; transform: translateY(10px); }
+.tracker-notification.show { transform: translateY(0); }
+.trk-center-msg { align-items: flex-end !important; justify-content: flex-end !important; padding: 0 20px 20px 0; }
+.trk-center-msg-box { font-size: 15px !important; padding: 12px 20px !important; }
+/* Пустое состояние */
+.trk-empty { padding: 36px 16px; text-align: center; }
+.trk-empty a { color: #2e7d32; font-weight: 700; text-decoration: none; border-bottom: 1px dashed currentColor; }
+body:not(.trk-theme-light) .trk-empty a { color: #6fdc96; }
+/* Карта проверок: статусы на узких экранах — выпадающий список */
+.tsk-mode-sel { display: none; height: 32px; border-radius: 10px; padding: 0 8px; border: 1px solid var(--trk-card-border); background: var(--trk-input-bg); color: inherit; margin-left: auto; }
+@media (max-width: 1440px) { #tskViewMode { display: none !important; } .tsk-mode-sel { display: inline-block; } }
+/* Закреплённая шапка и первая колонка: Карта проверок (список) */
+#tasksFullList.kp-wrap { max-height: 74vh; overflow: auto; }
+.kp-table { overflow: visible !important; }
+.kp-table thead th { position: sticky; top: 0; z-index: 3; }
+.kp-table td:first-child, .kp-table th:first-child { position: sticky; left: 0; z-index: 2; background: var(--card-bg, #fff); }
+.kp-table thead th:first-child { z-index: 4; background: var(--bg-soft, #f3f5f4); }
+body:not(.trk-theme-light) .kp-table td:first-child { background: #1f2326; }
+body:not(.trk-theme-light) .kp-table thead th:first-child { background: #262b2f; }
+/* Единая система элементов: колбаски-переключатели, чипы */
+.segmented, .tsk-dir-seg { height: 32px; box-sizing: border-box; border-radius: 9px; padding: 2px; }
+.segmented button, .tsk-dir-seg button { border-radius: 7px; font-size: 0.8rem; }
+.trk-prob-chip { border-radius: 9px; }
+/* Контраст: тепловая карта (ФИО, даты, подписи) */
+body.trk-theme-light table.hm-emp-table td.hm-emp-name, body.trk-theme-light .hm-emp-name { color: #111827; }
+body.trk-theme-light table.hm-emp-table thead th { color: #1f2937; }
+body.trk-theme-light .hm-emp-dir, body.trk-theme-light .hm-emp-name .hm-emp-cnt, body.trk-theme-light .hm-bank-meta { color: #4b5563; }
+/* Документы: описание обычным шрифтом */
+.task-link-row .task-order-desc { font-weight: 400; }
+/* Плагины: фон на всю высоту и читаемые подписи */
+html, body { min-height: 100%; }
+body { min-height: 100vh; }
+.plugin-card .plug-not-loaded { color: #b7c3cc; background: rgba(149,165,166,0.28); }
+body.trk-theme-light .plugin-card .plug-not-loaded { color: #4b5563; background: #e5e7eb; }
+.plugin-card .plugin-meta { color: #b0bac2; }
+body.trk-theme-light .plugin-card .plugin-meta { color: #4b5563; }
+/* Окно «Другое»: названия банков не обрезаются */
+#taskModal.tk-kind-other .dept-check-label, #taskModal.tk-kind-other label.chk-item, #taskModal.tk-kind-other .assignee-item { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+
+/* 11.11: поиск прячет карточки и в плитке; пустое состояние на всю ширину сетки */
+#tasksFullList .trk-search-hidden { display: none !important; }
+#tasksFullList > .trk-empty-search { grid-column: 1 / -1; }
+/* 11.11: под фоновым градиентом тот же цвет, без шва на длинных страницах */
+html { background-color: #050505; }
+html:has(body.trk-theme-light) { background-color: #cfd8dc; }
+/* 11.11: отключённая карточка плагина не гасит подписи целиком, приглушено только имя */
+.plugin-card.off { opacity: 1; }
+.plugin-card.off .plugin-name b, .plugin-card.off .plugin-icon { opacity: 0.6; }

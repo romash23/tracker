@@ -1,6 +1,6 @@
 """plugins/reminders.py — Умные напоминания."""
-__version__ = '1.2'
-__description__ = 'Умные напоминания: дедлайн сегодня/завтра, просрочки (клик → запись или день)'
+__version__ = '2.0'
+__description__ = 'Напоминания по проверкам: дедлайн в ближайшие 7 дней, этапы закончились без смены статуса, начало прошло в «Планировании»'
 
 from datetime import date, timedelta
 from flask import jsonify
@@ -56,8 +56,8 @@ function render(items) {
     }
     var html = '<div class="trk-bell-head">Напоминания (' + n + ')</div>';
     items.forEach(function(it){
-        var cls = it.kind === 'overdue' ? 'trk-bell-item-overdue' : (it.kind === 'tomorrow' ? 'trk-bell-item-tomorrow' : 'trk-bell-item-today');
-        var ico = it.kind === 'overdue' ? '⚠' : (it.kind === 'tomorrow' ? '⏰' : '🔥');
+        var cls = (it.kind === 'overdue' || it.kind === 'stale') ? 'trk-bell-item-overdue' : (it.kind === 'tomorrow' ? 'trk-bell-item-tomorrow' : 'trk-bell-item-today');
+        var ico = it.kind === 'overdue' ? '⚠' : it.kind === 'stale' ? '🕒' : (it.kind === 'tomorrow' ? '⏰' : '🔥');
         html += '<div class="trk-bell-item ' + cls + '" data-task-id="' + _esc(it.task_id) + '" data-kind="' + _esc(it.kind) + '">';
         html += '<div class="trk-bell-ico">' + ico + '</div>';
         html += '<div class="trk-bell-body"><div class="trk-bell-name">' + _esc(it.task_name) + '</div>';
@@ -117,59 +117,12 @@ function buildLogModalEntry(rec) {
 }
 function goToTask(tid, kind) {
     if (!tid) return;
-    var tab = document.querySelector('.tracker-tab[data-tab="calendar"]');
-    if (tab && !tab.classList.contains('active')) tab.click();
-    var dk = todayISO();
-    var isOverdue = (kind === 'overdue');
-    setTimeout(function(){
-        var rec = findMyLatestLog(tid, dk);
-        if (rec && typeof window.__trkOpenLogModal === 'function') {
-            window.__trkOpenLogModal(buildLogModalEntry(rec));
-            return;
-        }
-        if (isOverdue && typeof window.__trkOpenLogModal === 'function') {
-            var st2 = window.__trkState;
-            var me2 = (st2 && st2.currentUser) ? (st2.currentUser.employee_id || '') : '';
-            window.__trkOpenLogModal({
-                id: null,
-                employee_id: me2,
-                task_id: tid,
-                date: dk,
-                hours: 8,
-                status: 'in_progress',
-                comment: '',
-                link: ''
-            });
-            return;
-        }
-        if (typeof window.__trkOpenDayModal === 'function') {
-            var st = window.__trkState;
-            if (st) st.currentDay = dk;
-            if (typeof window.__trkRenderCalendar === 'function') {
-                Promise.resolve(window.__trkRenderCalendar()).then(function() {
-                    window.__trkOpenDayModal(dk);
-                });
-            } else {
-                window.__trkOpenDayModal(dk);
-            }
-            return;
-        }
-        if (typeof window.__trkOpenLogModal === 'function') {
-            window.__trkOpenLogModal({
-                id: null,
-                employee_id: (window.__trkState && window.__trkState.currentUser) ? (window.__trkState.currentUser.employee_id || '') : '',
-                task_id: tid,
-                date: dk,
-                hours: 8,
-                status: 'in_progress',
-                comment: '',
-                link: ''
-            });
-        }
-    }, 400);
+    if (typeof window.trkOpenTaskById === 'function') { window.trkOpenTaskById(tid); return; }
+    var st = window.__trkState || {}, t = (st.tasks || []).find(function(x) { return String(x.id) === String(tid); });
+    if (t && typeof window.trkOpenTaskSmart === 'function') window.trkOpenTaskSmart(t);
 }
 function boot(){
-    if (!window.REESTR_PERMS || !window.REESTR_PERMS['tab.calendar']) return;
+    var P = window.REESTR_PERMS || {}; if (!P['tab.tasks'] && !P['tab.calendar']) return;
     if (!getBell()) return;
     load();
     setInterval(load, INTERVAL_MS);
@@ -205,56 +158,33 @@ def register(app, db, hooks):
             u = None
         if not u:
             return jsonify({'success': False, 'error': 'auth'}), 401
-        emp_id = (u.get('employee_id') or '').strip()
-        if not emp_id:
-            return jsonify({'success': True, 'items': []})
-
         data = db.load_all()
-        today = date.today().strftime('%Y-%m-%d')
-        tomorrow = (date.today() + timedelta(days=1)).strftime('%Y-%m-%d')
-
-        my_tasks_today = set()
-        for l in data.get('log', []):
-            if l.get('employee_id') == emp_id and l.get('date') == today:
-                my_tasks_today.add(l.get('task_id'))
-
+        today_d = date.today()
+        today = today_d.strftime('%Y-%m-%d')
+        soon = (today_d + timedelta(days=7)).strftime('%Y-%m-%d')
         items = []
         for t in data.get('tasks', []):
-            if t.get('status') not in ('active', 'paused'):
+            if (t.get('task_kind') or 'audit') != 'audit':
                 continue
-            if emp_id not in (t.get('assignees') or []):
+            st = t.get('status') or ''
+            if st not in ('planning', 'approved', 'active'):
                 continue
-            if t.get('id') in my_tasks_today:
-                continue
-            dl = t.get('deadline') or ''
-            if not dl:
-                continue
-            if dl < today:
-                items.append({
-                    'kind': 'overdue',
-                    'task_id': t.get('id'),
-                    'task_name': t.get('name'),
-                    'deadline': dl,
-                    'label': 'Просрочена · дедлайн ' + dl,
-                })
-            elif dl == today:
-                items.append({
-                    'kind': 'today',
-                    'task_id': t.get('id'),
-                    'task_name': t.get('name'),
-                    'deadline': dl,
-                    'label': 'Дедлайн сегодня, отметки нет',
-                })
-            elif dl == tomorrow:
-                items.append({
-                    'kind': 'tomorrow',
-                    'task_id': t.get('id'),
-                    'task_name': t.get('name'),
-                    'deadline': dl,
-                    'label': 'Дедлайн завтра',
-                })
+            dl = (t.get('deadline') or '')[:10]
+            sd = (t.get('start_date') or '')[:10]
+            base = {'task_id': t.get('id'), 'task_name': t.get('name') or '', 'deadline': dl}
+            if dl and dl < today:
+                items.append(dict(base, kind='overdue',
+                                  label='Этапы закончились ' + dl[8:10] + '.' + dl[5:7] + ', статус не обновлён'))
+            elif dl and dl <= soon:
+                n = (date.fromisoformat(dl) - today_d).days
+                items.append(dict(base, kind='today' if n <= 1 else 'tomorrow',
+                                  label=('Дедлайн сегодня' if n == 0 else 'Дедлайн завтра' if n == 1 else 'Дедлайн через ' + str(n) + ' дн.')
+                                  + ' · ' + dl[8:10] + '.' + dl[5:7]))
+            if st == 'planning' and sd and sd < today:
+                items.append(dict(base, kind='stale',
+                                  label='Начало ' + sd[8:10] + '.' + sd[5:7] + ' прошло, проверка всё ещё в «Планировании»'))
 
-        items.sort(key=lambda x: ({'overdue': 0, 'today': 1, 'tomorrow': 2}).get(x['kind'], 3))
+        items.sort(key=lambda x: (({'overdue': 0, 'stale': 1, 'today': 2, 'tomorrow': 3}).get(x['kind'], 4), x.get('deadline') or ''))
         return jsonify({'success': True, 'items': items[:20]})
 
     def on_startup(**ctx):

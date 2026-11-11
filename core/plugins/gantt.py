@@ -1035,7 +1035,7 @@ body.gg-filling, body.gg-filling * { cursor: crosshair !important; user-select: 
 .gg-lp-btn { border: 1px solid rgba(92,107,192,0.7); background: rgba(92,107,192,0.15); color: inherit; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 0.78rem; cursor: pointer; }
 .gg-lp-btn:hover { background: rgba(92,107,192,0.3); }
 .gg-lp-man-hint { font-size: 0.72rem; color: var(--pg-meta, #a0a0a0); margin-top: 5px; }
-.gg-flash { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30000; background: #fff; color: #14532d; border: 3px solid #2e7d32; border-radius: 12px; padding: 14px 24px; font-weight: 700; box-shadow: 0 10px 40px rgba(0,0,0,0.35); display: none; }
+.gg-flash { position: fixed; right: 18px; bottom: 18px; left: auto; top: auto; transform: none; max-width: 420px; z-index: 30000; background: #fff; color: #14532d; border: 3px solid #2e7d32; border-radius: 12px; padding: 14px 24px; font-weight: 700; box-shadow: 0 10px 40px rgba(0,0,0,0.35); display: none; }
 .gg-flash.bad { color: #7f1d1d; border-color: #c62828; }
 
 /* Таблица проверок в 2 раза ниже (компактно) */
@@ -1065,6 +1065,35 @@ body.trk-theme-light #ganttBox .gg-sau { background: #8a9096; box-shadow: 0 0 0 
 .gg-sau-gapchip { background: repeating-linear-gradient(135deg, rgba(160,160,160,0.55) 0 3px, rgba(160,160,160,0.2) 3px 6px) !important; }
 #ganttBox .gg-sau-col > i.gg-man { box-shadow: inset 0 0 0 2px #3949ab; }
 #ganttBox .gg-sau-col > i.gg-man::after { content: '✎'; position: absolute; right: 1px; top: 50%; transform: translateY(-50%); font-size: 8px; line-height: 1; color: #fff; text-shadow: 0 0 2px #1a237e; }
+
+
+/* === визуальные правки 10.11: панель сдвигает таблицу, сегодня, скелетоны, пустые состояния === */
+body.gg-lp-open > .page, body.gg-lp-open .gg-page { margin-right: 410px; transition: margin-right .18s ease; }
+/* .wrap масштабирован zoom: 0.85, поэтому отступ делим на 0.85, иначе панель перекрывает таблицу на ~60 px */
+body.gg-lp-open .wrap { margin-right: calc(410px / 0.85); transition: margin-right .18s ease; }
+@media (max-width: 1100px) { body.gg-lp-open .wrap, body.gg-lp-open > .page, body.gg-lp-open .gg-page { margin-right: 0; } }
+.gg-today-line { z-index: 3; pointer-events: none; }
+.gg-mode-week .gg-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #2ecc71; box-shadow: 0 0 6px rgba(46,204,113,0.55); }
+#ganttBox .gg-sau-col > i.gg-sau-os { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 5px); }
+.lg-chip.gg-sau-oschip { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 2px, transparent 2px 5px) !important; }
+.gg-skel { padding: 10px 12px; }
+.gg-skel-row { display: flex; align-items: center; gap: 12px; height: 34px; border-bottom: 1px solid rgba(128,128,128,0.12); }
+.gg-skel-row i { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, rgba(128,128,128,0.16) 25%, rgba(128,128,128,0.30) 50%, rgba(128,128,128,0.16) 75%); background-size: 400% 100%; animation: ggSkel 1.3s ease-in-out infinite; }
+.gg-skel-name { flex: 0 0 220px; width: 220px; }
+.gg-skel-bar { height: 16px !important; }
+@keyframes ggSkel { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+.gg-empty { text-align: center; padding: 48px 20px; color: var(--pg-meta, #a0a0a0); font-size: 0.92rem; }
+.gg-empty a { color: #2ecc71; font-weight: 700; text-decoration: none; border-bottom: 1px dashed currentColor; }
+body.trk-theme-light .gg-empty { color: #4b5563; } body.trk-theme-light .gg-empty a { color: #1b7f3b; }
+.gg-seg .gg-s { display: none; }
+@media (max-width: 1440px) { .gg-seg .gg-l { display: none; } .gg-seg .gg-s { display: inline; } .gg-seg button { padding-left: 9px; padding-right: 9px; } }
+/* единая система: колбаски-переключатели */
+.gg-seg { height: 32px; box-sizing: border-box; border-radius: 9px; padding: 2px; align-items: stretch; }
+.gg-seg button { border-radius: 7px; font-size: 0.8rem; padding: 0 12px; line-height: 1; }
+/* контраст вторичного текста */
+body.trk-theme-light .gg-lp-sub, body.trk-theme-light .gg-lp-part, body.trk-theme-light .gg-lp-sum span, body.trk-theme-light .gg-lp-sec, body.trk-theme-light .gg-lp-empty { color: #4b5563; }
+body.trk-theme-light .gg-load-legend .gg-ll-note { color: #4b5563; }
+.gg-load-legend .gg-ll-note, .gg-lp-part { color: var(--pg-meta,#c2c2c2); }
 
 /* ручная правка нагрузки по проверке */
 body.gg-can-ov #ganttBox .gg-task-row .gg-track, body.gg-can-ov #ganttBox .gg-sub-row .gg-track { cursor: cell; }
@@ -1139,10 +1168,10 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
         </div>
         <div class="gg-seg-row">
             <div class="gg-seg" id="ggTypeSeg" role="group" aria-label="Направление">
-                <button type="button" data-v="">Всего ОАМ</button>
-                <button type="button" data-v="корпоративная">Корпоративное</button>
-                <button type="button" data-v="розничная">Розничное с ПВР</button>
-                <button type="button" data-v="розничная_без_пвр">Розничное без ПВР</button>
+                <button type="button" data-v=""><span class="gg-l">Всего ОАМ</span><span class="gg-s">ОАМ</span></button>
+                <button type="button" data-v="корпоративная"><span class="gg-l">Корпоративное</span><span class="gg-s">Корп.</span></button>
+                <button type="button" data-v="розничная"><span class="gg-l">Розничное с ПВР</span><span class="gg-s">Розн. с ПВР</span></button>
+                <button type="button" data-v="розничная_без_пвр"><span class="gg-l">Розничное без ПВР</span><span class="gg-s">Розн. без ПВР</span></button>
             </div>
             <div class="gg-seg" id="ggShowSeg" role="group" aria-label="Отображение">
                 <button type="button" data-v="banks">Банки</button>
@@ -1158,16 +1187,16 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
         <div class="gg-seg-row gg-load-row" id="ggLoadBar">
             <div class="gg-seg" id="ggMetricSeg" role="group" aria-label="Показатель">
                 <button type="button" data-v="load">Загрузка</button>
-                <button type="button" data-v="free">Свободно</button>
+                <button type="button" data-v="free"><span class="gg-l">Свободно</span><span class="gg-s">Своб.</span></button>
                 <button type="button" data-v="pct">%</button>
             </div>
             <div class="gg-seg" id="ggHcSeg" role="group" aria-label="Численность">
-                <button type="button" data-v="norm" title="Ёмкость = экспертный коэффициент × нормативная численность">Нормативная</button>
-                <button type="button" data-v="fact" title="Ёмкость = экспертный коэффициент × фактическая численность (работающие сотрудники)">Фактическая</button>
+                <button type="button" data-v="norm" title="Ёмкость = экспертный коэффициент × нормативная численность"><span class="gg-l">Нормативная</span><span class="gg-s">Норм.</span></button>
+                <button type="button" data-v="fact" title="Ёмкость = экспертный коэффициент × фактическая численность (работающие сотрудники)"><span class="gg-l">Фактическая</span><span class="gg-s">Факт.</span></button>
             </div>
             <div class="gg-seg gg-seg-multi" id="ggStatusSeg" role="group" aria-label="Статус" title="Можно выбрать несколько статусов">
-                <button type="button" data-v="planning">Планирование</button>
-                <button type="button" data-v="approved">Утверждена</button>
+                <button type="button" data-v="planning"><span class="gg-l">Планирование</span><span class="gg-s">План.</span></button>
+                <button type="button" data-v="approved"><span class="gg-l">Утверждена</span><span class="gg-s">Утв.</span></button>
                 <button type="button" data-v="active">Активна</button>
             </div>
             <button type="button" class="gg-xls-btn" id="ggXlsBtn" title="Выгрузить таблицу в Excel">⬇ Excel</button>
@@ -1179,7 +1208,7 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
     </div>
     <div class="banks-title" id="banksTitle" style="display:none;">Нагрузка по ТБ</div>
     <div class="gantt-box" id="banksBox" style="display:none;">
-        <div class="loading">Загрузка…</div>
+        <div class="gg-skel"><div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:10%;width:40%"></i></div><div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:25%;width:30%"></i></div><div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:15%;width:50%"></i></div></div>
     </div>
     <div class="gg-load-legend" id="banksLegend" style="display:none;">
         <span class="gg-ll-t">% к ёмкости:</span>
@@ -1196,7 +1225,7 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
     </div>
     <div class="banks-title" id="tasksTitle">Проверки</div>
     <div class="gantt-box" id="ganttBox">
-        <div class="loading">Загрузка…</div>
+        <div class="gg-skel"><div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:10%;width:40%"></i></div><div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:25%;width:30%"></i></div><div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:15%;width:50%"></i></div></div>
     </div>
     <div class="legend" id="ggLegend">
         <div class="it"><span class="sw active"></span>В работе</div>
@@ -1685,9 +1714,24 @@ function fillPocketFilter(pockets) {
     msSetOptions('pocket', opts);
 }
 
+function ggSkeleton(n) {
+    var h = '<div class="gg-skel" aria-busy="true" aria-label="Загрузка">';
+    for (var i = 0; i < (n || 8); i++) h += '<div class="gg-skel-row"><i class="gg-skel-name"></i><i class="gg-skel-bar" style="margin-left:' + (8 + (i * 37) % 30) + '%;width:' + (25 + (i * 53) % 40) + '%"></i></div>';
+    return h + '</div>';
+}
+function ggEmptyHtml(txt) {
+    return '<div class="gg-empty">' + (txt || 'Нет проверок по фильтру') + ' · <a href="#" class="gg-empty-reset">сбросить фильтры</a></div>';
+}
+document.addEventListener('click', function(ev) {
+    var a = ev.target.closest && ev.target.closest('.gg-empty-reset');
+    if (!a) return;
+    ev.preventDefault();
+    try { ['gg.fType', 'gg.status', 'gg.statusSel', 'gg.pocket', 'gg.dept'].forEach(function(k) { localStorage.removeItem(k); }); } catch (e) {}
+    location.reload();
+});
 function load() {
     var box = document.getElementById('ganttBox');
-    box.innerHTML = '<div class="loading">Загрузка…</div>';
+    box.innerHTML = ggSkeleton();
     var q = '?from=' + encodeURIComponent(document.getElementById('fFrom').value) +
             '&to=' + encodeURIComponent(document.getElementById('fTo').value);
     msGetSelected('dept').forEach(function(v) {
@@ -1778,7 +1822,7 @@ function renderDay(d) {
     var today = d.today || '';
 
     if (!tasks.length) {
-        box.innerHTML = '<div class="empty">Нет задач за выбранный период</div>';
+        box.innerHTML = ggEmptyHtml();
         clearBanks();
         return;
     }
@@ -1879,7 +1923,7 @@ function renderDay(d) {
     /* Легенда этапов */
     html += '<div class="gg-stage-legend">';
     STAGE_ORDER.forEach(function(k) {
-        html += '<span class="lg-item"><span class="lg-chip" style="background:' + STAGE_COLORS[k] + '"></span>' + STAGE_LABELS[k] + '</span>';
+        html += '<span class="lg-item"><span class="lg-chip' + (k === 'ос_проф' ? ' gg-sau-oschip' : '') + '" style="background:' + STAGE_COLORS[k] + '"></span>' + STAGE_LABELS[k] + '</span>';
     });
     html += '</div>';
 
@@ -1895,7 +1939,7 @@ function renderWeek(d) {
     var days = d.days || [];
     var today = d.today || '';
 
-    if (!tasks.length) { box.innerHTML = '<div class="empty">Нет задач за выбранный период</div>'; clearBanks(); return; }
+    if (!tasks.length) { box.innerHTML = ggEmptyHtml(); clearBanks(); return; }
     if (!days.length) { box.innerHTML = '<div class="empty">Пустой диапазон дат</div>'; return; }
 
     var STAGE_ORDER = ['подготовка','проверка_нжя','проверка_соглЦА','ос_проф','реализация_возражения','реализация_согласования','запас','оценка_тб'];
@@ -1947,6 +1991,8 @@ function renderWeek(d) {
     weeks.forEach(function(w, i) {
         if (w.mon === todayMon) {
             html += '<div class="gg-bg-cell gg-bg-today" style="left:' + (i * WEEK_W) + 'px;width:' + WEEK_W + 'px"></div>';
+            var _dw = (new Date(today + 'T00:00:00').getDay() + 6) % 7;
+            html += '<div class="gg-today-line" title="Сегодня" style="left:' + Math.round(i * WEEK_W + (_dw + 0.5) * WEEK_W / 7) + 'px"></div>';
         }
     });
     html += '</div>';
@@ -1975,7 +2021,7 @@ function renderWeek(d) {
     /* Легенда этапов */
     html += '<div class="gg-stage-legend">';
     STAGE_ORDER.forEach(function(k) {
-        html += '<span class="lg-item"><span class="lg-chip" style="background:' + STAGE_COLORS[k] + '"></span>' + STAGE_LABELS[k] + '</span>';
+        html += '<span class="lg-item"><span class="lg-chip' + (k === 'ос_проф' ? ' gg-sau-oschip' : '') + '" style="background:' + STAGE_COLORS[k] + '"></span>' + STAGE_LABELS[k] + '</span>';
     });
     html += '<span class="lg-item"><span class="lg-chip gg-sau-gapchip"></span>Нет активного этапа</span>';
     html += '</div>';
@@ -2017,7 +2063,7 @@ function ggSausageHtml(t, groups, cellW, COLORS, LABELS, perLbl, isDay) {
             var man = ggTovAny(t.id, isDay ? mondayOf(mn) : mn);
             var off = isDay && isOffDay(mn);
             var ttl = perLbl(i) + (isDay ? '' : ' · ' + fmtD(mn)) + ': ' + (st ? (LABELS[st.key] || st.key) : 'нет активного этапа') + (man ? ' · ✎ нагрузка задана вручную' : '');
-            h += '<i class="' + (col ? '' : 'gg-sau-gap') + (man ? ' gg-man' : '') + (off ? ' gg-sau-off' : '') + '"' + (col ? ' style="background:' + col + '"' : '') + ' title="' + esc(ttl) + '"></i>';
+            h += '<i class="' + (col ? '' : 'gg-sau-gap') + (st && st.key === 'ос_проф' ? ' gg-sau-os' : '') + (man ? ' gg-man' : '') + (off ? ' gg-sau-off' : '') + '"' + (col ? ' style="background:' + col + '"' : '') + ' title="' + esc(ttl) + '"></i>';
         });
         if (!mons.length) h += '<i class="gg-sau-gap"></i>';
         h += '</span>';
@@ -2043,7 +2089,7 @@ function buildMonths(days) {
 function renderMonth(d) {
     var box = document.getElementById('ganttBox');
     var tasks = d.tasks || [], days = d.days || [], today = d.today || '';
-    if (!tasks.length) { box.innerHTML = '<div class="empty">Нет задач за выбранный период</div>'; clearBanks(); return; }
+    if (!tasks.length) { box.innerHTML = ggEmptyHtml(); clearBanks(); return; }
     var months = buildMonths(days);
     if (!months.length) { box.innerHTML = '<div class="empty">Пустой диапазон дат</div>'; return; }
     var STAGE_COLORS = {'подготовка':'#C9CDCC','проверка_нжя':'#DFD4BD','проверка_соглЦА':'#D4B64B','ос_проф':'#747677','реализация_возражения':'#9BB393','реализация_согласования':'#6E8F6A','запас':'#B0BEC5','оценка_тб':'#8FA9C9'};
@@ -2062,7 +2108,11 @@ function renderMonth(d) {
     });
     html += '</div></div></div><div class="gg-body"><div class="gg-bg" style="width:' + trackW + 'px">';
     months.forEach(function(p, i) {
-        if (today && p.start <= today && today <= p.end) html += '<div class="gg-bg-cell gg-bg-today" style="left:' + (i * MONTH_W) + 'px;width:' + MONTH_W + 'px"></div>';
+        if (today && p.start <= today && today <= p.end) {
+            html += '<div class="gg-bg-cell gg-bg-today" style="left:' + (i * MONTH_W) + 'px;width:' + MONTH_W + 'px"></div>';
+            var _dim = +p.end.slice(8, 10), _dd = +today.slice(8, 10);
+            html += '<div class="gg-today-line" title="Сегодня" style="left:' + Math.round(i * MONTH_W + (_dd - 0.5) / _dim * MONTH_W) + 'px"></div>';
+        }
     });
     html += '</div>';
     tasks.forEach(function(t) {
@@ -2819,6 +2869,7 @@ function ggLoadPanelEl() {
 function ggLoadPanelClose() {
     var el = document.getElementById('ggLoadPanel');
     if (el) el.classList.remove('open');
+    document.body.classList.remove('gg-lp-open');
     ggLoadSel = null;
     Array.prototype.forEach.call(document.querySelectorAll('.gg-load-cell.gg-sel'), function(c) { c.classList.remove('gg-sel'); });
 }
@@ -2830,6 +2881,7 @@ function ggLoadPanelOpen(ri, i) {
     var x = ggCellInfo(ri, i); if (!x) return;
     var m = ggLoadModel, r = x.r, pi = x.pi;
     var el = ggLoadPanelEl();
+    document.body.classList.add('gg-lp-open');
     el.querySelector('#ggLpTitle').textContent = r.name;
     el.querySelector('#ggLpSub').textContent = pi.label + (pi.now ? ' · сейчас' : '') + (pi.offDays ? ' · нерабочих будних дней: ' + pi.offDays : '');
     var lvl = ggPctLevel(x.v, x.cap);
