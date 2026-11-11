@@ -11,7 +11,6 @@ __description__ = 'Свод по проверкам: KPI, индекс здор�
 import json
 import io
 from datetime import date, datetime, timedelta
-import re
 from flask import request, jsonify, Response
 
 _SCOPES = ('', 'корпоративная', 'розничная', 'розничная_без_пвр')
@@ -25,7 +24,7 @@ _JS = r"""
 (function(){
 'use strict';
 if (window.__svodV1) return; window.__svodV1 = true;
-var ST = { scope: '', from: '', to: '', data: null, sort: 'start', dir: 1, q: '', view: 'svod', week: '', wdata: null, wopen: {}, wmore: false };
+var ST = { scope: '', from: '', to: '', data: null, sort: 'start', dir: 1, q: '', view: 'svod', week: '', wdata: null };
 try { ST.view = localStorage.getItem('svod.view') || 'svod'; } catch (e) {}
 try { ST.scope = localStorage.getItem('svod.scope') || ''; } catch (e) {}
 var SCOPES = [['', 'Всего ОАМ'], ['корпоративная', 'Корпоративное'], ['розничная', 'Розничное с ПВР'], ['розничная_без_пвр', 'Розничное без ПВР']];
@@ -89,23 +88,7 @@ function css() {
     '#svodTasks .svod-t td:first-child,#svodTasks .svod-t th:first-child{position:sticky;left:0;z-index:2;background:var(--trk-card-bg,#1f2326)}',
     '#svodTasks .svod-t thead th:first-child{z-index:4}',
     'body.trk-theme-light #svodTasks .svod-t thead th,body.trk-theme-light #svodTasks .svod-t td:first-child{background:#fff}',
-    'body.trk-theme-light .svod-note,body.trk-theme-light .svod-sub{opacity:1;color:#4b5563}',
-    '.svw-t td{vertical-align:top}.svw-t .svw-tg{width:26px}.svw-toggle{border:1px solid var(--trk-card-border,#555);background:transparent;color:inherit;border-radius:6px;width:22px;height:22px;cursor:pointer;line-height:1;padding:0}',
-    '.svw-row.open td{background:rgba(38,162,105,.06)}.svw-name a{color:inherit;font-weight:700;text-decoration:none}.svw-name a:hover{text-decoration:underline}',
-    '.svw-mute{opacity:.78;font-size:.72rem}.svw-od{color:#e74c3c;font-weight:700}'
-    ,'.svw-mute{opacity:.78;font-size:.72rem}.svw-brief{min-width:280px;line-height:1.45}.svw-c{text-align:center;white-space:nowrap}.svw-bad{color:#e74c3c}',
-    '.svw-st{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.72rem;font-weight:700;color:#fff;background:#777;white-space:nowrap}',
-    '.svw-st.st-planning{background:#7e57c2}.svw-st.st-approved{background:#d68910}.svw-st.st-active{background:#2874a6}.svw-st.st-done{background:#239b56}.svw-st.st-cancelled{background:#7f8c8d}',
-    '.svw-nzh{color:#d68910}.svw-tag{font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:999px;background:rgba(214,137,16,.18);color:#d68910}',
-    '.svw-detrow td{padding:0 6px 10px!important;background:transparent!important}.svw-det{border-left:3px solid #26a269;padding:8px 12px;border-radius:0 8px 8px 0;background:rgba(127,127,127,.06)}',
-    '.svw-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:10px}.svw-dh{font-weight:700;font-size:.78rem;margin-bottom:4px}',
-    '.svw-ul{margin:0;padding-left:16px;font-size:.76rem;line-height:1.5}',
-    '.svw-diary{border-top:1px dashed var(--trk-card-border,#555);padding-top:8px}.svw-diary.nzh .svw-dh{color:#d68910}',
-    '.svw-dt{width:100%;border-collapse:collapse;font-size:.76rem}.svw-dt th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--trk-card-border,#444)}.svw-dt td{padding:4px 6px;vertical-align:top}',
-    '.svw-dt .svw-bank{white-space:nowrap;font-weight:600;width:180px}.svw-act{width:120px}.svw-who{margin-top:2px}',
-    '.svw-ta{width:100%;box-sizing:border-box;min-height:38px;resize:vertical;padding:4px 6px;border-radius:6px;border:1px solid var(--trk-card-border,#555);background:transparent;color:inherit;font:inherit;font-size:.76rem}',
-    '.svw-more{margin-top:4px}.svw-more>summary{cursor:pointer;font-weight:700;font-size:.82rem;padding:6px 2px;opacity:.85}.svw-more[open]>summary{margin-bottom:8px}',
-    'body.trk-theme-light .svw-det{background:#f6f8fa}body.trk-theme-light .svw-mute{opacity:1;color:#6b7280}'
+    'body.trk-theme-light .svod-note,body.trk-theme-light .svod-sub{opacity:1;color:#4b5563}'
     ].join('\n');
     document.head.appendChild(st);
 }
@@ -243,7 +226,7 @@ function skel() {
 }
 function viewSeg() {
     return '<div class="svod-bar"><div class="svod-seg" id="svodView">'
-        + [['svod', '📊 Свод'], ['week', '📰 Недельный отчёт']].map(function(x) { return '<button type="button" data-v="' + x[0] + '"' + (ST.view === x[0] ? ' class="active"' : '') + '>' + x[1] + '</button>'; }).join('')
+        + [['svod', '📊 Свод'], ['week', '📰 Недельный срез']].map(function(x) { return '<button type="button" data-v="' + x[0] + '"' + (ST.view === x[0] ? ' class="active"' : '') + '>' + x[1] + '</button>'; }).join('')
         + '</div></div>';
 }
 function monOf(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
@@ -276,72 +259,11 @@ function weekHtml() {
     var ov = w.overloads.map(function(x) { return '<tr><td>' + e(x.bank) + '</td><td class="num">пик ' + n(x.peak) + ' из ' + n(x.capacity) + '</td><td class="num"><span class="svod-lv svod-lv' + (x.pct > 125 ? 5 : 4) + '">' + x.pct + '%</span></td></tr>'; });
     var pr = w.problems.map(function(x) { return trow(x.id, [e(x.name), '<div class="svod-probs">' + x.problems.map(function(p) { return '<span class="svod-chip">' + e(p) + '</span>'; }).join('') + '</div>']); });
     var sn = w.deadlines_soon.map(function(x) { return trow(x.id, [e(x.name), fdd(x.deadline), e(x.status)]); });
-    var isAdm = !!(window.__trkState && window.__trkState.currentUser && window.__trkState.currentUser.role === 'admin');
-    var tl = w.tasks || [];
-    var allOpen = tl.length && tl.every(function(t) { return ST.wopen[t.id]; });
-    var EVI = { status: '🔄', new: '🆕', ext: '⏳', done: '✅' };
-    function brief(t) {
-        var parts = [];
-        if (t.events.length) parts.push(t.events.map(function(x) { return EVI[x.kind] + ' ' + e(x.text); }).join(' · '));
-        else parts.push('<span class="svw-mute">без событий за неделю</span>');
-        if (t.comments.length) parts.push('💬 ' + e(t.comments[t.comments.length - 1].text));
-        return parts.join('<br>');
-    }
-    function diaryHtml(t) {
-        if (!t.diary.length) return '<div class="svw-mute">У проверки нет банков</div>';
-        var h = '<div class="svw-diary' + (t.nzh ? ' nzh' : '') + '"><div class="svw-dh">📓 Дневник по ТБ за неделю'
-            + (t.nzh ? ' <span class="svw-tag">этап «Проверка НЖЯ»</span>' : ' <span class="svw-mute">(основной для этапа «Проверка НЖЯ»)</span>') + '</div>'
-            + '<table class="svw-dt"><thead><tr><th>ТБ</th><th>✔ Сделано</th><th>↪ Перенесено</th><th></th></tr></thead><tbody>';
-        t.diary.forEach(function(d) {
-            var key = e(t.id) + '|' + e(d.bank_id);
-            h += '<tr data-dk="' + key + '"><td class="svw-bank">' + (d.lead ? '👑 ' : '') + e(d.bank) + '</td>';
-            if (isAdm) {
-                h += '<td><textarea class="svw-ta" data-f="done" rows="2" placeholder="что сделали">' + e(d.done) + '</textarea></td>'
-                    + '<td><textarea class="svw-ta" data-f="moved" rows="2" placeholder="что перенесли и почему">' + e(d.moved) + '</textarea></td>'
-                    + '<td class="svw-act"><button type="button" class="svod-btn svw-save">💾</button><div class="svw-mute svw-who">' + (d.updated_at ? e(d.author) + ' · ' + e(d.updated_at.slice(8, 10) + '.' + d.updated_at.slice(5, 7) + ' ' + d.updated_at.slice(11, 16)) : '') + '</div></td>';
-            } else {
-                h += '<td>' + (d.done ? e(d.done).replace(/\n/g, '<br>') : '<span class="svw-mute">—</span>') + '</td><td>' + (d.moved ? e(d.moved).replace(/\n/g, '<br>') : '<span class="svw-mute">—</span>') + '</td><td class="svw-mute">' + e(d.author || '') + '</td>';
-            }
-            h += '</tr>';
-        });
-        return h + '</tbody></table></div>';
-    }
-    function detail(t) {
-        var h = '<div class="svw-det"><div class="svw-cols">';
-        h += '<div><div class="svw-dh">🗓 События недели</div>' + (t.events.length ? '<ul class="svw-ul">' + t.events.map(function(x) { return '<li>' + EVI[x.kind] + ' <b>' + fdd(x.ts.slice(0, 10)) + '</b> ' + e(x.text) + '</li>'; }).join('') + '</ul>' : '<div class="svw-mute">нет</div>') + '</div>';
-        h += '<div><div class="svw-dh">💬 Комментарии за неделю</div>' + (t.comments.length ? '<ul class="svw-ul">' + t.comments.map(function(x) { return '<li><b>' + fdd(x.date) + '</b> ' + e(x.text) + '</li>'; }).join('') + '</ul>' : '<div class="svw-mute">нет</div>') + '</div>';
-        h += '<div><div class="svw-dh">📌 Состояние</div><ul class="svw-ul">'
-            + '<li>Этап: <b>' + (e(t.stage) || '—') + '</b>' + (t.stage_end ? ' до ' + fdd(t.stage_end) : '') + '</li>'
-            + (t.next_stage ? '<li>Далее: ' + e(t.next_stage) + ' с ' + fdd(t.next_start) + '</li>' : '')
-            + '<li>Руководитель: ' + (e(t.lead) || '—') + ' · куратор ЦА: ' + (e(t.curator) || '—') + '</li>'
-            + (t.extras.length ? '<li>Доп. задачи: ' + t.extras.map(function(x) { return e(x.name) + ' (' + e(x.status) + ')'; }).join(', ') + '</li>' : '')
-            + (t.problems.length ? '<li class="svw-bad">🚨 ' + t.problems.map(e).join('; ') + '</li>' : '')
-            + '</ul></div>';
-        return h + '</div>' + diaryHtml(t) + '</div>';
-    }
-    var rows = tl.map(function(t) {
-        var op = !!ST.wopen[t.id];
-        return '<tr class="svw-row' + (op ? ' open' : '') + '" data-wid="' + e(t.id) + '">'
-            + '<td class="svw-tg"><button type="button" class="svw-toggle" title="' + (op ? 'Свернуть' : 'Подробнее: события, комментарии, дневник по ТБ') + '">' + (op ? '▾' : '▸') + '</button></td>'
-            + '<td class="svw-name"><a href="#" class="svw-open" data-tid="' + e(t.id) + '">' + e(t.name) + '</a><div class="svw-mute">' + e(t.banks.join(', ')) + '</div></td>'
-            + '<td><span class="svw-st st-' + e(t.status) + '">' + e(t.status_label) + '</span></td>'
-            + '<td>' + (t.stage ? (t.nzh ? '<b class="svw-nzh">' + e(t.stage) + '</b>' : e(t.stage)) : '<span class="svw-mute">—</span>') + '</td>'
-            + '<td class="svw-brief">' + brief(t) + '</td>'
-            + '<td class="svw-c">' + (t.problems.length ? '<span class="svw-bad" title="' + e(t.problems.join('; ')) + '">🚨 ' + t.problems.length + '</span>' : '') + '</td>'
-            + '<td class="svw-c" title="Заполнено строк дневника">' + (t.diary.length ? '📓 ' + t.diary_filled + '/' + t.diary.length : '') + '</td>'
-            + '<td class="svw-c' + (t.deadline && t.deadline < iso(new Date()) && (t.status === 'active' || t.status === 'approved' || t.status === 'planning') ? ' svw-od" title="Срок прошёл' : '') + '">' + (t.deadline ? fdd(t.deadline) + '.' + t.deadline.slice(2, 4) : '—') + '</td></tr>'
-            + (op ? '<tr class="svw-detrow"><td></td><td colspan="7">' + detail(t) + '</td></tr>' : '');
-    });
-    var taskBox = '<div class="svod-box" style="margin-bottom:12px"><h4 style="display:flex;align-items:center;gap:10px">📋 Проверки за неделю <span class="svod-cnt">' + tl.length + '</span>'
-        + '<button type="button" class="svod-btn" id="svodWAll" style="margin-left:auto">' + (allOpen ? '▾ Свернуть все' : '▸ Раскрыть все') + '</button></h4>'
-        + (tl.length ? '<table class="svod-t svw-t"><thead><tr><th></th><th>Проверка</th><th>Статус</th><th>Этап</th><th>Кратко за неделю</th><th title="Число проблем">🚨</th><th title="Дневник по ТБ: заполнено строк / всего банков">📓</th><th>Срок</th></tr></thead><tbody>' + rows.join('') + '</tbody></table>'
-            + '<div class="svod-note">По умолчанию — краткая версия. ▸ раскрывает события, комментарии и дневник по каждому ТБ (что сделали, что перенесли). Проверки на этапе «Проверка НЖЯ» стоят первыми.</div>'
-            : '<div class="svod-empty">За неделю нет активных проверок и событий</div>') + '</div>';
-    var more = '<details class="svw-more"' + (ST.wmore ? ' open' : '') + '><summary>Сводка по банкам и прочее (перегрузы ТБ, дедлайны, новые и завершённые)</summary>'
-        + '<div class="svod-grid">' + wsec('🔥 Перегрузы ТБ (эта и следующая неделя)', ov, 'Перегрузов нет 👍') + wsec('📅 Дедлайны в ближайшие 14 дней', sn, 'Дедлайнов нет') + '</div>'
+    return head + kp
+        + '<div class="svod-grid">' + wsec('🔄 Смена статуса', st, 'За неделю статусы не менялись') + wsec('⏳ Продления сроков', ex, 'Продлений не было') + '</div>'
+        + '<div class="svod-grid">' + wsec('🔥 Перегрузы ТБ (эта и следующая неделя)', ov, 'Перегрузов нет 👍') + wsec('🚨 Проблемные проверки', pr, 'Проблемных нет 👍') + '</div>'
         + '<div class="svod-grid">' + wsec('🆕 Новые проверки', cr, 'Новых проверок нет') + wsec('✅ Завершены', dn, 'Завершённых нет') + '</div>'
-        + '<div class="svod-grid">' + wsec('🔄 Смена статуса', st, 'За неделю статусы не менялись') + wsec('⏳ Продления сроков', ex, 'Продлений не было') + '</div></details>';
-    return head + kp + taskBox + more;
+        + wsec('📅 Дедлайны в ближайшие 14 дней', sn, 'Дедлайнов нет');
 }
 function loadWeek() {
     if (!ST.week) ST.week = iso(monOf(new Date()));
@@ -359,29 +281,6 @@ document.addEventListener('click', function(ev) {
     if (ev.target.closest('#svodWPrev')) { shiftWeek(-1); return; }
     if (ev.target.closest('#svodWNext')) { shiftWeek(1); return; }
     if (ev.target.closest('#svodWNow')) { ST.week = ''; loadWeek(); return; }
-    var wt = ev.target.closest('.svw-toggle');
-    if (wt) { var wid = wt.closest('tr').getAttribute('data-wid'); ST.wopen[wid] = !ST.wopen[wid]; render(); return; }
-    if (ev.target.closest('#svodWAll')) { var tl0 = (ST.wdata && ST.wdata.tasks) || []; var all0 = tl0.every(function(t) { return ST.wopen[t.id]; }); ST.wopen = {}; if (!all0) tl0.forEach(function(t) { ST.wopen[t.id] = true; }); render(); return; }
-    var wo = ev.target.closest('a.svw-open');
-    if (wo) { ev.preventDefault(); var oid = wo.getAttribute('data-tid'); var st0 = window.__trkState || {}; var tt = (st0.tasks || []).find(function(x) { return String(x.id) === String(oid); }); if (tt && typeof window.trkOpenTaskSmart === 'function') window.trkOpenTaskSmart(tt); else if (typeof window.trkOpenTaskById === 'function') window.trkOpenTaskById(oid); return; }
-    var sm = ev.target.closest('.svw-more > summary');
-    if (sm) { setTimeout(function() { var d = sm.parentNode; ST.wmore = !!d.open; }, 0); return; }
-    var sv = ev.target.closest('.svw-save');
-    if (sv) {
-        var tr0 = sv.closest('tr[data-dk]'), k0 = tr0.getAttribute('data-dk').split('|');
-        var body = { task_id: k0[0], bank_id: k0[1], week: ST.week, done: tr0.querySelector('[data-f=done]').value, moved: tr0.querySelector('[data-f=moved]').value };
-        var csrf = window.REESTR_CSRF || (document.querySelector('meta[name=csrf-token]') || {}).content || '';
-        sv.disabled = true;
-        fetch('/api/plugins/svod/diary', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'X-CSRFToken': csrf }, body: JSON.stringify(body) })
-            .then(function(r) { return r.json().catch(function() { return { success: false, error: 'HTTP ' + r.status }; }); })
-            .then(function(d) {
-                sv.disabled = false;
-                if (!d.success) { if (window.trkNotify) window.trkNotify('❌ ' + (d.error || 'Ошибка'), 'error'); else alert(d.error || 'Ошибка'); return; }
-                (ST.wdata.tasks || []).forEach(function(t) { if (String(t.id) !== k0[0]) return; t.diary.forEach(function(x) { if (String(x.bank_id) === k0[1]) { x.done = body.done.trim(); x.moved = body.moved.trim(); x.author = d.author; x.updated_at = d.updated_at; } }); t.diary_filled = t.diary.filter(function(x) { return x.done || x.moved; }).length; });
-                render(); if (window.trkNotify) window.trkNotify('✅ Дневник сохранён', 'success');
-            }).catch(function(er) { sv.disabled = false; alert(er.message || 'Ошибка сети'); });
-        return;
-    }
     if (ev.target.closest('#svodWXls')) { location.href = '/api/plugins/svod/weekly?format=xlsx&week=' + ST.week; return; }
     var b = ev.target.closest('#svodScope button[data-v]');
     if (b) { ST.scope = b.getAttribute('data-v'); try { localStorage.setItem('svod.scope', ST.scope); } catch (x) {} load(); return; }
@@ -462,7 +361,7 @@ def _server_problems(r, today):
     return p
 
 
-def weekly_compute(data, audit_rows, extensions, overrides, mon, today=None, diary_rows=None):
+def weekly_compute(data, audit_rows, extensions, overrides, mon, today=None):
     """Недельный отчёт по проверкам за неделю mon..mon+6.
     audit_rows — строки audit_log (entity='task') за неделю."""
     today = today or date.today()
@@ -491,19 +390,6 @@ def weekly_compute(data, audit_rows, extensions, overrides, mon, today=None, dia
                 status_changes.append({'id': tid, 'name': tasks[tid].get('name'), 'ts': r['ts'], 'who': who,
                                        'from': st_lbl(c.get('from')), 'to': st_lbl(c.get('to'))})
     status_changes.sort(key=lambda x: x['ts'])
-    _dd = []
-    def _tsd(v):
-        try:
-            return datetime.strptime(v[:19], '%Y-%m-%d %H:%M:%S')
-        except Exception:
-            return None
-    for x in status_changes:
-        p_ = _dd[-1] if _dd else None
-        if p_ and p_['id'] == x['id'] and p_['from'] == x['from'] and p_['to'] == x['to'] \
-                and _tsd(p_['ts']) and _tsd(x['ts']) and (_tsd(x['ts']) - _tsd(p_['ts'])).total_seconds() <= 300:
-            continue
-        _dd.append(x)
-    status_changes = _dd
     ext = []
     for x in extensions:
         ea = (x.get('extended_at') or '')[:10]
@@ -528,89 +414,9 @@ def weekly_compute(data, audit_rows, extensions, overrides, mon, today=None, dia
     soon.sort(key=lambda x: x['deadline'])
     done = [{'id': t['id'], 'name': t.get('name'), 'date': (t.get('completed_at') or '')[:10]}
             for t in tasks.values() if t.get('status') == 'done' and a <= (t.get('completed_at') or '')[:10] <= z]
-    # --- срез по проверкам: строка на проверку, события недели, этап, дневник по ТБ ---
-    dname = {x['id']: (x.get('name') or x['id']) for x in data.get('departments', [])}
-    ref = min(today, sun)
-    ref_s = ref.strftime('%Y-%m-%d')
-    all_tasks = data.get('tasks', [])
-    extras = {}
-    for x in all_tasks:
-        if x.get('task_kind') == 'other' and x.get('other_subkind') == 'audit_extra' and x.get('parent_task_id'):
-            extras.setdefault(x['parent_task_id'], []).append(x)
-    ev = {}
-    for x in status_changes:
-        ev.setdefault(x['id'], []).append({'ts': x['ts'], 'kind': 'status', 'text': x['from'] + ' → ' + x['to'] + (' (авто)' if x.get('auto') else '')})
-    for x in created:
-        ev.setdefault(x['id'], []).append({'ts': x['ts'], 'kind': 'new', 'text': 'создана, статус «' + x['status'] + '»'})
-    for x in ext:
-        ev.setdefault(x['id'], []).append({'ts': x['date'], 'kind': 'ext', 'text': 'продление +' + str(x['days'] or 0) + ' дн.: ' + (x['from'] or '—') + ' → ' + (x['to'] or '—') + (' · ' + x['comment'] if x['comment'] else '')})
-    for x in done:
-        ev.setdefault(x['id'], []).append({'ts': x['date'], 'kind': 'done', 'text': 'завершена'})
-    prob_map = {x['id']: x['problems'] for x in probs}
-
-    def stage_at(t, iso):
-        for s_ in t.get('stages') or []:
-            if s_.get('start') and s_['start'] <= iso <= (s_.get('end') or t.get('deadline') or s_['start']):
-                return s_
-        return None
-
-    def week_comments(t):
-        out = []
-        for ln in str(t.get('folder') or '').splitlines():
-            ln = ln.strip()
-            m = re.match(r'^(\d{2})\.(\d{2})\.(\d{4})\s*[—–-]?\s*(.*)$', ln)
-            if m:
-                d_ = m.group(3) + '-' + m.group(2) + '-' + m.group(1)
-                if a <= d_ <= z:
-                    out.append({'date': d_, 'text': m.group(4)})
-        return out
-
-    diary = {}
-    for r in diary_rows or []:
-        diary[(r['task_id'], r['bank_id'])] = {'done': r.get('done_text') or '', 'moved': r.get('moved_text') or '',
-                                               'author': r.get('author') or '', 'updated_at': r.get('updated_at') or ''}
-    task_rows = []
-    for t in tasks.values():
-        stt = t.get('status') or 'active'
-        evs = sorted(ev.get(t['id'], []), key=lambda x: x['ts'])
-        live = stt in ('planning', 'approved', 'active') and (t.get('start_date') or '9999') <= z and (t.get('deadline') or '0000') >= a
-        if not live and not evs:
-            continue
-        sg = stage_at(t, ref_s)
-        nxt_stage = None
-        if sg:
-            stl = [x for x in (t.get('stages') or []) if x.get('start')]
-            for i_, x in enumerate(stl):
-                if x is sg and i_ + 1 < len(stl):
-                    nxt_stage = stl[i_ + 1]
-        banks = list(t.get('department_ids') or [])
-        lead = t.get('lead_department') or ''
-        if lead in banks:
-            banks.remove(lead); banks.insert(0, lead)
-        ex_list = [{'id': x['id'], 'name': x.get('name') or '', 'status': st_lbl(x.get('status')),
-                    'load': x.get('load_coef')} for x in extras.get(t['id'], [])
-                   if x.get('status') not in ('cancelled',)]
-        cm = week_comments(t)
-        dr = [{'bank_id': b, 'bank': dname.get(b, b), 'lead': b == lead,
-               **diary.get((t['id'], b), {'done': '', 'moved': '', 'author': '', 'updated_at': ''})} for b in banks]
-        stage_key = (sg or {}).get('key') or ''
-        task_rows.append({
-            'id': t['id'], 'name': t.get('name') or '', 'status': stt, 'status_label': st_lbl(stt),
-            'stage': (sg or {}).get('label') or '', 'stage_key': stage_key,
-            'stage_end': (sg or {}).get('end') or '',
-            'next_stage': (nxt_stage or {}).get('label') or '', 'next_start': (nxt_stage or {}).get('start') or '',
-            'deadline': t.get('deadline') or '', 'lead': dname.get(lead, ''), 'curator': t.get('curator') or '',
-            'banks': [dname.get(b, b) for b in banks], 'events': evs, 'problems': prob_map.get(t['id'], []),
-            'comments': cm, 'extras': ex_list, 'diary': dr,
-            'diary_filled': sum(1 for x in dr if x['done'] or x['moved']),
-            'nzh': stage_key == 'проверка_нжя',
-        })
-    order = {'active': 0, 'approved': 1, 'planning': 2, 'done': 3, 'cancelled': 4}
-    task_rows.sort(key=lambda r: (0 if r['nzh'] else 1, order.get(r['status'], 9), r['deadline'] or '9999', r['name'].lower()))
     return {'week': a, 'week_end': z, 'status_changes': status_changes, 'created': created, 'extensions': ext,
             'done': done, 'overloads': over, 'problems': probs, 'deadlines_soon': soon,
-            'health': res['kpi'].get('health'), 'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'tasks': task_rows}
+            'health': res['kpi'].get('health'), 'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M')}
 
 
 def _weekly_xlsx(rep):
@@ -618,9 +424,9 @@ def _weekly_xlsx(rep):
     from openpyxl.styles import Font, PatternFill
     wb = Workbook()
     ws = wb.active
-    ws.title = 'Недельный отчёт'
+    ws.title = 'Недельный срез'
     bold, hdr = Font(bold=True), PatternFill('solid', fgColor='E0E0E0')
-    ws.append(['Недельный отчёт по проверкам · ' + rep['week'] + ' — ' + rep['week_end']])
+    ws.append(['Недельный срез по проверкам · ' + rep['week'] + ' — ' + rep['week_end']])
     ws['A1'].font = Font(bold=True, size=12)
     h = rep.get('health') or {}
     ws.append(['Индекс здоровья', h.get('index'), 'проблемных ' + str(h.get('problem_pct')) + '%, перегруженных недель ' + str(h.get('over_pct')) + '%'])
@@ -633,11 +439,6 @@ def _weekly_xlsx(rep):
             c.font, c.fill = bold, hdr
         for r in rows or [['—']]:
             ws.append(r)
-    block('Проверки за неделю (кратко)', ['Проверка', 'Статус', 'Этап', 'События недели', 'Проблемы', 'Срок'],
-          [[t['name'], t['status_label'], t['stage'], '; '.join(x['text'] for x in t['events']), '; '.join(t['problems']), t['deadline']]
-           for t in rep.get('tasks') or []])
-    _dr = [[t['name'], d['bank'], d['done'], d['moved'], d['author']] for t in rep.get('tasks') or [] for d in t['diary'] if d['done'] or d['moved']]
-    block('Дневник по ТБ (что сделали / что перенесли)', ['Проверка', 'ТБ', 'Сделано', 'Перенесено', 'Автор'], _dr)
     block('Смена статуса', ['Проверка', 'Было', 'Стало', 'Когда', 'Кто'],
           [[x['name'], x['from'], x['to'], x['ts'], x['who']] for x in rep['status_changes']])
     block('Новые проверки', ['Проверка', 'Статус', 'Когда', 'Кто'], [[x['name'], x['status'], x['ts'], x['who']] for x in rep['created']])
@@ -985,50 +786,11 @@ def register(app, db, hooks):
             ext = db.query('SELECT * FROM task_extensions')
         except Exception:
             ext = []
-        try:
-            dr = db.query('SELECT task_id, bank_id, done_text, moved_text, author, updated_at FROM svod_task_diary WHERE week=?',
-                          (mon.strftime('%Y-%m-%d'),))
-        except Exception:
-            dr = []
-        return weekly_compute(data, rows, ext, ov, mon, diary_rows=dr)
+        return weekly_compute(data, rows, ext, ov, mon)
 
     def _week_of(s):
         d = _d(s) or date.today()
         return d - timedelta(days=d.weekday())
-
-    try:
-        db.exec('CREATE TABLE IF NOT EXISTS svod_task_diary ('
-                'task_id TEXT NOT NULL, bank_id TEXT NOT NULL, week TEXT NOT NULL, '
-                'done_text TEXT DEFAULT "", moved_text TEXT DEFAULT "", author TEXT DEFAULT "", updated_at TEXT DEFAULT "", '
-                'PRIMARY KEY (task_id, bank_id, week))')
-    except Exception as _e:
-        print('[svod] diary table:', repr(_e))
-
-    @app.route('/api/plugins/svod/diary', methods=['POST'])
-    def _svod_diary():
-        u, err = _auth()
-        if err:
-            return err
-        if (u.get('role') if isinstance(u, dict) else getattr(u, 'role', '')) != 'admin':
-            return jsonify({'success': False, 'error': 'Дневник заполняет администратор'}), 403
-        b = request.get_json(silent=True) or {}
-        tid, bid = str(b.get('task_id') or '').strip(), str(b.get('bank_id') or '').strip()
-        mon = _week_of(b.get('week'))
-        if not tid or not bid:
-            return jsonify({'success': False, 'error': 'task_id/bank_id'}), 400
-        if not db.query_one('SELECT 1 FROM tasks WHERE id=?', (tid,)):
-            return jsonify({'success': False, 'error': 'Проверка не найдена'}), 404
-        done_t = str(b.get('done') or '').strip()[:4000]
-        moved_t = str(b.get('moved') or '').strip()[:4000]
-        who = (u.get('name') or u.get('username') or '') if isinstance(u, dict) else ''
-        now = datetime.now().strftime('%Y-%m-%d %H:%M')
-        wk = mon.strftime('%Y-%m-%d')
-        if not done_t and not moved_t:
-            db.exec('DELETE FROM svod_task_diary WHERE task_id=? AND bank_id=? AND week=?', (tid, bid, wk))
-        else:
-            db.exec('INSERT OR REPLACE INTO svod_task_diary (task_id, bank_id, week, done_text, moved_text, author, updated_at) '
-                    'VALUES (?,?,?,?,?,?,?)', (tid, bid, wk, done_t, moved_t, who, now))
-        return jsonify({'success': True, 'author': who, 'updated_at': now})
 
     @app.route('/api/plugins/svod/weekly', methods=['GET'])
     def _svod_weekly():
@@ -1064,10 +826,10 @@ def register(app, db, hooks):
         db.exec('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
                 (key, json.dumps({k: rep[k] for k in ('generated_at', 'health')}, ensure_ascii=False)))
         h = rep.get('health') or {}
-        msg = ('📰 Недельный отчёт ' + mon.strftime('%d.%m') + '–' + (mon + timedelta(days=6)).strftime('%d.%m')
+        msg = ('📰 Недельный срез ' + mon.strftime('%d.%m') + '–' + (mon + timedelta(days=6)).strftime('%d.%m')
                + ': смен статуса ' + str(len(rep['status_changes'])) + ', продлений ' + str(len(rep['extensions']))
                + ', перегрузов ТБ ' + str(len(rep['overloads'])) + ', индекс здоровья ' + str(h.get('index', '—'))
-               + '. Статистика → Свод → Недельный отчёт.')
+               + '. Статистика → Свод → Недельный срез.')
         for adm in db.query("SELECT id FROM users WHERE role='admin'"):
             db.exec("INSERT INTO notifications (ts, to_user_id, from_user_id, from_username, kind, task_id, employee_id, message, status, read_at) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?)",

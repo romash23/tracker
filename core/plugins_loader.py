@@ -41,7 +41,6 @@ DEFAULT_DISABLED = (
     'week_achievements',
     'weekly_summary_widget',
     'my_week',
-    'weekly_report',
     'excel_export',
 )
 
