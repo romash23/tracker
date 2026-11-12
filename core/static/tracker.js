@@ -3797,7 +3797,7 @@ function openTaskSummary(task) {
     h += _tsumRow('👤 Куратор ЦА', cur, !(task.curator && task.curator !== 'нет'));
     // Остальное — только непустое
     if (task.task_type) h += _tsumRow('🧭 Направление', escapeHtml(task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1)));
-    if (task.pocket) h += _tsumRow('👝 Карман', escapeHtml(task.pocket));
+    if (task.pocket) h += _tsumRow('👝 Карман', (task.task_type === 'корпоративная' ? '🏢 ' : task.task_type === 'розничная' ? '👥 ' : '') + escapeHtml(task.pocket));
     var deps = task.department_ids || [];
     if (deps.length) h += _tsumRow('🏦 Банки', '<ul class="tsum-list">' + deps.map(function(d) {
         return '<li>' + _tsumDepName(d) + (d === task.lead_department ? ' <span class="tsum-lead-mark" title="Банк-руководитель">👑</span>' : '') + '</li>';

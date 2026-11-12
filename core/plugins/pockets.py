@@ -7,7 +7,7 @@
 таблица 2 — карман × банки-участники + «вне кармана», итоги, ПШЕ и «в год на ПШЕ».
 Таблицы pockets / pocket_plans создаются миграцией в app.py (с резервной копией БД).
 """
-__version__ = '1.0'
+__version__ = '1.1'
 __description__ = 'Карманы: справочник по направлениям, годовые планы, распределение проверок по ТБ'
 
 import re
@@ -24,6 +24,60 @@ def short_bank(dep):
         return s
     parts = [p for p in re.split(r'[\s\-]+', dep.get('name') or '') if p]
     return ''.join(p[0].upper() for p in parts)[:6] or '?'
+
+
+_PALETTE = ['#2e7d32', '#6a3fb5', '#00838f', '#795548', '#b71c1c', '#546e7a', '#6d4c41',
+            '#5e35b1', '#ad1457', '#558b2f', '#00695c', '#8e24aa']
+# Цвета, занятые смыслом в окне: синий (корп.), розовый (розн.), оранжевый (⚠ нет в справочнике)
+_RESERVED = [(59, 130, 246), (217, 70, 143), (240, 160, 75)]
+
+
+def _rgb(c):
+    c = (c or '').strip().lstrip('#')
+    if len(c) == 3:
+        c = ''.join(x * 2 for x in c)
+    try:
+        return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return None
+
+
+def _dist(a, b):
+    return sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5
+
+
+def _close(a, b):
+    return bool(a and b) and _dist(a, b) < 120
+
+
+def _readable(c):
+    """Цвет метки с белым текстом: слишком светлые цвета затемняем."""
+    r = _rgb(c)
+    if not r:
+        return c
+    lum = (0.299 * r[0] + 0.587 * r[1] + 0.114 * r[2]) / 255
+    if lum <= 0.5:
+        return c
+    k = 0.5 / lum
+    return '#%02x%02x%02x' % tuple(int(x * k) for x in r)
+
+
+def label_colors(deps):
+    """Цвет метки банка: свой цвет банка, а если он совпадает или почти совпадает
+    с цветом уже показанного банка — следующий различимый цвет из палитры."""
+    out, used = {}, []
+    for d in deps:
+        c = d.get('color') or ''
+        rc = _rgb(c)
+        lum = (0.299 * rc[0] + 0.587 * rc[1] + 0.114 * rc[2]) / 255 if rc else 1
+        if not rc or lum > 0.55 or any(_close(rc, u) for u in used + _RESERVED):
+            # самый непохожий на уже занятые цвет из палитры
+            pc = max(_PALETTE, key=lambda x: min([_dist(_rgb(x), u) for u in used + _RESERVED] or [999]))
+            c, rc = pc, _rgb(pc)
+        c = _readable(c)
+        used.append(_rgb(c))
+        out[d['id']] = c
+    return out
 
 
 def _surname(n):
@@ -67,6 +121,7 @@ def plan_progress(data, pockets, plans):
 
 def pockets_compute(data, pockets, year, direction=''):
     deps = data.get('departments') or []
+    lcol = label_colors(deps)
     emp = {e['id']: e for e in data.get('employees') or []}
     dep_ids = [d['id'] for d in deps]
     known = {(p['name'], p['direction']) for p in pockets}
@@ -144,7 +199,7 @@ def pockets_compute(data, pockets, year, direction=''):
             except Exception:
                 per[dk] = None
         banks.append({'id': b, 'name': d.get('name') or '', 'short': short_bank(d),
-                      'color': d.get('color') or '#00897b', 'count': cnt, 'hc': hc, 'per_hc': per})
+                      'color': lcol.get(b) or '#00897b', 'count': cnt, 'hc': hc, 'per_hc': per})
     return {'year': year, 'direction': direction, 'cols': cols, 'banks': banks,
             't1': t1, 't1_total': t1_tot, 't2': t2, 't2_total': t2_tot,
             'tasks': tinfo, 'total_tasks': len(ytasks)}
@@ -156,10 +211,17 @@ _JS = r"""
 if (window.__pocketsV1) return; window.__pocketsV1 = true;
 var DIRS = [['', 'Все'], ['корпоративная', 'Корпоративное'], ['розничная', 'Розничное']];
 var DL = { 'корпоративная': 'Корп.', 'розничная': 'Розн.' };
+var DMETA = { 'корпоративная': { k: 'corp', ic: '🏢', t: 'Корпоративное', cl: 'pk-d-corp' }, 'розничная': { k: 'retail', ic: '👥', t: 'Розничное', cl: 'pk-d-retail' } };
+function ptag(name, dir, unk) {
+    var m = DMETA[dir];
+    return '<span class="pk-ptag ' + (m ? m.cl : '') + (unk ? ' pk-old' : '') + '" title="' + e((m ? m.t + ' направление' : 'Без направления') + (unk ? ' · нет в справочнике' : '')) + '">'
+        + (m ? '<i>' + m.ic + '</i>' : '') + e(name) + (unk ? '<em class="pk-warn">⚠</em>' : '') + '</span>';
+}
 var STL = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена' };
 var ST = { year: new Date().getFullYear(), dir: '', d: null, cell: null, edit: null, plan: null };
 try { ST.dir = localStorage.getItem('pk.dir') || ''; } catch (x) {}
 function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function n2(v) { return v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2).replace('.', ','); }
 function n(v) { return v == null ? '—' : String(Math.round(v * 100) / 100).replace('.', ','); }
 function fd(s) { return s ? s.split('-').reverse().join('.') : ''; }
 function api(url, body) {
@@ -215,13 +277,29 @@ function css() {
     '.pk-t thead th:first-child{z-index:3;background:#262a31}body.trk-theme-light .pk-t thead th:first-child{background:#eef1f4}',
     '.pk-t td[data-cell]{cursor:pointer}.pk-t td[data-cell]:hover{background:rgba(38,162,105,.16)}',
     '.pk-t tr.pk-tot td{font-weight:700;border-top:2px solid rgba(128,128,128,.4)}',
-    '.pk-t tr.pk-calc td{font-style:italic}',
+    '.pk-t tr.pk-calc td{font-weight:600}.pk-t tr.pk-calc td:first-child{font-weight:700}',
+    '.pk-t td[data-cell]{text-align:center}.pk-t td[data-cell] .pk-ln{display:block;font-size:.7rem;opacity:.85;font-weight:500;line-height:1.1}',
+    'body:not(.trk-theme-light) .pk-bank{box-shadow:0 0 0 1px rgba(255,255,255,.35)}',
     '.pk-t .pk-unk{color:#f0a04b}body.trk-theme-light .pk-t .pk-unk{color:#a85a00}',
     '.pk-t small{display:block;font-weight:500;opacity:.9;font-size:.7rem}',
+    'body:not(.trk-theme-light) .pk-bank{box-shadow:0 0 0 1px rgba(255,255,255,.35)}',
     '.pk-bank{display:inline-block;min-width:34px;padding:1px 6px;border-radius:6px;color:#fff;font-weight:700;font-size:.72rem;text-align:center;text-shadow:0 1px 1px rgba(0,0,0,.35)}',
     '.pk-cell{margin:8px 0;padding:8px 10px;border:1px solid rgba(38,162,105,.5);border-radius:10px}',
     '.pk-cell a{cursor:pointer;color:inherit;text-decoration:underline dotted}',
-    '.pk-empty{padding:10px;opacity:.75;font-size:.82rem}'
+    '.pk-empty{padding:10px;opacity:.75;font-size:.82rem}',
+    '.pk-ptag{display:inline-flex;align-items:center;gap:4px;max-width:none;padding:1px 8px 1px 6px;border-radius:6px;border-left:4px solid #888;background:rgba(128,128,128,.12);font-weight:700;white-space:nowrap;line-height:1.35;text-align:left;vertical-align:middle}',
+    '.pk-ptag i{font-style:normal;font-size:1.05em;line-height:1}',
+    '.pk-ptag em.pk-warn{font-style:normal;color:#f0a04b;margin-left:2px}body.trk-theme-light .pk-ptag em.pk-warn{color:#b45f00}',
+    '.pk-d-corp.pk-ptag{border-left-color:#3b82f6;background:rgba(59,130,246,.14)}',
+    '.pk-d-retail.pk-ptag{border-left-color:#d9468f;background:rgba(217,70,143,.14)}',
+    '.pk-ptag.pk-old{opacity:.85}',
+    '.pk-dsec{margin-top:16px;padding:10px 12px 12px;border-radius:12px;border:1px solid rgba(128,128,128,.28);border-top-width:4px}',
+    '.pk-dsec.pk-d-corp{border-top-color:#3b82f6}.pk-dsec.pk-d-retail{border-top-color:#d9468f}',
+    '.pk-dsec h4.pk-dh{margin:0 0 8px;font-size:.95rem}',
+    '.pk-dsec h5{margin:12px 0 6px;font-size:.82rem}',
+    '.pk-dir.pk-d-corp{border-left:4px solid #3b82f6}.pk-dir.pk-d-retail{border-left:4px solid #d9468f}',
+    '.pk-legend{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.75rem;opacity:.9;margin:4px 0 0}',
+    '.pk-t thead th{vertical-align:middle}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -276,9 +354,9 @@ function pocketRow(p, ed) {
         h += '<span class="pk-form" style="margin:0"><input type="text" data-f="pname" value="' + e(p.name) + '" maxlength="100">'
            + '<button class="pk-btn pri mini" data-act="rensave" data-id="' + p.id + '">💾</button><button class="pk-btn mini" data-act="rencancel">Отмена</button></span>';
     } else {
-        h += '<span class="pk-name">' + e(p.name) + '</span>';
+        h += '<span class="pk-name">' + ptag(p.name, p.direction) + '</span>';
     }
-    h += '<span class="pk-mute">проверок всего: ' + (p.tasks_total || 0) + '</span>';
+    h += '<span class="pk-mute" title="Число проверок с этим карманом за все годы">проверок: ' + (p.tasks_total || 0) + '</span>';
     if (!p.is_active) h += '<span class="pk-chip">закрыт</span>';
     if (ed) {
         h += '<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'
@@ -304,26 +382,43 @@ function pocketRow(p, ed) {
     return h + '</div>';
 }
 function render() {
-    var d = ST.d, ed = d.can_edit, m = d.matrix;
+    var d = ST.d, ed = d.can_edit;
     var h = '<div class="pk-sec"><h4>Справочник карманов и планы на ' + ST.year + ' год</h4><div class="pk-dirs">';
     DIRS.slice(1).forEach(function(dr) {
         if (ST.dir && ST.dir !== dr[0]) return;
         var list = d.pockets.filter(function(p) { return p.direction === dr[0]; });
-        h += '<div class="pk-dir"><h5>' + dr[1] + '</h5>';
+        var DM = DMETA[dr[0]];
+        h += '<div class="pk-dir ' + DM.cl + '"><h5>' + DM.ic + ' ' + dr[1] + '</h5>';
         if (!list.length) h += '<div class="pk-empty">Карманов нет' + (ed ? ' — добавьте ниже' : '') + '</div>';
         list.forEach(function(p) { h += pocketRow(p, ed); });
-        if (ed) h += '<div class="pk-form" style="margin:8px 0 0"><input type="text" data-f="newname" data-dir="' + e(dr[0]) + '" placeholder="Новый карман (' + dr[1].toLowerCase() + ')" maxlength="100" style="width:220px"><button class="pk-btn mini" data-act="add" data-dir="' + e(dr[0]) + '">+ Добавить</button></div>';
+        if (ed) h += '<div class="pk-form" style="margin:8px 0 0"><input type="text" data-f="newname" data-dir="' + e(dr[0]) + '" placeholder="Новый карман: ' + (dr[0] === 'корпоративная' ? 'корпоративный' : 'розничный') + '" maxlength="100" style="width:220px"><button class="pk-btn mini" data-act="add" data-dir="' + e(dr[0]) + '">+ Добавить</button></div>';
         h += '</div>';
     });
     h += '</div></div>';
     h += '<div id="pkCellBox"></div>';
-    var cols = m.cols, NONE = '__none';
+    h += '<div class="pk-legend">Обозначения: ' + ptag('корпоративное', 'корпоративная') + ptag('розничное', 'розничная') + '<span class="pk-ptag" style="border-left-color:transparent;background:transparent;padding-left:0"><em class="pk-warn" style="margin:0">⚠</em></span> <span class="pk-mute">— значения нет в справочнике, замените в карточке проверки</span>' + '</div>';
+    var mm = d.matrices || {};
+    DIRS.slice(1).forEach(function(dr) {
+        if (ST.dir && ST.dir !== dr[0]) return;
+        var M = DMETA[dr[0]]; if (mm[M.k]) h += dirTables(mm[M.k], dr[0], M);
+    });
+    if (d.nodir && d.nodir.length) {
+        h += '<div class="pk-sec"><div class="pk-cell" style="border-color:rgba(240,160,75,.6)"><b>⚠ Без направления: ' + d.nodir.length + '</b> <span class="pk-mute">— не попадают ни в одну таблицу, укажите направление в карточке проверки</span>';
+        d.nodir.forEach(function(t) { h += '<div class="pk-plan" style="margin-left:0">• <a data-act="opentask" data-id="' + e(t.id) + '">' + e(t.name) + '</a><span class="pk-mute">' + e(STL[t.status] || t.status) + ' · ' + fd(t.start) + '–' + fd(t.deadline) + (t.pocket ? ' · карман «' + e(t.pocket) + '»' : '') + '</span></div>'; });
+        h += '</div></div>';
+    }
+    h += '<div class="pk-mute" style="margin-top:8px">Числа — фактические проверки «Карты проверок» с датой начала в ' + ST.year + ' году (кроме отменённых). Банк-участник — банк, выбранный в банках проверки. ПШЕ — нормативная численность направления из карточки банка. Клик по ячейке — список проверок.</div>';
+    document.getElementById('pkBody').innerHTML = h;
+    if (ST.cell) showCell(ST.cell);
+}
+function dirTables(m, dir, M) {
+    var cols = m.cols, NONE = '__none', pre = M.k + '|';
     var keys = cols.map(function(c) { return c.key; }).concat([NONE]);
-    function colHead(c) { return '<th class="' + (c.unknown ? 'pk-unk' : '') + '" title="' + (c.unknown ? 'Нет в справочнике' : e(c.direction)) + '">' + e(c.name) + '<small>' + e(DL[c.direction] || '') + (c.unknown ? ' · нет в справочнике' : '') + '</small></th>'; }
-    // Таблица 1
-    h += '<div class="pk-sec"><h4>1. Банки-руководители проверок по карманам (' + ST.year + ')</h4>';
-    if (!m.total_tasks) h += '<div class="pk-empty">Нет проверок с датой начала в ' + ST.year + ' году по выбранному направлению</div>';
-    h += '<div class="pk-tw"><table class="pk-t"><thead><tr><th>ТБ</th>' + cols.map(colHead).join('') + '<th>Вне кармана</th><th>Итого</th></tr></thead><tbody>';
+    var h = '<div class="pk-dsec ' + M.cl + '"><h4 class="pk-dh">' + M.ic + ' ' + M.t + ' направление · ' + ST.year + ' <span class="pk-mute">· проверок: ' + (m.total_tasks || 0) + '</span></h4>';
+    if (!m.total_tasks) h += '<div class="pk-empty">Нет проверок этого направления с датой начала в ' + ST.year + ' году</div>';
+    // Таблица 1: банк-руководитель × карман
+    h += '<h5>1. Банки-руководители проверок по карманам</h5>';
+    h += '<div class="pk-tw"><table class="pk-t"><thead><tr><th>ТБ</th>' + cols.map(function(c) { return '<th>' + ptag(c.name, c.direction, c.unknown) + '</th>'; }).join('') + '<th>Вне кармана</th><th>Итого</th></tr></thead><tbody>';
     m.banks.forEach(function(b) {
         var row = m.t1[b.id] || {}, tot = 0;
         h += '<tr><td>' + bank(b) + ' <span class="pk-mute">' + e(b.name) + '</span></td>';
@@ -331,40 +426,38 @@ function render() {
             var ids = row[k] || []; tot += ids.length;
             if (!ids.length) { h += '<td></td>'; return; }
             var sn = []; ids.forEach(function(id) { var s = m.tasks[id].lead_short; if (s && sn.indexOf(s) < 0) sn.push(s); });
-            h += '<td data-cell="t1|' + e(b.id) + '|' + e(k) + '"><b>' + ids.length + '</b>' + (sn.length ? ' ' + e(sn.join(', ')) : '') + '</td>';
+            h += '<td data-cell="' + pre + 't1|' + e(b.id) + '|' + e(k) + '"><b>' + ids.length + '</b>' + (sn.length ? '<span class="pk-ln">' + e(sn.join(', ')) + '</span>' : '') + '</td>';
         });
         h += '<td><b>' + (tot || '') + '</b></td></tr>';
     });
     var g1 = 0;
     h += '<tr class="pk-tot"><td>Итого</td>' + keys.map(function(k) { var v = m.t1_total[k] || 0; g1 += v; return '<td>' + (v || '') + '</td>'; }).join('') + '<td>' + (g1 || '') + '</td></tr>';
-    h += '</tbody></table></div></div>';
-    // Таблица 2
-    h += '<div class="pk-sec"><h4>2. Банки-участники: число проверок по карманам (' + ST.year + ')</h4>';
+    h += '</tbody></table></div>';
+    // Таблица 2: карман × банк-участник
+    h += '<h5>2. Банки-участники: число проверок по карманам</h5>';
     h += '<div class="pk-tw"><table class="pk-t"><thead><tr><th>Карман</th>' + m.banks.map(function(b) { return '<th>' + bank(b) + '</th>'; }).join('') + '<th>Итого</th></tr></thead><tbody>';
     cols.concat([{ key: NONE, name: 'Вне кармана', direction: '' }]).forEach(function(c) {
         var r = m.t2[c.key] || {}, tot = 0;
-        h += '<tr><td class="' + (c.unknown ? 'pk-unk' : '') + '">' + e(c.name) + (c.direction ? ' <span class="pk-mute">' + e(DL[c.direction]) + '</span>' : '') + '</td>';
-        m.banks.forEach(function(b) { var ids = r[b.id] || []; tot += ids.length; h += ids.length ? '<td data-cell="t2|' + e(b.id) + '|' + e(c.key) + '">' + ids.length + '</td>' : '<td></td>'; });
+        h += '<tr><td>' + (c.key === NONE ? 'Вне кармана' : ptag(c.name, c.direction, c.unknown)) + '</td>';
+        m.banks.forEach(function(b) { var ids = r[b.id] || []; tot += ids.length; h += ids.length ? '<td data-cell="' + pre + 't2|' + e(b.id) + '|' + e(c.key) + '">' + ids.length + '</td>' : '<td></td>'; });
         h += '<td><b>' + (tot || '') + '</b></td></tr>';
     });
     var g2 = 0;
     h += '<tr class="pk-tot"><td>Итого</td>' + m.banks.map(function(b) { var v = m.t2_total[b.id] || 0; g2 += v; return '<td>' + (v || '') + '</td>'; }).join('') + '<td>' + (g2 || '') + '</td></tr>';
-    [['corp', 'корпоративная', 'корп.'], ['retail', 'розничная', 'розн.']].forEach(function(x) {
-        if (ST.dir && ST.dir !== x[1]) return;
-        h += '<tr class="pk-calc"><td>Проверок, ' + x[2] + '</td>' + m.banks.map(function(b) { return '<td>' + (b.count[x[0]] || '') + '</td>'; }).join('') + '<td></td></tr>';
-        h += '<tr class="pk-calc"><td title="Нормативная (штатная) численность из карточки банка">ПШЕ, ' + x[2] + '</td>' + m.banks.map(function(b) { return '<td>' + n(b.hc[x[0]]) + '</td>'; }).join('') + '<td></td></tr>';
-        h += '<tr class="pk-calc"><td>Проверок в год на ПШЕ, ' + x[2] + '</td>' + m.banks.map(function(b) { return '<td><b>' + n(b.per_hc[x[0]]) + '</b></td>'; }).join('') + '<td></td></tr>';
-    });
-    h += '</tbody></table></div><div class="pk-mute" style="margin-top:6px">Год проверки — по дате начала. Отменённые проверки не учитываются. Банк считается участником, если он выбран в банках проверки. Клик по ячейке — список проверок.</div></div>';
-    document.getElementById('pkBody').innerHTML = h;
-    if (ST.cell) showCell(ST.cell);
+    var hcSum = 0, hcCnt = 0; m.banks.forEach(function(b) { var v = parseFloat(b.hc[M.k]); if (v > 0) { hcSum += v; hcCnt += (m.t2_total[b.id] || 0); } });
+    h += '<tr class="pk-calc"><td title="Нормативная (штатная) численность направления из карточки банка">Кол-во ПШЕ</td>' + m.banks.map(function(b) { return '<td>' + n(b.hc[M.k]) + '</td>'; }).join('') + '<td>' + (hcSum ? n(hcSum) : '—') + '</td></tr>';
+    h += '<tr class="pk-calc"><td title="Итого по банку (участия в проверках направления) / кол-во ПШЕ">Проверок в год на ПШЕ</td>' + m.banks.map(function(b) { return '<td>' + n2(b.per_hc[M.k]) + '</td>'; }).join('') + '<td title="По банкам с заданной численностью">' + (hcSum ? n2(hcCnt / hcSum) : '—') + '</td></tr>';
+    h += '</tbody></table></div></div>';
+    return h;
 }
 function showCell(c) {
-    var m = ST.d.matrix, p = c.split('|'), tbl = p[0], b = p[1], k = p.slice(2).join('|');
+    var p = c.split('|'), dk = p[0], tbl = p[1], b = p[2], k = p.slice(3).join('|');
+    var m = (ST.d.matrices || {})[dk]; if (!m) return;
     var ids = tbl === 't1' ? ((m.t1[b] || {})[k] || []) : ((m.t2[k] || {})[b] || []);
     var bk = m.banks.filter(function(x) { return x.id === b; })[0] || { name: b, short: '?', color: '#888' };
     var col = m.cols.filter(function(x) { return x.key === k; })[0];
-    var h = '<div class="pk-cell"><div class="pk-line"><b>' + (tbl === 't1' ? 'Руководит: ' : 'Участвует: ') + '</b>' + bank(bk) + ' · ' + e(col ? col.name : 'Вне кармана')
+    var dir = dk === 'corp' ? 'корпоративная' : 'розничная';
+    var h = '<div class="pk-cell"><div class="pk-line"><b>' + (tbl === 't1' ? 'Руководит: ' : 'Участвует: ') + '</b>' + bank(bk) + ' · ' + (col ? ptag(col.name, col.direction, col.unknown) : DMETA[dir].ic + ' вне кармана')
         + '<button class="pk-btn mini" data-act="cellclose" style="margin-left:auto">✕</button></div>';
     ids.forEach(function(id) { var t = m.tasks[id]; h += '<div class="pk-plan" style="margin-left:0">• <a data-act="opentask" data-id="' + e(id) + '">' + e(t.name) + '</a><span class="pk-mute">' + e(STL[t.status] || t.status) + ' · ' + fd(t.start) + '–' + fd(t.deadline) + (t.lead ? ' · рук. ' + e(t.lead) : '') + '</span></div>'; });
     var box = document.getElementById('pkCellBox'); if (box) { box.innerHTML = h + '</div>'; box.scrollIntoView({ block: 'nearest' }); }
@@ -518,8 +611,19 @@ def register(app, db, hooks):
             cnt[k] = cnt.get(k, 0) + 1
         for p in pockets:
             p['tasks_total'] = cnt.get((p['name'], p['direction']), 0)
+        mats = {_DIR_KEY[dr]: pockets_compute(data, pockets, year, dr)
+                for dr in DIRS if not direction or dr == direction}
+        nodir = []
+        if not direction:
+            emp = {e['id']: e for e in data.get('employees') or []}
+            for t in _audits(data):
+                if (t.get('start_date') or '')[:4] == str(year) and (t.get('task_type') or '') not in DIRS:
+                    nodir.append({'id': t['id'], 'name': t.get('name') or '', 'status': t.get('status') or '',
+                                  'start': t.get('start_date') or '', 'deadline': t.get('deadline') or '',
+                                  'pocket': (t.get('pocket') or '').strip(),
+                                  'lead': (emp.get(t.get('lead_employee') or '') or {}).get('name') or ''})
         return jsonify({'success': True, 'can_edit': u.get('role') == 'admin', 'pockets': pockets,
-                        'plans': plans, 'matrix': pockets_compute(data, pockets, year, direction)})
+                        'plans': plans, 'matrices': mats, 'nodir': nodir})
 
     @app.route('/api/plugins/pockets/save', methods=['POST'])
     def _pk_save():

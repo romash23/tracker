@@ -1702,6 +1702,7 @@ function ggIsPvrPocket(p) {
 /* Фильтр «Розничная без ПВР»: карман ПВР в списке карманов недоступен. */
 var GG_TYPE_NO_PVR = 'розничная_без_пвр';
 var ggPocketsAll = [];
+var ggPocketDirs = {};
 function fillPocketFilter(pockets) {
     ggPocketsAll = (pockets || []).slice();
     var noPvr = document.getElementById('fType').value === GG_TYPE_NO_PVR;
@@ -1709,7 +1710,8 @@ function fillPocketFilter(pockets) {
     ggPocketsAll.forEach(function(p) {
         if (!p) return;
         if (noPvr && ggIsPvrPocket(p)) return;
-        opts.push({ value: p, label: p });
+        var ic = (ggPocketDirs[p] || []).map(function(d) { return d === 'корпоративная' ? '🏢' : (d === 'розничная' ? '👥' : ''); }).join('');
+        opts.push({ value: p, label: (ic ? ic + ' ' : '') + p });
     });
     msSetOptions('pocket', opts);
 }
@@ -1753,6 +1755,7 @@ function load() {
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (!d || !d.success) { box.innerHTML = '<div class="empty">Ошибка загрузки</div>'; return; }
+            ggPocketDirs = d.pocket_dirs || {};
             fillPocketFilter(d.pockets || []);
             render(d);
         })
@@ -3401,6 +3404,13 @@ def register(app, db, hooks):
         pockets = sorted({(_t.get('pocket') or '').strip()
                           for _t in data.get('tasks', [])
                           if (_t.get('pocket') or '').strip()})
+        # Направления каждого кармана (для значков 🏢/👥 в фильтре)
+        pocket_dirs = {}
+        for _t in data.get('tasks', []):
+            _pn = (_t.get('pocket') or '').strip()
+            if _pn:
+                pocket_dirs.setdefault(_pn, set()).add(_t.get('task_type') or '')
+        pocket_dirs = {k: sorted(v) for k, v in pocket_dirs.items()}
         # Тер банки для второй таблицы ("Нагрузка по банкам").
         # Вариант A: если банки выбраны в фильтре — строки = ТОЛЬКО выбранные
         # (и только те из них, что реально встречаются в выборке задач);
@@ -3487,6 +3497,7 @@ def register(app, db, hooks):
             'tasks': out,
             'today': today,
             'pockets': pockets,
+            'pocket_dirs': pocket_dirs,
             'banks': banks,
             'total_capacity': total_capacity,
             'total_capacity_fact': total_capacity_fact,
