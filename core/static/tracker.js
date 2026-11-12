@@ -1260,7 +1260,7 @@ function trkMapTableHtml(tasks) {
     (state.tasks || []).forEach(function(x) { if (x.task_kind === 'other' && x.other_subkind === 'audit_extra' && x.parent_task_id) (extras[x.parent_task_id] = extras[x.parent_task_id] || []).push(x); });
     var canDel = hasPerm('action.task.delete') && !!(state.currentUser && state.currentUser.role === 'admin');
     var h = '<table class="kp-table"><thead><tr>'
-        + '<th>Проверка</th><th>Описание</th><th>Куратор ЦА</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
+        + '<th>Проверка</th><th>Карман</th><th>Описание</th><th>Куратор ЦА</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
         + (canDel ? '<th></th>' : '') + '</tr></thead><tbody>';
     tasks.forEach(function(t) {
         var sv = t.status || 'active';
@@ -1286,6 +1286,7 @@ function trkMapTableHtml(tasks) {
         var probs = window.trkTaskProblemsBadge ? window.trkTaskProblemsBadge(t, { soft: true }) : '';
         h += '<tr class="dict-item kp-row st-' + escapeHtml(sv) + (t.overdue ? ' kp-row--overdue' : '') + '" data-id="' + escapeHtml(t.id) + '">'
             + '<td class="kp-name"><span class="dict-item-name">' + nm + '</span>' + sub + '</td>'
+            + '<td class="kp-pocket">' + _trkPocketBadge(t) + '</td>'
             + '<td class="kp-desc"' + (desc ? ' title="' + escapeHtml(desc) + '"' : '') + '>' + (desc ? '<div class="kp-desc-txt">' + escapeHtml(desc) + '</div>' : '<span class="kp-muted">—</span>') + '</td>'
             + '<td class="kp-cur">' + cur + '</td><td>' + lead + '</td>'
             + '<td>' + (parts.length ? escapeHtml(parts.join(', ')) : '<span class="kp-muted">—</span>') + '</td>'
@@ -1298,6 +1299,28 @@ function trkMapTableHtml(tasks) {
     });
     return h + '</tbody></table>';
 }
+function _trkPocketBadge(t, opts) {
+    opts = opts || {};
+    if (!t) return '';
+    var p = String(t.pocket || '').trim();
+    var dir = t.task_type || '';
+    var cls = dir === '\u043a\u043e\u0440\u043f\u043e\u0440\u0430\u0442\u0438\u0432\u043d\u0430\u044f' ? 'corp'
+            : (dir === '\u0440\u043e\u0437\u043d\u0438\u0447\u043d\u0430\u044f' ? 'retail' : '');
+    var icon = cls === 'corp' ? '\ud83c\udfe2' : (cls === 'retail' ? '\ud83d\udc65' : '');
+    if (!p) {
+        if (opts.hideEmpty) return '';
+        return '<span class="task-card-pocket none" title="\u0412\u043d\u0435 \u043a\u0430\u0440\u043c\u0430\u043d\u0430">\u2014 \u0432\u043d\u0435 \u043a\u0430\u0440\u043c\u0430\u043d\u0430</span>';
+    }
+    var known = false;
+    try {
+        var list = window.__trkPocketList || (state && state.pockets) || [];
+        known = list.some(function(x) { return x && x.name === p && (!dir || x.direction === dir) && x.is_active !== false; });
+    } catch (e) {}
+    var warn = known ? '' : ' data-pk-warn="1"';
+    var ttl = '\u041a\u0430\u0440\u043c\u0430\u043d' + (dir ? ' \u00b7 ' + dir : '') + (known ? '' : ' (\u043d\u0435\u0442 \u0432 \u0441\u043f\u0440\u0430\u0432\u043e\u0447\u043d\u0438\u043a\u0435)');
+    return '<span class="task-card-pocket ' + cls + '"' + warn + ' title="' + escapeHtml(ttl) + '">' + (icon ? icon + ' ' : '') + escapeHtml(p) + '</span>';
+}
+window._trkPocketBadge = _trkPocketBadge;
 function taskRowMin(t) {
     var stMap = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена' };
     var sv = t.status || 'active';
@@ -1464,6 +1487,7 @@ function taskCardRowGrid(t) {
     if (_urgBadge) statusBadge += _urgBadge;
 
     var deptBadges = _deptBadgesForTask(t);
+    var _pkHtml = _trkPocketBadge(t, { hideEmpty: true });
     var _curOk = !!(t.curator && t.curator !== 'нет');
     var _curTxt = _curOk ? t.curator : 'не указан';
     var curatorHtml = '<div class="task-card-curator' + (_curOk ? '' : ' task-card-curator--none') + '" title="Куратор ЦА: ' + escapeHtml(_curTxt) + '">👤 ' + escapeHtml(_curTxt) + '</div>';
@@ -1523,7 +1547,8 @@ function taskCardRowGrid(t) {
         + '<div class="task-card-accent"></div>'
         + '<div class="task-card-head">'
         +   '<div class="task-card-icon-wrap">' + window.trkQuarterBadge(t.icon, 'task-card-icon') + '</div>'
-        +   '<div class="task-card-titles">'
+        +   '<div class="task-card-titles' + (_pkHtml ? ' task-card-titles--pocket' : '') + '">'
+        +     _pkHtml
         +     '<div class="task-card-title' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         +     (deptBadges ? '<div class="task-card-sub">' + deptBadges + '</div>' : '')
         +     curatorHtml

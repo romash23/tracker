@@ -11073,3 +11073,26 @@ body:not(.trk-theme-light) .dash-help-btn:hover{background:rgba(167,139,250,.12)
 .dash-help-ok{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;border-radius:9px;padding:8px 18px;font-weight:600;cursor:pointer}
 body:not(.trk-theme-light) .dash-help-box{background:#1b1b22;color:#e5e7eb;box-shadow:0 18px 50px rgba(0,0,0,.6)}
 body:not(.trk-theme-light) .dash-help-lead,body:not(.trk-theme-light) .dash-help-foot,body:not(.trk-theme-light) .dash-help-x{color:#a1a1aa}
+
+
+/* PATCH: карман в карте проверок (список + плитка) */
+.kp-table .kp-pocket { white-space: nowrap; }
+.task-card-pocket {
+    display: inline-flex; align-items: center; gap: 4px;
+    align-self: flex-start;
+    font-size: 13px; font-weight: 800; letter-spacing: .01em;
+    padding: 2px 9px; border-radius: 10px;
+    white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    background: rgba(120,120,120,.12); color: var(--trk-meta,#5b6b73);
+    border: 1px solid rgba(120,120,120,.22);
+    margin-bottom: 4px;
+}
+.task-card-pocket.corp { background: rgba(40,116,166,.14); color: #2874a6; border-color: rgba(40,116,166,.32); }
+.task-card-pocket.retail { background: rgba(216,27,125,.13); color: #c2185b; border-color: rgba(216,27,125,.30); }
+.task-card-pocket.none { background: transparent; color: var(--trk-meta,#8a97a0); border-style: dashed; font-weight: 700; }
+.task-card-pocket[data-pk-warn] { border-color: #e08a00; box-shadow: 0 0 0 1px rgba(224,138,0,.25); }
+.tasks-grid .task-card .task-card-titles--pocket .task-card-title,
+.task-card-titles--pocket .task-card-title { font-size: 11px !important; margin-top: 1px !important; line-height: 1.2 !important; }
+body:not(.trk-theme-light) .task-card-pocket { background: rgba(200,200,200,.10); color: #aab4bb; border-color: rgba(200,200,200,.20); }
+body:not(.trk-theme-light) .task-card-pocket.corp { background: rgba(86,161,214,.16); color: #7cc0ec; border-color: rgba(86,161,214,.34); }
+body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,146,.16); color: #f48fb1; border-color: rgba(240,98,146,.34); }
