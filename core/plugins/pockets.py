@@ -212,13 +212,21 @@ if (window.__pocketsV1) return; window.__pocketsV1 = true;
 var DIRS = [['', 'Все'], ['корпоративная', 'Корпоративное'], ['розничная', 'Розничное']];
 var DL = { 'корпоративная': 'Корп.', 'розничная': 'Розн.' };
 var DMETA = { 'корпоративная': { k: 'corp', ic: '🏢', t: 'Корпоративное', cl: 'pk-d-corp' }, 'розничная': { k: 'retail', ic: '👥', t: 'Розничное', cl: 'pk-d-retail' } };
+function nkey(n) { return String(n || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+function isShared(name) { return !!(ST.shared && ST.shared[nkey(name)]); }
 function ptag(name, dir, unk) {
-    var m = DMETA[dir];
-    return '<span class="pk-ptag ' + (m ? m.cl : '') + (unk ? ' pk-old' : '') + '" title="' + e((m ? m.t + ' направление' : 'Без направления') + (unk ? ' · нет в справочнике' : '')) + '">'
-        + (m ? '<i>' + m.ic + '</i>' : '') + e(name) + (unk ? '<em class="pk-warn">⚠</em>' : '') + '</span>';
+    var m = DMETA[dir], sh = !unk && m && isShared(name);
+    return '<span class="pk-ptag ' + (m ? m.cl : '') + (unk ? ' pk-old' : '') + (sh ? ' pk-shared' : '') + '" title="' + e((m ? m.t + ' направление' : 'Без направления') + (sh ? ' · общий карман: есть в обоих направлениях' : '') + (unk ? ' · нет в справочнике' : '')) + '">'
+        + (m ? '<i>' + m.ic + '</i>' : '') + e(name) + (sh ? '<b class="pk-sh" aria-hidden="true">⇄</b>' : '') + (unk ? '<em class="pk-warn">⚠</em>' : '') + '</span>';
+}
+function calcShared(list) {
+    var by = {}, out = {};
+    (list || []).forEach(function(p) { var k = nkey(p.name); if (!k) return; by[k] = by[k] || {}; by[k][p.direction] = 1; });
+    Object.keys(by).forEach(function(k) { if (by[k]['корпоративная'] && by[k]['розничная']) out[k] = 1; });
+    return out;
 }
 var STL = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена' };
-var ST = { year: new Date().getFullYear(), dir: '', d: null, cell: null, edit: null, plan: null };
+var ST = { year: new Date().getFullYear(), dir: '', d: null, cell: null, edit: null, plan: null, ed: null, shared: {} };
 try { ST.dir = localStorage.getItem('pk.dir') || ''; } catch (x) {}
 function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function n2(v) { return v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2).replace('.', ','); }
@@ -299,7 +307,32 @@ function css() {
     '.pk-dsec h5{margin:12px 0 6px;font-size:.82rem}',
     '.pk-dir.pk-d-corp{border-left:4px solid #3b82f6}.pk-dir.pk-d-retail{border-left:4px solid #d9468f}',
     '.pk-legend{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.75rem;opacity:.9;margin:4px 0 0}',
-    '.pk-t thead th{vertical-align:middle}'
+    '.pk-t thead th{vertical-align:middle}',
+    '.pk-ptag.pk-shared{border-left-width:0;padding-left:8px;background-image:linear-gradient(rgba(128,128,128,0),rgba(128,128,128,0)),linear-gradient(180deg,#3b82f6 0 50%,#d9468f 50% 100%);background-size:100% 100%,4px 100%;background-repeat:no-repeat;background-position:0 0,0 0;box-shadow:inset 0 0 0 1px rgba(168,85,247,.55)}',
+    '.pk-d-corp.pk-ptag.pk-shared{background-color:rgba(59,130,246,.14)}.pk-d-retail.pk-ptag.pk-shared{background-color:rgba(217,70,143,.14)}',
+    '.pk-ptag b.pk-sh{font-weight:800;color:#a855f7;margin-left:3px;font-size:.85em}body.trk-theme-light .pk-ptag b.pk-sh{color:#7e22ce}',
+    '.pk-sec h4 .pk-btn{margin-left:10px;vertical-align:middle}',
+    '.pk-ed{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px}',
+    '.pk-edcol{border:1px solid rgba(128,128,128,.28);border-radius:10px;padding:8px 10px 10px;border-top-width:4px}',
+    '.pk-edcol.pk-d-corp{border-top-color:#3b82f6}.pk-edcol.pk-d-retail{border-top-color:#d9468f}',
+    '.pk-edcol h5{margin:0 0 8px;font-size:.85rem;display:flex;align-items:center;gap:8px}.pk-edcol h5 .pk-mute{font-weight:500;margin-left:auto}',
+    '.pk-edrow{display:flex;align-items:center;gap:6px;padding:4px 6px;margin:3px 0;border-radius:8px;border:1px solid rgba(128,128,128,.22);background:rgba(128,128,128,.05)}',
+    '.pk-edrow.pk-drag{opacity:.45}.pk-edrow.pk-over{box-shadow:0 -2px 0 #26a269}',
+    '.pk-edrow.pk-shared{border-color:rgba(168,85,247,.6);background:rgba(168,85,247,.10)}',
+    '.pk-edrow.pk-new{border-style:dashed;border-color:rgba(38,162,105,.7)}.pk-edrow.pk-chg input[type=text]{border-color:#d68910}',
+    '.pk-edrow.pk-del{opacity:.5}.pk-edrow.pk-del input[type=text]{text-decoration:line-through}',
+    '.pk-edrow.pk-dup input[type=text]{border-color:#e74c3c;background:rgba(231,76,60,.08)}',
+    '.pk-hd{cursor:grab;opacity:.55;user-select:none;padding:0 2px;font-size:.9rem}.pk-hd:active{cursor:grabbing}',
+    '.pk-edrow input[type=text]{flex:1;min-width:120px;padding:4px 7px;border-radius:6px;border:1px solid rgba(128,128,128,.45);background:transparent;color:inherit;font:inherit;font-size:.82rem;font-weight:600}',
+    '.pk-edrow label{display:inline-flex;align-items:center;gap:3px;font-size:.72rem;opacity:.85;white-space:nowrap}',
+    '.pk-edrow .pk-cnt{font-size:.7rem;opacity:.75;min-width:44px;text-align:right;white-space:nowrap}',
+    '.pk-shb{font-size:.68rem;font-weight:700;padding:1px 6px;border-radius:999px;background:rgba(168,85,247,.18);color:#c084fc;white-space:nowrap}body.trk-theme-light .pk-shb{color:#7e22ce}',
+    '.pk-edrow .pk-btn[disabled]{opacity:.35;cursor:not-allowed}',
+    '.pk-edadd{display:flex;gap:6px;margin-top:8px}.pk-edadd input{flex:1;padding:4px 7px;border-radius:6px;border:1px dashed rgba(38,162,105,.7);background:transparent;color:inherit;font:inherit;font-size:.82rem}',
+    '.pk-edbar{position:sticky;bottom:-18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px 0 4px;background:inherit}',
+    '.pk-box .pk-edbar{background:#1d2026}body.trk-theme-light .pk-box .pk-edbar{background:#fff}',
+    '.pk-edbar .pk-mute{margin-right:auto}',
+    '.pk-edhint{font-size:.74rem;opacity:.85;margin:0 0 8px}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -314,13 +347,61 @@ function open() {
         ov.addEventListener('mousedown', function(ev) { if (ev.target === ov) close(); });
         ov.addEventListener('click', onClick);
         ov.addEventListener('change', onChange);
+        ov.addEventListener('input', onInput);
+        ov.addEventListener('dragstart', onDragStart);
+        ov.addEventListener('dragover', onDragOver);
+        ov.addEventListener('drop', onDrop);
+        ov.addEventListener('dragend', onDragEnd);
     }
     ov.style.display = 'flex';
     document.addEventListener('keydown', onKey);
     head(); load();
 }
-function close() { var ov = document.getElementById('pkOverlay'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey); }
-function onKey(ev) { if (ev.key === 'Escape') close(); }
+function close() { if (ST.ed && edChanges() && !confirm('Закрыть без сохранения изменений в списках?')) return; ST.ed = null; var ov = document.getElementById('pkOverlay'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey); }
+function onKey(ev) {
+    if (ev.key === 'Escape') { if (ST.ed) { if (edChanges() && !confirm('Отменить несохранённые изменения?')) return; ST.ed = null; render(); return; } close(); return; }
+    var t = ev.target;
+    if (ST.ed && ev.key === 'Enter' && t && t.hasAttribute && t.hasAttribute('data-edadd')) {
+        ev.preventDefault(); edSync(); var dr = t.getAttribute('data-edadd');
+        if (edAdd(dr, t.value)) edRefresh('[data-edadd="' + dr + '"]');
+    }
+}
+var DRAG = null;
+function onInput(ev) {
+    if (!ST.ed || !ev.target.hasAttribute('data-edname')) return;
+    edSync();
+    // подсветка общих/повторов без перерисовки (чтобы не терять курсор)
+    var sh = edShared();
+    document.querySelectorAll('#pkEd .pk-edrow').forEach(function(r) {
+        var dr = r.getAttribute('data-dir'), it = ST.ed.cols[dr][+r.getAttribute('data-i')], k = nkey(it.name);
+        var cnt = ST.ed.cols[dr].filter(function(x) { return !x.del && nkey(x.name) === k; }).length;
+        r.classList.toggle('pk-shared', !it.del && !!k && !!sh[k]);
+        r.classList.toggle('pk-dup', !it.del && !!k && cnt > 1);
+        r.classList.toggle('pk-chg', !!it.id && (it.name.trim() !== it.orig || it.is_active !== it.orig_active));
+    });
+    var n = edChanges(), dup = document.querySelector('#pkEd .pk-edrow.pk-dup'), bar = document.querySelector('#pkEd .pk-edbar');
+    if (bar) { bar.querySelector('.pk-mute').textContent = dup ? '⚠ Повтор названия в одном направлении' : (n ? 'Изменений: ' + n : 'Изменений нет'); bar.querySelector('[data-act="edsave"]').disabled = !n || !!dup; }
+}
+function onDragStart(ev) {
+    var r = ev.target.closest && ev.target.closest('.pk-edrow'); if (!r || !ST.ed) return;
+    if (ev.target.tagName === 'INPUT') { ev.preventDefault(); return; }
+    edSync(); DRAG = { dir: r.getAttribute('data-dir'), i: +r.getAttribute('data-i') }; r.classList.add('pk-drag');
+    try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', 'pk'); } catch (x) {}
+}
+function onDragOver(ev) {
+    if (!DRAG) return; var r = ev.target.closest && ev.target.closest('.pk-edrow');
+    document.querySelectorAll('#pkEd .pk-over').forEach(function(x) { if (x !== r) x.classList.remove('pk-over'); });
+    if (r && r.getAttribute('data-dir') === DRAG.dir) { ev.preventDefault(); r.classList.add('pk-over'); }
+}
+function onDrop(ev) {
+    if (!DRAG) return; var r = ev.target.closest && ev.target.closest('.pk-edrow');
+    if (r && r.getAttribute('data-dir') === DRAG.dir) {
+        ev.preventDefault(); var L = ST.ed.cols[DRAG.dir], to = +r.getAttribute('data-i');
+        var it = L.splice(DRAG.i, 1)[0]; L.splice(to, 0, it);
+    }
+    DRAG = null; edRefresh();
+}
+function onDragEnd() { if (DRAG) { DRAG = null; edRefresh(); } }
 function head() {
     var h = '<h3>🗂 Карманы</h3>'
         + '<span class="pk-seg"><button data-act="yprev" title="Предыдущий год">◀</button><button class="active" style="cursor:default">' + ST.year + '</button><button data-act="ynext" title="Следующий год">▶</button></span>'
@@ -332,6 +413,7 @@ function load() {
     api('/api/plugins/pockets/data?year=' + ST.year + '&dir=' + encodeURIComponent(ST.dir)).then(function(d) {
         if (!d || !d.success) { document.getElementById('pkBody').innerHTML = '<div class="pk-empty">Ошибка: ' + e(d && d.error) + '</div>'; return; }
         ST.d = d;
+        ST.shared = calcShared(d.pockets);
         window.__trkPocketList = d.pockets;
         try { if (window.state) window.state.pockets = d.pockets; } catch (x) {}
         render();
@@ -381,9 +463,117 @@ function pocketRow(p, ed) {
     if (ST.plan && ST.plan.pocket_id === p.id && !ST.plan.id) h += planForm(p.id, null);
     return h + '</div>';
 }
+function edStart() {
+    var cols = {};
+    ['корпоративная', 'розничная'].forEach(function(dr) {
+        cols[dr] = ST.d.pockets.filter(function(p) { return p.direction === dr; })
+            .map(function(p) { return { id: p.id, name: p.name, orig: p.name, is_active: !!p.is_active, orig_active: !!p.is_active, tasks: p.tasks_total || 0, del: false }; });
+    });
+    ST.ed = { cols: cols, orig: JSON.stringify(cols) };
+}
+function edSync() {
+    // считать значения из инпутов в модель
+    var box = document.getElementById('pkEd'); if (!box || !ST.ed) return;
+    box.querySelectorAll('.pk-edrow').forEach(function(r) {
+        var it = ST.ed.cols[r.getAttribute('data-dir')][+r.getAttribute('data-i')]; if (!it) return;
+        var inp = r.querySelector('input[type=text]'), cb = r.querySelector('input[type=checkbox]');
+        if (inp) it.name = inp.value; if (cb) it.is_active = cb.checked;
+    });
+}
+function edShared() {
+    var all = [];
+    Object.keys(ST.ed.cols).forEach(function(dr) { ST.ed.cols[dr].forEach(function(it) { if (!it.del) all.push({ name: it.name, direction: dr }); }); });
+    return calcShared(all);
+}
+function edChanges() {
+    var n = 0;
+    Object.keys(ST.ed.cols).forEach(function(dr) {
+        ST.ed.cols[dr].forEach(function(it, i) {
+            if (!it.id) { if (nkey(it.name) && !it.del) n++; return; }
+            if (it.del || it.name.trim() !== it.orig || it.is_active !== it.orig_active) n++;
+        });
+    });
+    var o = JSON.parse(ST.ed.orig);
+    Object.keys(o).forEach(function(dr) {
+        var a = o[dr].map(function(x) { return x.id; }).join(','), b = ST.ed.cols[dr].filter(function(x) { return x.id; }).map(function(x) { return x.id; }).join(',');
+        if (a !== b) n++;
+    });
+    return n;
+}
+function edRender() {
+    var sh = edShared(), h = '<div id="pkEd"><div class="pk-edhint">Перетаскивайте строки за ⋮⋮ или стрелками, чтобы задать порядок в списках выбора. Переименование кармана переносится в его проверки. '
+        + '<span class="pk-shb">⇄ общий</span> — карман с таким же названием есть в другом направлении: удобно для ПВР, МСФО и т. п.</div><div class="pk-ed">';
+    ['корпоративная', 'розничная'].forEach(function(dr) {
+        var M = DMETA[dr], list = ST.ed.cols[dr], other = dr === 'корпоративная' ? 'розничная' : 'корпоративная';
+        var seen = {}, live = list.filter(function(x) { return !x.del && nkey(x.name); });
+        list.forEach(function(it) { var k = nkey(it.name); if (k && !it.del) seen[k] = (seen[k] || 0) + 1; });
+        h += '<div class="pk-edcol ' + M.cl + '"><h5>' + M.ic + ' ' + M.t + '<span class="pk-mute">' + live.length + ' карм.</span></h5>';
+        if (!list.length) h += '<div class="pk-empty">Список пуст — добавьте первый карман</div>';
+        list.forEach(function(it, i) {
+            var k = nkey(it.name), cls = 'pk-edrow';
+            if (!it.id) cls += ' pk-new'; else if (it.name.trim() !== it.orig || it.is_active !== it.orig_active) cls += ' pk-chg';
+            if (it.del) cls += ' pk-del'; if (!it.del && k && sh[k]) cls += ' pk-shared'; if (!it.del && k && seen[k] > 1) cls += ' pk-dup';
+            var canDel = !it.tasks;
+            h += '<div class="' + cls + '" draggable="true" data-dir="' + e(dr) + '" data-i="' + i + '">'
+               + '<span class="pk-hd" title="Перетащить">⋮⋮</span>'
+               + '<input type="text" maxlength="100" value="' + e(it.name) + '" data-edname' + (it.del ? ' disabled' : '') + ' placeholder="Название кармана">'
+               + (!it.del && k && sh[k] ? '<span class="pk-shb" title="Есть и в направлении «' + e(DMETA[other].t) + '»">⇄ общий</span>' : '')
+               + (!it.del && k && !sh[k] ? '<button class="pk-btn mini" data-act="edcopy" data-dir="' + e(dr) + '" data-i="' + i + '" title="Добавить такой же карман в направление «' + e(DMETA[other].t) + '»">⇄ ' + DMETA[other].ic + '</button>' : '')
+               + '<span class="pk-cnt" title="Проверок с этим карманом">' + (it.id ? it.tasks + ' пров.' : 'новый') + '</span>'
+               + '<label title="Закрытый карман не предлагается при создании проверок"><input type="checkbox"' + (it.is_active ? ' checked' : '') + (it.del ? ' disabled' : '') + '> актив.</label>'
+               + '<button class="pk-btn mini" data-act="edup" data-dir="' + e(dr) + '" data-i="' + i + '" title="Выше"' + (i ? '' : ' disabled') + '>↑</button>'
+               + '<button class="pk-btn mini" data-act="eddown" data-dir="' + e(dr) + '" data-i="' + i + '" title="Ниже"' + (i < list.length - 1 ? '' : ' disabled') + '>↓</button>'
+               + (it.del ? '<button class="pk-btn mini" data-act="edundel" data-dir="' + e(dr) + '" data-i="' + i + '" title="Вернуть">↺</button>'
+                         : '<button class="pk-btn mini" data-act="eddel" data-dir="' + e(dr) + '" data-i="' + i + '"' + (canDel ? ' title="Удалить"' : ' disabled title="Карман указан в проверках — его можно только закрыть (снять «актив.»)"') + '>🗑</button>')
+               + '</div>';
+        });
+        h += '<div class="pk-edadd"><input type="text" maxlength="100" data-edadd="' + e(dr) + '" placeholder="Новый карман (Enter — добавить)"><button class="pk-btn mini" data-act="edadd" data-dir="' + e(dr) + '">+ Добавить</button></div></div>';
+    });
+    var n = edChanges(), dup = h.indexOf('pk-dup"') > -1;
+    h += '</div><div class="pk-edbar"><span class="pk-mute">' + (dup ? '⚠ Повтор названия в одном направлении' : (n ? 'Изменений: ' + n : 'Изменений нет')) + '</span>'
+       + '<button class="pk-btn" data-act="edcancel">Отмена</button><button class="pk-btn pri" data-act="edsave"' + (n && !dup ? '' : ' disabled') + '>💾 Сохранить списки</button></div></div>';
+    return h;
+}
+function edRefresh(focusSel) {
+    var box = document.getElementById('pkEd'); if (!box) return;
+    var tmp = document.createElement('div'); tmp.innerHTML = edRender(); box.parentNode.replaceChild(tmp.firstChild, box);
+    if (focusSel) { var f = document.querySelector(focusSel); if (f) f.focus(); }
+}
+function edAdd(dr, name) {
+    name = String(name || '').trim().replace(/\s+/g, ' ');
+    if (!name) return false;
+    var list = ST.ed.cols[dr];
+    if (list.some(function(x) { return !x.del && nkey(x.name) === nkey(name); })) { msg('❌ «' + name + '» уже есть в этом направлении', true); return false; }
+    list.push({ id: 0, name: name, orig: '', is_active: true, orig_active: true, tasks: 0, del: false });
+    return true;
+}
+function edSave() {
+    edSync();
+    var bad = null, payload = {};
+    Object.keys(ST.ed.cols).forEach(function(dr) {
+        var seen = {};
+        payload[dr] = { items: [], deleted: [] };
+        ST.ed.cols[dr].forEach(function(it) {
+            if (it.del) { if (it.id) payload[dr].deleted.push(it.id); return; }
+            var nm = it.name.trim().replace(/\s+/g, ' '), k = nkey(nm);
+            if (!k) { if (it.id) bad = bad || 'Пустое название у кармана «' + it.orig + '»'; return; }
+            if (seen[k]) bad = bad || 'Повтор «' + nm + '» в направлении «' + DMETA[dr].t + '»'; seen[k] = 1;
+            payload[dr].items.push({ id: it.id || 0, name: nm, is_active: it.is_active });
+        });
+    });
+    if (bad) { msg('❌ ' + bad, true); return; }
+    api('/api/plugins/pockets/bulk', { lists: payload }).then(function(r) {
+        if (r && r.success) { ST.ed = null; done(r, '✅ Списки сохранены' + (r.renamed_in_tasks ? ', обновлено проверок: ' + r.renamed_in_tasks : '')); }
+        else done(r);
+    });
+}
 function render() {
     var d = ST.d, ed = d.can_edit;
-    var h = '<div class="pk-sec"><h4>Справочник карманов и планы на ' + ST.year + ' год</h4><div class="pk-dirs">';
+    if (ST.ed && ed) {
+        document.getElementById('pkBody').innerHTML = '<div class="pk-sec"><h4>✎ Редактирование списков карманов</h4>' + edRender() + '</div>';
+        return;
+    }
+    var h = '<div class="pk-sec"><h4>Справочник карманов и планы на ' + ST.year + ' год' + (ed ? '<button class="pk-btn mini" data-act="edopen" title="Добавить, переименовать, упорядочить и закрыть карманы обоих направлений">✎ Редактировать списки</button>' : '') + '</h4><div class="pk-dirs">';
     DIRS.slice(1).forEach(function(dr) {
         if (ST.dir && ST.dir !== dr[0]) return;
         var list = d.pockets.filter(function(p) { return p.direction === dr[0]; });
@@ -485,6 +675,21 @@ function onClick(ev) {
     if (a === 'yprev' || a === 'ynext') { ST.year += (a === 'ynext' ? 1 : -1); ST.cell = null; head(); load(); return; }
     if (a === 'cellclose') { ST.cell = null; document.getElementById('pkCellBox').innerHTML = ''; return; }
     if (a === 'opentask') { var tid = t.getAttribute('data-id'); close(); if (window.trkOpenTaskById) window.trkOpenTaskById(tid); return; }
+    if (a === 'edopen') { edStart(); ST.edit = null; ST.plan = null; render(); return; }
+    if (ST.ed && a && a.indexOf('ed') === 0) {
+        edSync();
+        var edr = t.getAttribute('data-dir'), ei = +t.getAttribute('data-i'), L = edr ? ST.ed.cols[edr] : null;
+        if (a === 'edcancel') { if (edChanges() && !confirm('Отменить несохранённые изменения?')) return; ST.ed = null; render(); return; }
+        if (a === 'edsave') { edSave(); return; }
+        if (a === 'edup' && ei > 0) { var x = L.splice(ei, 1)[0]; L.splice(ei - 1, 0, x); }
+        if (a === 'eddown' && ei < L.length - 1) { var y = L.splice(ei, 1)[0]; L.splice(ei + 1, 0, y); }
+        if (a === 'eddel') { if (!L[ei].id) L.splice(ei, 1); else L[ei].del = true; }
+        if (a === 'edundel') L[ei].del = false;
+        if (a === 'edadd') { var ai = document.querySelector('[data-edadd="' + edr + '"]'); if (!edAdd(edr, ai && ai.value)) { ai && ai.focus(); return; } }
+        if (a === 'edcopy') { var oth = edr === 'корпоративная' ? 'розничная' : 'корпоративная'; edAdd(oth, L[ei].name); }
+        edRefresh(a === 'edadd' ? '[data-edadd="' + edr + '"]' : null);
+        return;
+    }
     if (a === 'add') {
         var dr = t.getAttribute('data-dir'), inp = t.parentNode.querySelector('[data-f="newname"]');
         var nm = (inp.value || '').trim(); if (!nm) { inp.focus(); return; }
@@ -522,6 +727,7 @@ function onClick(ev) {
 }
 function onChange(ev) {
     var t = ev.target;
+    if (ST.ed) { if (t.type === 'checkbox') onInput({ target: (t.closest('.pk-edrow') || t).querySelector('[data-edname]') || t }); return; }
     if (t.getAttribute && t.getAttribute('data-act') === 'active') {
         var id = +t.getAttribute('data-id'), p = ST.d.pockets.filter(function(x) { return x.id === id; })[0]; if (!p) return;
         api('/api/plugins/pockets/save', { id: id, name: p.name, direction: p.direction, is_active: t.checked, comment: p.comment || '' })
@@ -668,6 +874,69 @@ def register(app, db, hooks):
                          'VALUES (?,?,?,?,?,?,?)', (name, direction, active, (mx or 0) + 1, comment, now, now))
         _audit(u, 'create', new_id, {'name': name, 'direction': direction})
         return jsonify({'success': True, 'id': new_id})
+
+    @app.route('/api/plugins/pockets/bulk', methods=['POST'])
+    def _pk_bulk():
+        """Сохранение списков карманов целиком: порядок, переименования, активность, новые, удалённые."""
+        u, err = _admin()
+        if err:
+            return err
+        lists = (request.get_json(silent=True) or {}).get('lists') or {}
+        cur = {p['id']: p for p in _pockets()}
+        plan = {}
+        for dr, pack in lists.items():
+            if dr not in DIRS:
+                return jsonify({'success': False, 'error': 'Неизвестное направление'}), 400
+            items, seen = [], set()
+            for it in (pack or {}).get('items') or []:
+                name = re.sub(r'\s+', ' ', str(it.get('name') or '')).strip()[:100]
+                pid = int(it.get('id') or 0)
+                if not name:
+                    return jsonify({'success': False, 'error': 'Пустое название кармана'}), 400
+                if name.lower() in seen:
+                    return jsonify({'success': False, 'error': 'Карман «%s» повторяется в направлении «%s»' % (name, dr)}), 400
+                seen.add(name.lower())
+                if pid and (pid not in cur or cur[pid]['direction'] != dr):
+                    return jsonify({'success': False, 'error': 'Карман #%d не найден — обновите окно' % pid}), 409
+                items.append((pid, name, 1 if it.get('is_active', True) else 0))
+            dels = [int(x) for x in (pack or {}).get('deleted') or [] if int(x) in cur and cur[int(x)]['direction'] == dr]
+            for pid in dels:
+                old = cur[pid]
+                used = db.query_one('SELECT count(*) AS c FROM tasks WHERE trim(pocket)=? AND task_type=?',
+                                    (old['name'], dr))['c']
+                if used:
+                    return jsonify({'success': False, 'error': 'Карман «%s» указан в %d проверк(ах) — его можно только закрыть' % (old['name'], used)}), 400
+            plan[dr] = (items, dels)
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        renamed, log = 0, []
+        with db.transaction() as tx:
+            for dr, (items, dels) in plan.items():
+                for pid in dels:
+                    tx.exec('DELETE FROM pocket_plans WHERE pocket_id=?', (pid,))
+                    tx.exec('DELETE FROM pockets WHERE id=?', (pid,))
+                    log.append(('delete', pid, {'name': cur[pid]['name'], 'direction': dr}))
+                # временные имена, чтобы перестановка/обмен названий не упёрлись в UNIQUE(name, direction)
+                for pid, name, act in items:
+                    if pid and name != cur[pid]['name']:
+                        tx.exec('UPDATE pockets SET name=? WHERE id=?', ('\u0000tmp%d' % pid, pid))
+                for sort, (pid, name, act) in enumerate(items, 1):
+                    if pid:
+                        old = cur[pid]
+                        tx.exec('UPDATE pockets SET name=?, is_active=?, sort=?, updated_at=? WHERE id=?',
+                                (name, act, sort, now, pid))
+                        if name != old['name']:
+                            c = tx.exec('UPDATE tasks SET pocket=? WHERE trim(pocket)=? AND task_type=?',
+                                        (name, old['name'], dr)).rowcount
+                            renamed += max(c or 0, 0)
+                        if name != old['name'] or act != old['is_active']:
+                            log.append(('update', pid, {'name': [old['name'], name], 'is_active': [old['is_active'], act], 'direction': dr}))
+                    else:
+                        c = tx.exec('INSERT INTO pockets (name, direction, is_active, sort, comment, created_at, updated_at) '
+                                    'VALUES (?,?,?,?,?,?,?)', (name, dr, act, sort, '', now, now))
+                        log.append(('create', c.lastrowid, {'name': name, 'direction': dr}))
+        for kind, pid, det in log:
+            _audit(u, kind, pid, det)
+        return jsonify({'success': True, 'renamed_in_tasks': renamed, 'changes': len(log)})
 
     @app.route('/api/plugins/pockets/delete', methods=['POST'])
     def _pk_delete():

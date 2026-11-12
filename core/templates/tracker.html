@@ -78,8 +78,9 @@
         <div class="dash-wrap dash-split-wrap">
             <div class="dash-main-pane">
                 <div class="plan-toolbar dash-toolbar" id="dashToolbar">
-                    <div class="plan-title">📊 Песочница планирования</div>
+                    <div class="plan-title">🧪 Песочница планирования</div>
                     <div class="dash-toolbar-right">
+                        <button class="btn dash-help-btn" id="dashHelpBtn" type="button" title="Как пользоваться песочницей">❔ Как пользоваться</button>
                         <button class="btn dash-save-btn" id="dashSaveBtn">Сохранить изменения</button>
                     </div>
                 </div>
@@ -121,14 +122,17 @@
     <div class="tracker-panel{% if AT == 'calendar' %} active{% endif %}" id="panel-calendar">
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
-            <button class="plan-dashboards-btn" id="openDashboardsInlineBtn" type="button">Дашборды</button>
-            {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-dashboards-btn" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ">🗂 Карманы</button>{% endif %}
+            <div class="plan-actions">
+            <button class="plan-act plan-act--dash" id="openDashboardsInlineBtn" type="button" title="Песочница: перетаскивание проверок и нагрузка ТБ в реальном времени"><i>🧪</i><span>Песочница</span></button>
+            {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-act plan-act--pockets" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ"><i>🗂</i><span>Карманы</span></button>{% endif %}
+            <span class="plan-act-sep" aria-hidden="true"></span>
             <div class="export-menu-wrap" style="position:relative;display:inline-block;">
-                <button class="dict-add-btn" id="exportMenuBtn" style="background:linear-gradient(135deg,#27ae60,#229954);">📥 Экспорт ▾</button>
-                <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
+                <button class="plan-act plan-act--export" id="exportMenuBtn" type="button"><i>📥</i><span>Экспорт</span><b class="plan-act-caret">▾</b></button>
+                <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
                     <div class="export-menu-item" data-form="calendar" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">📅 Календарь (полный)</div>
                     <div class="export-menu-item" data-form="debtors" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">⚠️ Кто не заполнил отчёт (сегодня)</div>
                 </div>
+            </div>
             </div>
         </div>
         <div class="plan-tables">

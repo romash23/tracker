@@ -21213,3 +21213,55 @@ document.addEventListener('click', function(e) {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildStatusSelect); else buildStatusSelect();
 })();
+
+
+/* ===== Песочница: краткая инструкция (всплывающее окно) ===== */
+(function(){
+    var KEY = 'dash.help.hide';
+    function hidden(){ try { return localStorage.getItem(KEY) === '1'; } catch(e){ return false; } }
+    function close(){
+        var ov = document.getElementById('dashHelpOv'); if (!ov) return;
+        var cb = ov.querySelector('#dashHelpHide');
+        try { if (cb && cb.checked) localStorage.setItem(KEY, '1'); else localStorage.removeItem(KEY); } catch(e){}
+        ov.remove(); document.removeEventListener('keydown', onKey, true);
+    }
+    function onKey(e){ if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+    function open(){
+        if (document.getElementById('dashHelpOv')) return;
+        var ov = document.createElement('div');
+        ov.id = 'dashHelpOv'; ov.className = 'dash-help-ov';
+        ov.innerHTML = '<div class="dash-help-box" role="dialog" aria-modal="true" aria-labelledby="dashHelpTitle">'
+          + '<button class="dash-help-x" type="button" title="Закрыть">×</button>'
+          + '<h3 id="dashHelpTitle">🧪 Песочница — как пользоваться</h3>'
+          + '<p class="dash-help-lead">Здесь можно примерить сроки проверок и сразу увидеть, как меняется нагрузка ТБ. В базу ничего не попадает, пока вы не сохраните.</p>'
+          + '<ol class="dash-help-list">'
+          + '<li><b>Выберите проверку</b> в списке сверху или нажмите «+ Создать проверку» — она появится на оси.</li>'
+          + '<li><b>Кликните по оси и тяните.</b> За пустое место — двигается вся проверка, за цветной этап — только этот этап, за край этапа — меняется его длительность.</li>'
+          + '<li><b>Следите за гистограммами справа.</b> Нагрузка ТБ пересчитывается прямо во время перетаскивания — видно, где появляется перегруз.</li>'
+          + '<li><b>«+ Ось»</b> добавляет ещё одну проверку (до 5), чтобы сравнить их влияние вместе. 📌 закрепляет ось.</li>'
+          + '<li><b>«Сохранить изменения»</b> покажет список правок и запишет их только после подтверждения.</li>'
+          + '</ol>'
+          + '<div class="dash-help-foot"><label><input type="checkbox" id="dashHelpHide"' + (hidden() ? ' checked' : '') + '> Не показывать при входе</label>'
+          + '<button class="btn dash-help-ok" type="button">Понятно</button></div>'
+          + '</div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('mousedown', function(e){ if (e.target === ov) close(); });
+        ov.querySelector('.dash-help-x').addEventListener('click', close);
+        ov.querySelector('.dash-help-ok').addEventListener('click', close);
+        document.addEventListener('keydown', onKey, true);
+        setTimeout(function(){ var b = ov.querySelector('.dash-help-ok'); if (b) b.focus(); }, 30);
+    }
+    window.openDashHelp = open;
+    function autoShow(){
+        if (hidden()) return;
+        var p = document.getElementById('panel-dashboards');
+        if (p && p.classList.contains('active')) open();
+    }
+    document.addEventListener('click', function(e){
+        if (!e.target || !e.target.closest) return;
+        if (e.target.closest('#dashHelpBtn')) { e.preventDefault(); open(); return; }
+        if (e.target.closest('#openDashboardsInlineBtn')) setTimeout(autoShow, 350);
+    }, true);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(autoShow, 600); });
+    else setTimeout(autoShow, 600);
+})();
