@@ -1247,8 +1247,9 @@ body:not(.trk-theme-light) .gg-cf-no { background: transparent; color: #8fd19e; 
                 <div class="gg-field gg-span-2"><label>Иконка</label><input type="text" id="ggFIcon" maxlength="8"></div>
                 <div class="gg-field gg-span-10"><label>Название</label><input type="text" id="ggFName" readonly></div>
                 <div class="gg-field gg-span-3"><label>Направление</label><select id="ggFType"><option value="">Выберите направление</option><option value="розничная">Розничная</option><option value="корпоративная">Корпоративная</option></select></div>
-                <div class="gg-field gg-span-3"><label>Карман</label><input type="text" id="ggFPocket" maxlength="200"></div>
+                <div class="gg-field gg-span-3"><label>Карман</label><select id="ggFPocket"><option value="">— вне кармана —</option></select></div>
             </div>
+            <div class="gg-help" id="ggFPocketHint"></div>
             <div class="gg-box">
                 <div class="gg-box-title">Этапы задачи</div>
                 <div class="gg-stage-grid" id="ggStages"></div>
@@ -1617,12 +1618,49 @@ function ggTaskRebuildLeadOptions(preserveEmp) {
     (ggTaskState.employees || []).filter(function(e){ return leadDept && e.department_id === leadDept; }).forEach(function(e){ le.insertAdjacentHTML('beforeend', '<option value="' + esc(e.id) + '">' + esc(e.name) + '</option>'); });
     if (preserveEmp && curEmp) le.value = curEmp; if (le.value !== curEmp && preserveEmp && curEmp) le.value = '';
 }
+var ggTaskPocketsCache = null;
+function ggTaskLoadPockets() {
+    if (ggTaskPocketsCache) return Promise.resolve(ggTaskPocketsCache);
+    return fetch('/api/plugins/pockets/data', {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){ ggTaskPocketsCache = (d && d.pockets) || []; return ggTaskPocketsCache; })
+        .catch(function(){ ggTaskPocketsCache = []; return ggTaskPocketsCache; });
+}
+function ggTaskFillPocket(dir, cur) {
+    var sel = document.getElementById('ggFPocket');
+    if (!sel) return;
+    var hint = document.getElementById('ggFPocketHint');
+    var apply = function(list) {
+        var opts = list.filter(function(p){ return dir && p.direction === dir && p.is_active; });
+        var h = '<option value="">— вне кармана —</option>', found = !cur;
+        opts.forEach(function(p){ if (p.name === cur) found = true;
+            h += '<option value="' + esc(p.name) + '">' + esc(p.name) + '</option>'; });
+        var warn = false;
+        if (!found && cur) { warn = true;
+            h += '<option value="' + esc(cur) + '">' + esc(cur) + ' (нет в справочнике)</option>'; }
+        sel.innerHTML = h;
+        sel.value = cur || '';
+        if (warn) sel.setAttribute('data-pk-warn', '1'); else sel.removeAttribute('data-pk-warn');
+        if (hint) hint.textContent = !dir
+            ? 'Сначала выберите направление.'
+            : (warn ? 'Старое значение: карман вне справочника. Выберите из списка.'
+                    : (opts.length ? 'Карманы направления «' + dir + '». Новые — в «Планирование → 🗂 Карманы».'
+                                   : 'Для направления «' + dir + '» карманов нет — добавьте их в «🗂 Карманы».'));
+    };
+    if (ggTaskPocketsCache) { apply(ggTaskPocketsCache); return; }
+    apply([]);
+    ggTaskLoadPockets().then(function(list){ if (ggTaskMask().classList.contains('open')) apply(list); });
+}
+document.addEventListener('change', function(e){ if (e.target && e.target.id === 'ggFType') {
+    var sel = document.getElementById('ggFPocket'); var cur = (sel && !sel.getAttribute('data-pk-warn')) ? sel.value : '';
+    ggTaskFillPocket(e.target.value, cur);
+}});
 function ggTaskFillForm(task) {
     ggTaskCurrent = ggTaskClone(task);
     document.getElementById('ggFIcon').value = task.icon || '📋';
     document.getElementById('ggFName').value = task.name || '';
     document.getElementById('ggFType').value = task.task_type || '';
-    document.getElementById('ggFPocket').value = task.pocket || '';
+    ggTaskFillPocket(task.task_type || '', task.pocket || '');
     ggTaskBuildStages(task.stages || []);
     ggTaskBuildDeptChecks(ggNormList(task.department_ids));
     ggTaskBuildAssignChecks(ggNormList(task.assignees));
@@ -1649,7 +1687,12 @@ function ggTaskPayload() {
     t.icon = document.getElementById('ggFIcon').value.trim() || '📋';
     t.name = t.name || document.getElementById('ggFName').value.trim();
     t.task_type = document.getElementById('ggFType').value;
-    t.pocket = document.getElementById('ggFPocket').value.trim();
+    var _pkEl = document.getElementById('ggFPocket');
+    t.pocket = (_pkEl && _pkEl.value ? _pkEl.value : '').trim();
+    var _hint = document.getElementById('ggFPocketHint');
+    if (_hint) _hint.textContent = _pkEl && _pkEl.getAttribute('data-pk-warn')
+        ? 'Старое значение: карман вне справочника. Выберите из списка.'
+        : 'Карманы задаются в «Планирование → 🗂 Карманы».';
     t.department_ids = ggTaskSelectedChecks('ggDeptChecks');
     t.assignees = ggTaskSelectedChecks('ggAssignChecks');
     t.lead_department = document.getElementById('ggFLeadDept').value;
