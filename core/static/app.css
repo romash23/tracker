@@ -11029,3 +11029,73 @@ body:not(.trk-theme-light) #panel-vacations .vac-hc .vac-bank-chart-months,
 body:not(.trk-theme-light) .vac-bank-chart-meta{color:#aab4bc}
 body:not(.trk-theme-light) #panel-vacations .vac-sidebar{border-right-color:rgba(255,255,255,.08)}
 body:not(.trk-theme-light) #panel-vacations .vac-emp-list{border-left-color:rgba(255,255,255,.1)}
+
+
+/* ===== Планирование: кнопки действий (v2) ===== */
+.plan-actions{display:inline-flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.plan-act{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:10px;border:1px solid transparent;
+  font:inherit;font-size:.82rem;font-weight:700;letter-spacing:.01em;cursor:pointer;white-space:nowrap;
+  transition:transform .15s ease,box-shadow .15s ease,background-color .15s ease,border-color .15s ease}
+.plan-act i{font-style:normal;font-size:1rem;line-height:1}
+.plan-act:hover{transform:translateY(-1px)}
+.plan-act:active{transform:translateY(0) scale(.98)}
+.plan-act:focus-visible{outline:2px solid #6366f1;outline-offset:2px}
+.plan-act--dash{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;box-shadow:0 3px 10px rgba(79,70,229,.32)}
+.plan-act--dash:hover{box-shadow:0 6px 16px rgba(79,70,229,.42)}
+.plan-act--pockets{background:rgba(13,148,136,.10);border-color:rgba(13,148,136,.45);color:#0f766e}
+.plan-act--pockets:hover{background:rgba(13,148,136,.18);box-shadow:0 4px 12px rgba(13,148,136,.2)}
+.plan-act--export{background:#fff;border-color:#cbd5e1;color:#334155}
+.plan-act--export:hover{border-color:#94a3b8;box-shadow:0 4px 12px rgba(15,23,42,.10)}
+.plan-act-caret{font-size:.7rem;opacity:.7;margin-left:-1px}
+.plan-act-sep{width:1px;height:22px;background:rgba(100,116,139,.35);margin:0 2px}
+body:not(.trk-theme-light) .plan-act--pockets{background:rgba(45,212,191,.10);border-color:rgba(45,212,191,.45);color:#5eead4}
+body:not(.trk-theme-light) .plan-act--pockets:hover{background:rgba(45,212,191,.18)}
+body:not(.trk-theme-light) .plan-act--export{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.22);color:#e5e7eb}
+body:not(.trk-theme-light) .plan-act--export:hover{border-color:rgba(255,255,255,.4);box-shadow:0 4px 12px rgba(0,0,0,.35)}
+body:not(.trk-theme-light) .plan-act--dash{box-shadow:0 3px 12px rgba(124,58,237,.35)}
+@media (max-width:1400px){.plan-act{height:32px;padding:0 11px;font-size:.78rem}}
+.plan-act.plan-act--hero{height:40px;padding:0 18px;font-size:.92rem;border-radius:12px;gap:8px}
+.plan-act.plan-act--hero i{font-size:1.15rem}
+@media (max-width:1400px){.plan-act.plan-act--hero{height:38px;padding:0 16px;font-size:.88rem}}
+
+/* ===== Песочница: кнопка и окно инструкции ===== */
+.dash-help-btn{background:transparent;border:1px solid rgba(124,58,237,.45);color:#6d28d9;border-radius:9px;padding:6px 12px;font-weight:600;margin-right:8px;cursor:pointer}
+.dash-help-btn:hover{background:rgba(124,58,237,.08)}
+body:not(.trk-theme-light) .dash-help-btn{color:#c4b5fd;border-color:rgba(167,139,250,.5)}
+body:not(.trk-theme-light) .dash-help-btn:hover{background:rgba(167,139,250,.12)}
+.dash-help-ov{position:fixed;inset:0;z-index:21000;background:rgba(15,15,25,.45);display:flex;align-items:center;justify-content:center;padding:16px;animation:dashHelpIn .15s ease-out}
+@keyframes dashHelpIn{from{opacity:0}to{opacity:1}}
+.dash-help-box{position:relative;width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto;background:#fff;color:#1f2937;border-radius:14px;padding:22px 24px 18px;box-shadow:0 18px 50px rgba(0,0,0,.28);border-top:4px solid #7c3aed}
+.dash-help-box h3{margin:0 28px 8px 0;font-size:18px}
+.dash-help-lead{margin:0 0 12px;color:#4b5563;font-size:14px;line-height:1.45}
+.dash-help-list{margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.5}
+.dash-help-list li{margin-bottom:7px}
+.dash-help-x{position:absolute;top:10px;right:12px;border:0;background:transparent;font-size:22px;line-height:1;color:#6b7280;cursor:pointer}
+.dash-help-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:#6b7280}
+.dash-help-foot label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.dash-help-ok{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:0;border-radius:9px;padding:8px 18px;font-weight:600;cursor:pointer}
+body:not(.trk-theme-light) .dash-help-box{background:#1b1b22;color:#e5e7eb;box-shadow:0 18px 50px rgba(0,0,0,.6)}
+body:not(.trk-theme-light) .dash-help-lead,body:not(.trk-theme-light) .dash-help-foot,body:not(.trk-theme-light) .dash-help-x{color:#a1a1aa}
+
+
+/* PATCH: карман в карте проверок (список + плитка) */
+.kp-table .kp-pocket { white-space: nowrap; }
+.task-card-pocket {
+    display: inline-flex; align-items: center; gap: 4px;
+    align-self: flex-start;
+    font-size: 13px; font-weight: 800; letter-spacing: .01em;
+    padding: 2px 9px; border-radius: 10px;
+    white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    background: rgba(120,120,120,.12); color: var(--trk-meta,#5b6b73);
+    border: 1px solid rgba(120,120,120,.22);
+    margin-bottom: 4px;
+}
+.task-card-pocket.corp { background: rgba(40,116,166,.14); color: #2874a6; border-color: rgba(40,116,166,.32); }
+.task-card-pocket.retail { background: rgba(216,27,125,.13); color: #c2185b; border-color: rgba(216,27,125,.30); }
+.task-card-pocket.none { background: transparent; color: var(--trk-meta,#8a97a0); border-style: dashed; font-weight: 700; }
+.task-card-pocket[data-pk-warn] { border-color: #e08a00; box-shadow: 0 0 0 1px rgba(224,138,0,.25); }
+.tasks-grid .task-card .task-card-titles--pocket .task-card-title,
+.task-card-titles--pocket .task-card-title { font-size: 11px !important; margin-top: 1px !important; line-height: 1.2 !important; }
+body:not(.trk-theme-light) .task-card-pocket { background: rgba(200,200,200,.10); color: #aab4bb; border-color: rgba(200,200,200,.20); }
+body:not(.trk-theme-light) .task-card-pocket.corp { background: rgba(86,161,214,.16); color: #7cc0ec; border-color: rgba(86,161,214,.34); }
+body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,146,.16); color: #f48fb1; border-color: rgba(240,98,146,.34); }

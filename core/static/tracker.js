@@ -329,7 +329,7 @@ var state = {
     calendar: null, heatmap: null, summary: null, summaryIsGrid: true,
     currentYM: '', currentEmployee: '', currentDepartment: '', currentTeam: '', currentDay: '',
     calViewMode: 'tasks', tskViewMode: 'all',
-    tskDisplayMode: 'list', tskGridCols: 3, tskView: 'tile',
+    tskDisplayMode: 'list', tskGridCols: 3, tskView: 'list',
     hmYM: '', hmDateFrom: '', hmDateTo: '',
     sumViewMode: 'grid', sumShowDayTotals: true, sumTaskRowMode: 'full',
     today: '', theme: 'dark', maskNames: false,
@@ -919,10 +919,11 @@ function loadState() {
         fillTagFilters();
         // PATCH 1.0.9: читаем сохранённый вид задач
         try {
-            var _tv109 = localStorage.getItem('tracker_tsk_view');
-            if (_tv109 !== 'list') _tv109 = 'tile';
+            // 13.11: по умолчанию «Список»; новый ключ, чтобы старый сохранённый «tile» не перебивал
+            var _tv109 = localStorage.getItem('tracker_tsk_view2');
+            if (_tv109 !== 'tile') _tv109 = 'list';
             state.tskView = _tv109;
-        } catch (e) { state.tskView = 'tile'; }
+        } catch (e) { state.tskView = 'list'; }
         applyPermsToUI();
         try {
             state.tskCompactMode = (localStorage.getItem('tracker_tsk_compact') === '1');
@@ -1260,7 +1261,7 @@ function trkMapTableHtml(tasks) {
     (state.tasks || []).forEach(function(x) { if (x.task_kind === 'other' && x.other_subkind === 'audit_extra' && x.parent_task_id) (extras[x.parent_task_id] = extras[x.parent_task_id] || []).push(x); });
     var canDel = hasPerm('action.task.delete') && !!(state.currentUser && state.currentUser.role === 'admin');
     var h = '<table class="kp-table"><thead><tr>'
-        + '<th>Проверка</th><th>Описание</th><th>Куратор ЦА</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
+        + '<th>Проверка</th><th>Карман</th><th>Описание</th><th>Куратор ЦА</th><th>Руководитель</th><th>Участники</th><th>Статус</th><th>Срок</th><th>Комментарий</th><th>Проблемы</th>'
         + (canDel ? '<th></th>' : '') + '</tr></thead><tbody>';
     tasks.forEach(function(t) {
         var sv = t.status || 'active';
@@ -1286,6 +1287,7 @@ function trkMapTableHtml(tasks) {
         var probs = window.trkTaskProblemsBadge ? window.trkTaskProblemsBadge(t, { soft: true }) : '';
         h += '<tr class="dict-item kp-row st-' + escapeHtml(sv) + (t.overdue ? ' kp-row--overdue' : '') + '" data-id="' + escapeHtml(t.id) + '">'
             + '<td class="kp-name"><span class="dict-item-name">' + nm + '</span>' + sub + '</td>'
+            + '<td class="kp-pocket">' + _trkPocketBadge(t) + '</td>'
             + '<td class="kp-desc"' + (desc ? ' title="' + escapeHtml(desc) + '"' : '') + '>' + (desc ? '<div class="kp-desc-txt">' + escapeHtml(desc) + '</div>' : '<span class="kp-muted">—</span>') + '</td>'
             + '<td class="kp-cur">' + cur + '</td><td>' + lead + '</td>'
             + '<td>' + (parts.length ? escapeHtml(parts.join(', ')) : '<span class="kp-muted">—</span>') + '</td>'
@@ -1298,6 +1300,28 @@ function trkMapTableHtml(tasks) {
     });
     return h + '</tbody></table>';
 }
+function _trkPocketBadge(t, opts) {
+    opts = opts || {};
+    if (!t) return '';
+    var p = String(t.pocket || '').trim();
+    var dir = t.task_type || '';
+    var cls = dir === '\u043a\u043e\u0440\u043f\u043e\u0440\u0430\u0442\u0438\u0432\u043d\u0430\u044f' ? 'corp'
+            : (dir === '\u0440\u043e\u0437\u043d\u0438\u0447\u043d\u0430\u044f' ? 'retail' : '');
+    var icon = cls === 'corp' ? '\ud83c\udfe2' : (cls === 'retail' ? '\ud83d\udc65' : '');
+    if (!p) {
+        if (opts.hideEmpty) return '';
+        return '<span class="task-card-pocket none" title="\u0412\u043d\u0435 \u043a\u0430\u0440\u043c\u0430\u043d\u0430">\u2014 \u0432\u043d\u0435 \u043a\u0430\u0440\u043c\u0430\u043d\u0430</span>';
+    }
+    var known = false;
+    try {
+        var list = window.__trkPocketList || (state && state.pockets) || [];
+        known = list.some(function(x) { return x && x.name === p && (!dir || x.direction === dir) && x.is_active !== false; });
+    } catch (e) {}
+    var warn = known ? '' : ' data-pk-warn="1"';
+    var ttl = '\u041a\u0430\u0440\u043c\u0430\u043d' + (dir ? ' \u00b7 ' + dir : '') + (known ? '' : ' (\u043d\u0435\u0442 \u0432 \u0441\u043f\u0440\u0430\u0432\u043e\u0447\u043d\u0438\u043a\u0435)');
+    return '<span class="task-card-pocket ' + cls + '"' + warn + ' title="' + escapeHtml(ttl) + '">' + (icon ? icon + ' ' : '') + escapeHtml(p) + '</span>';
+}
+window._trkPocketBadge = _trkPocketBadge;
 function taskRowMin(t) {
     var stMap = { planning: 'Планирование', approved: 'Утверждена', active: 'Активна', done: 'Завершена', cancelled: 'Отменена' };
     var sv = t.status || 'active';
@@ -1464,6 +1488,7 @@ function taskCardRowGrid(t) {
     if (_urgBadge) statusBadge += _urgBadge;
 
     var deptBadges = _deptBadgesForTask(t);
+    var _pkHtml = _trkPocketBadge(t, { hideEmpty: true });
     var _curOk = !!(t.curator && t.curator !== 'нет');
     var _curTxt = _curOk ? t.curator : 'не указан';
     var curatorHtml = '<div class="task-card-curator' + (_curOk ? '' : ' task-card-curator--none') + '" title="Куратор ЦА: ' + escapeHtml(_curTxt) + '">👤 ' + escapeHtml(_curTxt) + '</div>';
@@ -1523,7 +1548,8 @@ function taskCardRowGrid(t) {
         + '<div class="task-card-accent"></div>'
         + '<div class="task-card-head">'
         +   '<div class="task-card-icon-wrap">' + window.trkQuarterBadge(t.icon, 'task-card-icon') + '</div>'
-        +   '<div class="task-card-titles">'
+        +   '<div class="task-card-titles' + (_pkHtml ? ' task-card-titles--pocket' : '') + '">'
+        +     _pkHtml
         +     '<div class="task-card-title' + (t.overdue ? ' overdue' : '') + '">' + escapeHtml(t.name) + '</div>'
         +     (deptBadges ? '<div class="task-card-sub">' + deptBadges + '</div>' : '')
         +     curatorHtml
@@ -1681,6 +1707,30 @@ function renderTasksFull() {
     if (state.tskDir) tasks = tasks.filter(function(t) { return (t.task_type || '') === state.tskDir; });
     _tskDirMark();
 
+    // 13.11: фильтр «Карман» — варианты из проверок выбранного направления
+    var _pf = $('tskPocketFilter'), pocket = _pf ? (_pf.value || '') : '';
+    if (_pf) {
+        var _pSeen = {}, _pOpts = [];
+        (state.tasks || []).forEach(function(t) {
+            if (state.tskDir && (t.task_type || '') !== state.tskDir) return;
+            var p = String(t.pocket || '').trim();
+            if (p && !_pSeen[p]) { _pSeen[p] = 1; _pOpts.push(p); }
+        });
+        _pOpts.sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase(), 'ru'); });
+        if (pocket && pocket !== '__none__' && !_pSeen[pocket]) _pOpts.unshift(pocket);
+        var _pKey = _pOpts.join('\u0001');
+        if (_pf._optsKey !== _pKey) {
+            _pf._optsKey = _pKey;
+            var _ph = '<option value="">Карман</option>';
+            _pOpts.forEach(function(p) { _ph += '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>'; });
+            _ph += '<option value="__none__">— без кармана</option>';
+            _pf.innerHTML = _ph;
+            _pf.value = pocket;
+        }
+    }
+    if (pocket === '__none__') tasks = tasks.filter(function(t) { return !String(t.pocket || '').trim(); });
+    else if (pocket) tasks = tasks.filter(function(t) { return String(t.pocket || '').trim() === pocket; });
+
     if (mode === 'planning') tasks = tasks.filter(function(t) { return t.status === 'planning'; });
     else if (mode === 'approved') tasks = tasks.filter(function(t) { return t.status === 'approved'; });
     else if (mode === 'active') tasks = tasks.filter(function(t) { return t.status === 'active'; });
@@ -1719,7 +1769,7 @@ function renderTasksFull() {
     var html = '';
     tasks.forEach(function(t) { html += taskCardRowGrid(t); });
     // PATCH 1.0.9: три режима — плитка / компактно / список
-    var _view = state.tskView || 'tile';
+    var _view = state.tskView || 'list';
     var _cols = parseInt(state.tskGridCols, 10) || 3;
     if (_cols < 1) _cols = 1;
     if (_cols > 5) _cols = 5;
@@ -2097,45 +2147,42 @@ function exportCalendarToExcel() {
     else bindExportCalendar();
 })();
 
-function toggleExportMenu(force) {
-    var drop = document.getElementById('exportMenuDrop');
-    if (!drop) return;
-    var show = (force === true) || drop.style.display === 'none';
-    drop.style.display = show ? 'block' : 'none';
+// «Планирование → 📥 Экспорт»: один файл xlsx (Проверки, Карманы × план, По месяцам), без фильтров экрана.
+function exportPlannedToExcel(btn) {
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    notify('📥 Готовим Excel по запланированным проверкам...', 'info');
+    fetch('/api/tracker/export/planned', { credentials: 'same-origin' }).then(function(r) {
+        var ct = r.headers.get('Content-Type') || '';
+        if (!r.ok || ct.indexOf('spreadsheetml') < 0) {
+            return r.text().then(function(txt) {
+                var msg = 'HTTP ' + r.status;
+                try { var j = JSON.parse(txt); if (j && j.error) msg = j.error; } catch (_) {}
+                throw new Error(msg);
+            });
+        }
+        var cd = r.headers.get('Content-Disposition') || '', m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+        var name = m ? decodeURIComponent(m[1]) : 'planned_audits.xlsx';
+        return r.blob().then(function(bl) {
+            var url = URL.createObjectURL(bl), a = document.createElement('a');
+            a.href = url; a.download = name; document.body.appendChild(a); a.click();
+            setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 1500);
+            notify('✅ Файл ' + name + ' скачан', 'success');
+        });
+    }).catch(function(e) {
+        notify('Не удалось выгрузить Excel: ' + (e && e.message ? e.message : e), 'error');
+    }).then(function() { if (btn) btn.disabled = false; });
 }
-function runExportForm(form) {
-    toggleExportMenu(false);
-    if (form === 'calendar') { if (typeof exportCalendarToExcel === 'function') exportCalendarToExcel(); }
-    else if (form === 'debtors') exportDebtorsToExcel();
-}
-function exportDebtorsToExcel() {
-    var d = new Date();
-    var iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-    var params = new URLSearchParams();
-    params.set('date', iso);
-    var deptFilter = document.getElementById('calDeptFilter');
-    if (deptFilter && deptFilter.value) params.set('department', deptFilter.value);
-    var teamFilter = document.getElementById('calTeamFilter');
-    if (teamFilter && teamFilter.value) params.set('team', teamFilter.value);
-    notify('⚠️ Считаем, кто не заполнил отчёт...', 'info');
-    window.open('/api/tracker/export/debtors?' + params.toString(), '_blank');
-}
+window.exportPlannedToExcel = exportPlannedToExcel;
 (function(){
-    function bindExportMenu() {
+    function bindExportPlanned() {
         document.addEventListener('click', function(e) {
-            var t = e.target;
-            if (!t || !t.closest) return;
-            if (t.closest('#exportMenuBtn')) { toggleExportMenu(); return; }
-            var item = t.closest('.export-menu-item');
-            if (item) { runExportForm(item.getAttribute('data-form')); return; }
-            var drop = document.getElementById('exportMenuDrop');
-            if (drop && drop.style.display !== 'none' && !t.closest('.export-menu-wrap')) {
-                drop.style.display = 'none';
-            }
+            var t = e.target && e.target.closest ? e.target.closest('#exportPlannedBtn') : null;
+            if (t) { e.preventDefault(); exportPlannedToExcel(t); }
         });
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindExportMenu);
-    else bindExportMenu();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindExportPlanned);
+    else bindExportPlanned();
 })();
 
 function renderCalendar() {
@@ -2754,6 +2801,7 @@ function openDepartmentModal(dep) {
     g('dep_color', (dep && dep.color) || '#00897b');
     g('dep_headcount_retail', (dep && dep.headcount_retail !== null && dep.headcount_retail !== undefined) ? dep.headcount_retail : '');
     g('dep_headcount_corp', (dep && dep.headcount_corp !== null && dep.headcount_corp !== undefined) ? dep.headcount_corp : '');
+    g('dep_short_name', (dep && dep.short_name) || '');
     var headSel = $('dep_head');
     if (headSel) {
         headSel.innerHTML = '<option value="">— не указан —</option>'
@@ -2785,6 +2833,7 @@ function saveDepartment() {
         head_employee_id: $('dep_head') ? ($('dep_head').value || '') : '',
         headcount_retail: _hr,
         headcount_corp: _hc,
+        short_name: $('dep_short_name') ? $('dep_short_name').value.trim() : '',
     };
     apiJson('/api/tracker/department/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -3349,16 +3398,28 @@ function _stageEnd(idx) {
     return dl || '';
 }
 function _fillPocketOptions() {
-    var dl = $('taskPocketOptions');
-    if (!dl) return;
-    var seen = {}, opts = [];
-    (state.tasks || []).forEach(function(t){
-        var p = (t.pocket || '').trim();
-        if (p && !seen[p]) { seen[p] = 1; opts.push(p); }
-    });
-    opts.sort();
-    dl.innerHTML = opts.map(function(p){ return '<option value="' + escapeHtml(p) + '">'; }).join('');
+    var sel = $('task_pocket');
+    if (!sel || sel.tagName !== 'SELECT') return;
+    var dir = $('task_type') ? $('task_type').value : '';
+    var cur = sel.getAttribute('data-cur');
+    if (cur === null) cur = sel.value || '';
+    var _py = (($('task_start_date') && $('task_start_date').value) || '').slice(0, 4) || String(new Date().getFullYear());
+    var list = window.trkPocketsFor ? window.trkPocketsFor(dir, _py) : (window.__trkPocketList || state.pockets || []).filter(function(p) { return p.direction === dir && p.is_active; });
+    var h = '<option value="">— вне кармана —</option>', found = !cur;
+    list.forEach(function(p) { if (p.name === cur) found = true; h += '<option value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</option>'; });
+    // Старое значение проверки, которого нет в справочнике, показываем, чтобы не потерять его молча
+    if (!found) h += '<option value="' + escapeHtml(cur) + '">' + escapeHtml(cur) + ' (нет в справочнике)</option>';
+    sel.innerHTML = h;
+    sel.value = cur;
+    sel.removeAttribute('data-cur');
+    sel.disabled = !dir || !!($('task_type') && $('task_type').disabled);
+    var hint = $('taskPocketHint');
+    if (hint) hint.textContent = !dir ? 'Сначала выберите направление.'
+        : (list.length ? 'Открытые карманы направления «' + dir + '» на ' + _py + ' год (по дате начала). Новые задаются в «🗂 Карманы → 📋 Справочник и планы».'
+                       : 'На ' + _py + ' год для направления «' + dir + '» карманов нет — добавьте их в «🗂 Карманы → 📋 Справочник и планы».');
 }
+window.trkFillPocketOptions = _fillPocketOptions;
+document.addEventListener('change', function(e) { if (e.target && e.target.id === 'task_start_date') { _fillPocketOptions(); return; } if (e.target && e.target.id === 'task_type') { var s = $('task_pocket'); if (s) s.setAttribute('data-cur', ''); _fillPocketOptions(); } });
 
 // Нижняя граница для начала этапа idx: начало ближайшего ЗАПОЛНЕННОГО
 // предыдущего этапа (этап не может идти раньше предшественника),
@@ -3604,6 +3665,7 @@ function applyTaskKindUI(kind) {
     });
 }
 /* Открывает карточку проверки по id (сводка, колокольчик). Окно «Карточка (статистика)» больше не используется. */
+window.openTaskModal = function(t, k) { return openTaskModal(t, k); };
 window.trkOpenTaskById = function(id) {
     var t = (state.tasks || []).find(function(x) { return String(x.id) === String(id); });
     if (!t) { notify('Задача не найдена', 'error'); return; }
@@ -3652,7 +3714,7 @@ function openTaskModal(task, forceKind) {
     renderTaskOrdersDraft();
     // PATCH tasks-stages: тип задачи, карман, этапы
     g('task_type', (task && task.task_type) || '');
-    g('task_pocket', (task && task.pocket) || '');
+    var _pkSel = $('task_pocket'); if (_pkSel) _pkSel.setAttribute('data-cur', (task && task.pocket) || '');
     _fillPocketOptions();
     _taskStagesDraft = {};
     if (task && Array.isArray(task.stages)) {
@@ -3783,7 +3845,7 @@ function openTaskSummary(task) {
     h += _tsumRow('👤 Куратор ЦА', cur, !(task.curator && task.curator !== 'нет'));
     // Остальное — только непустое
     if (task.task_type) h += _tsumRow('🧭 Направление', escapeHtml(task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1)));
-    if (task.pocket) h += _tsumRow('👝 Карман', escapeHtml(task.pocket));
+    if (task.pocket) h += _tsumRow('👝 Карман', (task.task_type === 'корпоративная' ? '🏢 ' : task.task_type === 'розничная' ? '👥 ' : '') + escapeHtml(task.pocket));
     var deps = task.department_ids || [];
     if (deps.length) h += _tsumRow('🏦 Банки', '<ul class="tsum-list">' + deps.map(function(d) {
         return '<li>' + _tsumDepName(d) + (d === task.lead_department ? ' <span class="tsum-lead-mark" title="Банк-руководитель">👑</span>' : '') + '</li>';
@@ -5358,6 +5420,7 @@ function renderEmpDayModal(d) {
    ============================================================ */
 on('tskDeptFilter', 'change', renderTasksFull);
 on('tskCuratorFilter', 'change', renderTasksFull);
+on('tskPocketFilter', 'change', renderTasksFull);
 on('tskSortSelect', 'change', renderTasksFull);
 (function() {
     var seg = $('tskDirSeg'); if (!seg) return;
@@ -17210,16 +17273,15 @@ window.__trkEditTaskFromDay = true;
 if (window.__trkTaskViewV109) return;
 window.__trkTaskViewV109 = true;
 
-var KEY = 'tracker_tsk_view';
+var KEY = 'tracker_tsk_view2';
 var COLS_KEY = 'tracker_tsk_cols';
 
 function _read(){
     try {
         var v = localStorage.getItem(KEY);
-        if (v === 'list') return 'list';
-        if (v) return 'tile';
+        if (v === 'tile') return 'tile';
     } catch(e){}
-    return 'tile';
+    return 'list';
 }
 function _write(v){
     try { localStorage.setItem(KEY, v); } catch(e){}
@@ -19867,11 +19929,12 @@ function renderBankStatsPanel(bank){
         var defName = 'Новая проверка ' + (existingCount + 1);
         var defDir = stateDash.dir === 'corp' ? 'corp' : 'retail';
         // Список существующих карманов
-        var seen = {}, pockets = [];
-        (st().tasks || []).forEach(function(t){ var pk=(t.pocket||'').trim(); if(pk && !seen[pk]){ seen[pk]=1; pockets.push(pk);} });
-        pockets.sort();
-        var pocketOpts = ['<option value="">— Без кармана —</option>'];
-        pockets.forEach(function(pk){ pocketOpts.push('<option value="'+escapeHtml(pk)+'">'+escapeHtml(pk)+'</option>'); });
+        function pocketOptsFor(dir){
+            var tt = dirTaskType(dir), o = ['<option value="">— Вне кармана —</option>'];
+            (window.trkPocketsFor ? window.trkPocketsFor(tt, '') : (window.__trkPocketList || [])).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
+            return o.join('');
+        }
+        var pocketOpts = [pocketOptsFor(defDir)];
 
         var ov = document.createElement('div');
         ov.id = 'dashCreateModal';
@@ -19905,6 +19968,7 @@ function renderBankStatsPanel(bank){
             if (!b) return;
             dirSel = b.getAttribute('data-dir');
             seg.querySelectorAll('[data-dir]').forEach(function(x){ x.classList.toggle('active', x===b); });
+            var ps = byId('dashCmPocket'); if (ps) ps.innerHTML = pocketOptsFor(dirSel);
         });
         ov.addEventListener('mousedown', function(e){ if (e.target === ov) dashCloseCreateModal(); });
         byId('dashCmCancel').addEventListener('click', dashCloseCreateModal);
@@ -21196,4 +21260,56 @@ document.addEventListener('click', function(e) {
         seg.parentNode.insertBefore(sel, seg.nextSibling); sync();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildStatusSelect); else buildStatusSelect();
+})();
+
+
+/* ===== Песочница: краткая инструкция (всплывающее окно) ===== */
+(function(){
+    var KEY = 'dash.help.hide';
+    function hidden(){ try { return localStorage.getItem(KEY) === '1'; } catch(e){ return false; } }
+    function close(){
+        var ov = document.getElementById('dashHelpOv'); if (!ov) return;
+        var cb = ov.querySelector('#dashHelpHide');
+        try { if (cb && cb.checked) localStorage.setItem(KEY, '1'); else localStorage.removeItem(KEY); } catch(e){}
+        ov.remove(); document.removeEventListener('keydown', onKey, true);
+    }
+    function onKey(e){ if (e.key === 'Escape') { e.stopPropagation(); close(); } }
+    function open(){
+        if (document.getElementById('dashHelpOv')) return;
+        var ov = document.createElement('div');
+        ov.id = 'dashHelpOv'; ov.className = 'dash-help-ov';
+        ov.innerHTML = '<div class="dash-help-box" role="dialog" aria-modal="true" aria-labelledby="dashHelpTitle">'
+          + '<button class="dash-help-x" type="button" title="Закрыть">×</button>'
+          + '<h3 id="dashHelpTitle">🧪 Песочница — как пользоваться</h3>'
+          + '<p class="dash-help-lead">Здесь можно примерить сроки проверок и сразу увидеть, как меняется нагрузка ТБ. В базу ничего не попадает, пока вы не сохраните.</p>'
+          + '<ol class="dash-help-list">'
+          + '<li><b>Выберите проверку</b> в списке сверху или нажмите «+ Создать проверку» — она появится на оси.</li>'
+          + '<li><b>Кликните по оси и тяните.</b> За пустое место — двигается вся проверка, за цветной этап — только этот этап, за край этапа — меняется его длительность.</li>'
+          + '<li><b>Следите за гистограммами справа.</b> Нагрузка ТБ пересчитывается прямо во время перетаскивания — видно, где появляется перегруз.</li>'
+          + '<li><b>«+ Ось»</b> добавляет ещё одну проверку (до 5), чтобы сравнить их влияние вместе. 📌 закрепляет ось.</li>'
+          + '<li><b>«Сохранить изменения»</b> покажет список правок и запишет их только после подтверждения.</li>'
+          + '</ol>'
+          + '<div class="dash-help-foot"><label><input type="checkbox" id="dashHelpHide"' + (hidden() ? ' checked' : '') + '> Не показывать при входе</label>'
+          + '<button class="btn dash-help-ok" type="button">Понятно</button></div>'
+          + '</div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('mousedown', function(e){ if (e.target === ov) close(); });
+        ov.querySelector('.dash-help-x').addEventListener('click', close);
+        ov.querySelector('.dash-help-ok').addEventListener('click', close);
+        document.addEventListener('keydown', onKey, true);
+        setTimeout(function(){ var b = ov.querySelector('.dash-help-ok'); if (b) b.focus(); }, 30);
+    }
+    window.openDashHelp = open;
+    function autoShow(){
+        if (hidden()) return;
+        var p = document.getElementById('panel-dashboards');
+        if (p && p.classList.contains('active')) open();
+    }
+    document.addEventListener('click', function(e){
+        if (!e.target || !e.target.closest) return;
+        if (e.target.closest('#dashHelpBtn')) { e.preventDefault(); open(); return; }
+        if (e.target.closest('#openDashboardsInlineBtn')) setTimeout(autoShow, 350);
+    }, true);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(autoShow, 600); });
+    else setTimeout(autoShow, 600);
 })();

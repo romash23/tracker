@@ -78,8 +78,9 @@
         <div class="dash-wrap dash-split-wrap">
             <div class="dash-main-pane">
                 <div class="plan-toolbar dash-toolbar" id="dashToolbar">
-                    <div class="plan-title">📊 Песочница планирования</div>
+                    <div class="plan-title">🧪 Песочница планирования</div>
                     <div class="dash-toolbar-right">
+                        <button class="btn dash-help-btn" id="dashHelpBtn" type="button" title="Как пользоваться песочницей">❔ Как пользоваться</button>
                         <button class="btn dash-save-btn" id="dashSaveBtn">Сохранить изменения</button>
                     </div>
                 </div>
@@ -121,13 +122,11 @@
     <div class="tracker-panel{% if AT == 'calendar' %} active{% endif %}" id="panel-calendar">
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
-            <button class="plan-dashboards-btn" id="openDashboardsInlineBtn" type="button">Дашборды</button>
-            <div class="export-menu-wrap" style="position:relative;display:inline-block;">
-                <button class="dict-add-btn" id="exportMenuBtn" style="background:linear-gradient(135deg,#27ae60,#229954);">📥 Экспорт ▾</button>
-                <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
-                    <div class="export-menu-item" data-form="calendar" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">📅 Календарь (полный)</div>
-                    <div class="export-menu-item" data-form="debtors" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">⚠️ Кто не заполнил отчёт (сегодня)</div>
-                </div>
+            <button class="plan-act plan-act--dash plan-act--hero" id="openDashboardsInlineBtn" type="button" title="Песочница: перетаскивание проверок и нагрузка ТБ в реальном времени"><i>🧪</i><span>Песочница</span></button>
+            <div class="plan-actions">
+            {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-act plan-act--pockets" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ"><i>🗂</i><span>Карманы</span></button>{% endif %}
+            <span class="plan-act-sep" aria-hidden="true"></span>
+            <button class="plan-act plan-act--export" id="exportPlannedBtn" type="button" title="Excel без фильтров: запланированные проверки, карманы × план, проверки по месяцам"><i>📥</i><span>Экспорт</span></button>
             </div>
         </div>
         <div class="plan-tables">
@@ -163,6 +162,9 @@
                     <option value="нет">нет</option>
                 </select>
             </label>
+            <label class="sum-filter" title="Карман"><span>🗂</span>
+                <select id="tskPocketFilter"><option value="">Карман</option></select>
+            </label>
             <div class="tsk-dir-seg" id="tskDirSeg" role="group" aria-label="Направление" title="Направление проверки">
                 <button type="button" data-v="">Все</button>
                 <button type="button" data-v="розничная">Розничное</button>
@@ -187,8 +189,8 @@
                 </select>
             </label>
             <div class="segmented" id="tskViewSeg" title="Вид отображения задач">
-                <button type="button" data-view="tile" title="Плитка">▢ Плитка</button>
                 <button type="button" data-view="list" title="Список: одна задача в строке">📋 Список</button>
+                <button type="button" data-view="tile" title="Плитка">▢ Плитка</button>
             </div>
             <div class="segmented" id="tskViewMode" style="margin-left:auto;">
                 <button class="active" data-mode="all">Все</button>
@@ -437,6 +439,9 @@
     <div class="form-group"><label>👥 Штатная численность (розничное направление)</label>
         <input type="number" id="dep_headcount_retail" min="0" step="0.5" placeholder="например: 2.5">
     </div>
+    <div class="form-group"><label>🔤 Короткое название (для узких таблиц)</label>
+        <input type="text" id="dep_short_name" maxlength="8" placeholder="например: ПБ">
+    </div>
     <div class="form-group"><label>🏢 Штатная численность (корпоративное направление)</label>
         <input type="number" id="dep_headcount_corp" min="0" step="0.5" placeholder="например: 3.5">
         <small style="color:#64748b;">Общая штатная численность = розн + корп и должна быть целой. Пусто — не задано.</small>
@@ -575,9 +580,8 @@
             </select>
         </div>
         <div class="form-group"><label>👝 Карман</label>
-            <input type="text" id="task_pocket" list="taskPocketOptions" maxlength="200" autocomplete="off" placeholder="например: Ипотека">
-            <datalist id="taskPocketOptions"></datalist>
-            <div class="assignees-hint">Свободный текст. Подсказки — из уже использованных карманов.</div>
+            <select id="task_pocket"><option value="">— вне кармана —</option></select>
+            <div class="assignees-hint" id="taskPocketHint">Список открытых карманов выбранного направления. Новые карманы задаются в «Планирование → 🗂 Карманы».</div>
         </div>
     </div>
     <div class="form-group tk-audit-only" id="taskStagesGroup">
@@ -825,6 +829,6 @@
 {% for _pl in ['updater', 'task_audit', 'my_week', 'pulse', 'gantt'] %}{% if _pl in LP %}
 <script src="/plugins-assets/{{ _pl }}.js"></script>{% endif %}{% endfor %}
 {# «Загрузка сотрудников» (capacity) и «Статистика по командам» (stats_teams) убраны из меню «Статистика»; страницы плагинов остались #}
-{% for _pl in ['svod', 'week_achievements', 'excel_export', 'reminders'] %}{% if _pl in LP %}
+{% for _pl in ['svod', 'week_achievements', 'excel_export', 'reminders', 'pockets'] %}{% if _pl in LP %}
 <script src="/plugins-assets/{{ _pl }}.js"></script>{% endif %}{% endfor %}
 {% endblock %}
