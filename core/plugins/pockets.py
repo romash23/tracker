@@ -7,7 +7,7 @@
 таблица 2 — карман × банки-участники + «вне кармана», итоги, ПШЕ и «в год на ПШЕ».
 Таблицы pockets / pocket_plans создаются миграцией в app.py (с резервной копией БД).
 """
-__version__ = '1.1'
+__version__ = '1.2'
 __description__ = 'Карманы: справочник по направлениям, годовые планы, распределение проверок по ТБ'
 
 import re
@@ -214,6 +214,12 @@ var DL = { 'корпоративная': 'Корп.', 'розничная': 'Р�
 var DMETA = { 'корпоративная': { k: 'corp', ic: '🏢', t: 'Корпоративное', cl: 'pk-d-corp' }, 'розничная': { k: 'retail', ic: '👥', t: 'Розничное', cl: 'pk-d-retail' } };
 function nkey(n) { return String(n || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
 function isShared(name) { return !!(ST.shared && ST.shared[nkey(name)]); }
+function setList(L) { window.__trkPocketList = L || []; try { if (window.state) window.state.pockets = window.__trkPocketList; } catch (x) {} }
+// Открытые карманы направления на год (год проверки — по дате начала; пусто — текущий год)
+window.trkPocketsFor = function(dir, year) {
+    var y = String(year || new Date().getFullYear());
+    return (window.__trkPocketList || []).filter(function(p) { return p && (!dir || p.direction === dir) && p.is_active && (p.year == null || String(p.year) === y); });
+};
 function ptag(name, dir, unk) {
     var m = DMETA[dir], sh = !unk && m && isShared(name);
     return '<span class="pk-ptag ' + (m ? m.cl : '') + (unk ? ' pk-old' : '') + (sh ? ' pk-shared' : '') + '" title="' + e((m ? m.t + ' направление' : 'Без направления') + (sh ? ' · общий карман: есть в обоих направлениях' : '') + (unk ? ' · нет в справочнике' : '')) + '">'
@@ -226,7 +232,7 @@ function ptagT(name, dir, unk) {
 }
 function shCol(c) { return c && c.key !== '__none' && !c.unknown && isShared(c.name); }
 function popClose() {
-    ST.cell = null; var p = document.getElementById('pkPop'); if (p) p.style.display = 'none';
+    tipHide(); ST.cell = null; var p = document.getElementById('pkPop'); if (p) p.style.display = 'none';
     document.querySelectorAll('#pkOverlay td.pk-cell-on').forEach(function(x) { x.classList.remove('pk-cell-on'); });
 }
 function popPlace(pop, a) {
@@ -355,14 +361,27 @@ function css() {
     '.pk-box .pk-edbar{background:#1d2026}body.trk-theme-light .pk-box .pk-edbar{background:#fff}',
     '.pk-edbar .pk-mute{margin-right:auto}',
     '.pk-edhint{font-size:.74rem;opacity:.85;margin:0 0 8px}',
-    '.pk-box.pk-box--ed{width:min(720px,94vw)}',
+    '.pk-box.pk-box--ed{width:min(820px,94vw)}',
     '.pk-pop{position:fixed;z-index:20050;display:none;min-width:300px;max-width:min(520px,92vw);max-height:46vh;overflow:auto;padding:8px 10px 10px;border-radius:10px;background:#262a32;color:#e6e6e6;border:1px solid rgba(38,162,105,.7);box-shadow:0 12px 34px rgba(0,0,0,.5);font-size:.82rem}',
     'body.trk-theme-light .pk-pop{background:#fff;color:#1f2328;box-shadow:0 12px 34px rgba(15,23,42,.22)}',
     '.pk-pop .pk-cell{margin:0;padding:0;border:0}.pk-pop .pk-plan{margin:5px 0 0}.pk-pop a{cursor:pointer;color:inherit;text-decoration:underline dotted}',
     '.pk-t td.pk-cell-on{outline:2px solid #26a269;outline-offset:-2px;background:rgba(38,162,105,.16)}',
     '.pk-ptag.pk-tt{border-left:0;padding:1px 7px;background:rgba(128,128,128,.12)}',
     '.pk-ptag.pk-tt.pk-tsh{background:rgba(168,85,247,.18);box-shadow:inset 0 0 0 1px rgba(168,85,247,.6);color:#d8b4fe}body.trk-theme-light .pk-ptag.pk-tt.pk-tsh{color:#6b21a8;background:rgba(168,85,247,.12)}',
-    '.pk-t th.pk-thsh,.pk-t td.pk-tdsh,.pk-t tr.pk-trsh>td{box-shadow:inset 0 0 0 999px rgba(168,85,247,.08)}'
+    '.pk-edrow{flex-wrap:wrap}',
+    '.pk-edrow .pk-pl{display:inline-flex;align-items:center;gap:3px;font-size:.72rem;white-space:nowrap;opacity:1}',
+    '.pk-edrow input[data-edplan]{width:54px;padding:3px 5px;border-radius:6px;border:1px solid rgba(128,128,128,.45);background:transparent;color:inherit;font:inherit;font-size:.8rem;font-weight:700;text-align:right}',
+    'body:not(.trk-theme-light) .pk-edrow input[data-edplan]{color-scheme:dark}',
+    '.pk-pst{font-size:.7rem;font-weight:700;padding:1px 7px;border-radius:999px;white-space:nowrap}',
+    '.pk-pst.need{background:rgba(230,126,34,.18);color:#f0a04b}.pk-pst.ok{background:rgba(39,174,96,.18);color:#4cd387}.pk-pst.over{background:rgba(231,76,60,.18);color:#ff8a7a}.pk-pst.none{opacity:.7;border:1px dashed rgba(128,128,128,.55)}',
+    'body.trk-theme-light .pk-pst.need{color:#a85a00}body.trk-theme-light .pk-pst.ok{color:#1e7d46}body.trk-theme-light .pk-pst.over{color:#b42318}',
+    '.pk-edsum{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.76rem;margin:0 0 8px;padding:6px 8px;border-radius:8px;background:rgba(128,128,128,.09)}',
+    '.pk-prev{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border-radius:10px;border:1px dashed rgba(38,162,105,.65);font-size:.78rem}',
+    '.pk-edrow.pk-fromprev{border-color:rgba(59,130,246,.65)}',
+    '.pk-tip{position:fixed;z-index:20060;display:none;max-width:340px;padding:7px 10px;border-radius:9px;font-size:.78rem;font-weight:600;line-height:1.35;pointer-events:none;background:#262a32;color:#e6e6e6;border:1px solid rgba(128,128,128,.5);border-left-width:4px;box-shadow:0 10px 28px rgba(0,0,0,.4)}',
+    'body.trk-theme-light .pk-tip{background:#fff;color:#1f2328;box-shadow:0 10px 28px rgba(15,23,42,.2)}',
+    '.pk-tip.need{border-left-color:#e67e22}.pk-tip.ok{border-left-color:#27ae60}.pk-tip.over{border-left-color:#e74c3c}',
+    '.pk-head .pk-edbtn{border-color:#26a269}.pk-head .pk-edbtn.on{background:#26a269;color:#fff}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -402,19 +421,25 @@ function onKey(ev) {
 }
 var DRAG = null;
 function onInput(ev) {
-    if (!ST.ed || !ev.target.hasAttribute('data-edname')) return;
+    var t = ev.target; if (!ST.ed || !t || !t.hasAttribute) return;
+    var isPlan = t.hasAttribute('data-edplan');
+    if (!t.hasAttribute('data-edname') && !isPlan) return;
     edSync();
-    // подсветка общих/повторов без перерисовки (чтобы не терять курсор)
+    // подсветка общих/повторов/статуса плана без перерисовки (чтобы не терять курсор)
     var sh = edShared();
     document.querySelectorAll('#pkEd .pk-edrow').forEach(function(r) {
         var dr = r.getAttribute('data-dir'), it = ST.ed.cols[dr][+r.getAttribute('data-i')], k = nkey(it.name);
         var cnt = ST.ed.cols[dr].filter(function(x) { return !x.del && nkey(x.name) === k; }).length;
         r.classList.toggle('pk-shared', !it.del && !!k && !!sh[k]);
         r.classList.toggle('pk-dup', !it.del && !!k && cnt > 1);
-        r.classList.toggle('pk-chg', !!it.id && (it.name.trim() !== it.orig || it.is_active !== it.orig_active));
+        r.classList.toggle('pk-chg', !!it.id && itChanged(it));
+        var st = pstat(it.plan, it.fact || 0), c = r.querySelector('[data-pst]');
+        if (c) { c.className = 'pk-pst ' + st.k; c.textContent = st.s; c.title = st.t; }
     });
+    ['корпоративная', 'розничная'].forEach(function(dr) { var b = document.querySelector('#pkEd [data-sum="' + dr + '"]'); if (b) b.innerHTML = sumHtml(dr); });
+    if (isPlan) { var row = t.closest('.pk-edrow'); if (row) edTip(t, row.getAttribute('data-dir'), ST.ed.cols[row.getAttribute('data-dir')][+row.getAttribute('data-i')]); }
     var n = edChanges(), dup = document.querySelector('#pkEd .pk-edrow.pk-dup'), bar = document.querySelector('#pkEd .pk-edbar');
-    if (bar) { bar.querySelector('.pk-mute').textContent = dup ? '⚠ Повтор названия в одном направлении' : (n ? 'Изменений: ' + n : 'Изменений нет'); bar.querySelector('[data-act="edsave"]').disabled = !n || !!dup; }
+    if (bar) { bar.querySelector('.pk-mute').textContent = dup ? '⚠ Повтор названия в одном направлении' : (n ? 'Изменений: ' + n : 'Изменений нет'); var sb = bar.querySelector('[data-act="edsave"]'); if (sb) sb.disabled = !n || !!dup; }
 }
 function onDragStart(ev) {
     var r = ev.target.closest && ev.target.closest('.pk-edrow'); if (!r || !ST.ed) return;
@@ -440,6 +465,7 @@ function head() {
     var h = '<h3>🗂 Карманы</h3>'
         + '<span class="pk-seg"><button data-act="yprev" title="Предыдущий год">◀</button><button class="active" style="cursor:default">' + ST.year + '</button><button data-act="ynext" title="Следующий год">▶</button></span>'
         + '<span class="pk-seg" id="pkDirSeg">' + DIRS.map(function(d) { return '<button data-dir="' + e(d[0]) + '" class="' + (ST.dir === d[0] ? 'active' : '') + '">' + e(d[1]) + '</button>'; }).join('') + '</span>'
+        + '<button class="pk-btn pk-edbtn' + (ST.ed ? ' on' : '') + '" data-act="' + (ST.ed ? 'edcancel' : 'edopen') + '" title="' + (ST.ed ? 'Вернуться к таблицам' : 'Карманы года по направлениям и план проверок на каждый карман') + '">📋 Справочник и планы</button>'
         + '<button class="pk-btn x" data-act="close" title="Закрыть (Esc)">✕</button>';
     document.getElementById('pkHead').innerHTML = h;
 }
@@ -448,60 +474,71 @@ function load() {
         if (!d || !d.success) { document.getElementById('pkBody').innerHTML = '<div class="pk-empty">Ошибка: ' + e(d && d.error) + '</div>'; return; }
         ST.d = d;
         ST.shared = calcShared(d.pockets);
-        window.__trkPocketList = d.pockets;
-        try { if (window.state) window.state.pockets = d.pockets; } catch (x) {}
+        setList(d.all_pockets || d.pockets);
+        if (ST.ed) edStart();
         render();
     });
 }
-function plansOf(pid) { return (ST.d.plans || []).filter(function(p) { return p.pocket_id === pid; }); }
-function planForm(pid, pl) {
-    pl = pl || {};
-    return '<div class="pk-form" data-planform="' + pid + '">'
-        + '<span class="pk-mute">Открыт</span><input type="date" data-f="date_from" value="' + e(pl.date_from || (ST.year + '-01-01')) + '">'
-        + '<span class="pk-mute">закрыт</span><input type="date" data-f="date_to" value="' + e(pl.date_to || (ST.year + '-06-30')) + '">'
-        + '<span class="pk-mute">план проверок</span><input type="number" min="0" step="1" data-f="plan_count" value="' + e(pl.plan_count != null ? pl.plan_count : 3) + '">'
-        + '<input type="text" data-f="comment" placeholder="комментарий" value="' + e(pl.comment || '') + '" style="width:160px">'
-        + '<button class="pk-btn pri mini" data-act="plansave" data-pid="' + pid + '" data-id="' + (pl.id || '') + '">💾</button>'
-        + '<button class="pk-btn mini" data-act="plancancel">Отмена</button></div>';
+function pn(v) { v = String(v == null ? '' : v).trim(); if (v === '') return ''; var n = parseInt(v, 10); return isNaN(n) ? 'x' : String(n); }
+function itChanged(it) { return it.name.trim() !== it.orig || it.is_active !== it.orig_active || pn(it.plan) !== pn(it.orig_plan); }
+function plw(n, acc) { n = Math.abs(n); var a = n % 10, b = n % 100; if (a === 1 && b !== 11) return acc ? 'проверку' : 'проверка'; if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return 'проверки'; return 'проверок'; }
+function pstat(plan, fact) {
+    var p = pn(plan);
+    if (p === '' || p === 'x') return { k: 'none', s: 'без плана', t: 'План не задан' };
+    var d = (+p) - fact;
+    if (d > 0) return { k: 'need', s: (d === 1 ? 'нужна ещё 1' : 'нужно ещё ' + d), t: (d === 1 ? 'Нужна ещё 1 проверка' : 'Нужно ещё ' + d + ' ' + plw(d)) };
+    if (d < 0) return { k: 'over', s: 'больше плана на ' + (-d), t: 'Заведено больше планового на ' + (-d) + ' ' + plw(-d, true) };
+    return { k: 'ok', s: '✓ план выполнен', t: 'План выполнен' };
 }
-function pocketRow(p, ed) {
-    var h = '<div class="pk-row' + (p.is_active ? '' : ' pk-off') + '"><div class="pk-line">';
-    if (ST.edit === p.id) {
-        h += '<span class="pk-form" style="margin:0"><input type="text" data-f="pname" value="' + e(p.name) + '" maxlength="100">'
-           + '<button class="pk-btn pri mini" data-act="rensave" data-id="' + p.id + '">💾</button><button class="pk-btn mini" data-act="rencancel">Отмена</button></span>';
-    } else {
-        h += '<span class="pk-name">' + ptag(p.name, p.direction) + '</span>';
-    }
-    h += '<span class="pk-mute" title="Число проверок с этим карманом за все годы">проверок: ' + (p.tasks_total || 0) + '</span>';
-    if (!p.is_active) h += '<span class="pk-chip">закрыт</span>';
-    if (ed) {
-        h += '<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'
-           + '<button class="pk-btn mini" data-act="planadd" data-id="' + p.id + '">+ план</button>'
-           + '</span>';
-    }
-    h += '</div>';
-    plansOf(p.id).forEach(function(pl) {
-        if (ST.plan && ST.plan.id === pl.id) { h += planForm(p.id, pl); return; }
-        var pc = pl.plan_count ? Math.min(100, Math.round(pl.count * 100 / pl.plan_count)) : 100;
-        h += '<div class="pk-plan">📅 ' + fd(pl.date_from) + '–' + fd(pl.date_to)
-           + '<span class="pk-bar"><i style="width:' + pc + '%"></i></span>'
-           + '<span>запланировано <b>' + pl.count + '</b> из <b>' + pl.plan_count + '</b></span>'
-           + (pl.left ? '<span class="pk-left">· задайте ещё ' + pl.left + '</span>' : '<span class="pk-ok">· план закрыт</span>')
-           + (pl.comment ? '<span class="pk-mute">' + e(pl.comment) + '</span>' : '')
-           + (ed && pl.left ? '<button class="pk-btn mini" data-act="newtask" data-id="' + p.id + '" data-from="' + e(pl.date_from) + '">+ проверка</button>' : '')
-           + (ed ? '<button class="pk-btn mini" data-act="planedit" data-id="' + pl.id + '">✎</button><button class="pk-btn mini" data-act="plandel" data-id="' + pl.id + '">🗑</button>' : '')
-           + '</div>';
+function edSum(dr) {
+    var r = { P: 0, F: 0, np: 0, cnt: 0 };
+    ST.ed.cols[dr].forEach(function(it) { if (it.del || !nkey(it.name)) return; r.cnt++; var p = pn(it.plan); if (p === '' || p === 'x') { r.np++; return; } r.P += +p; r.F += (it.fact || 0); });
+    r.has = r.cnt - r.np > 0; return r;
+}
+function sumHtml(dr) {
+    var s = edSum(dr);
+    if (!s.has) return '<span class="pk-mute">План на ' + ST.year + ' год не задан' + (s.cnt ? ' ни для одного кармана' : '') + '</span>';
+    var st = pstat(s.P, s.F);
+    return '<b>Итого:</b><span>план ' + s.P + ' · заведено ' + s.F + '</span><span class="pk-pst ' + st.k + '" title="' + e(st.t) + '">' + e(st.k === 'ok' ? '✓ план выполнен' : st.t) + '</span>'
+        + (s.np ? '<span class="pk-mute">без плана: ' + s.np + ' карм. — в итог не входят</span>' : '');
+}
+var TIPT = null;
+function tipHide() { var tp = document.getElementById('pkTip'); if (tp) tp.style.display = 'none'; }
+function edTip(a, dr, it) {
+    var ov = document.getElementById('pkOverlay'); if (!ov || !a) return;
+    var tip = document.getElementById('pkTip');
+    if (!tip) { tip = document.createElement('div'); tip.id = 'pkTip'; tip.className = 'pk-tip'; tip.setAttribute('role', 'status'); tip.setAttribute('aria-live', 'polite'); ov.appendChild(tip); }
+    var st = pstat(it.plan, it.fact || 0), s = edSum(dr), p = pn(it.plan);
+    var h = '«' + e(it.name.trim() || 'карман') + '»: ' + (st.k === 'none' ? 'план не задан' : 'план ' + p + ', заведено ' + (it.fact || 0) + ' — ' + e(st.t.charAt(0).toLowerCase() + st.t.slice(1)));
+    if (s.has) { var ss = pstat(s.P, s.F); h += '<br><span style="font-weight:500">' + DMETA[dr].ic + ' Итого по направлению: план ' + s.P + ', заведено ' + s.F + ' — ' + e(ss.t.charAt(0).toLowerCase() + ss.t.slice(1)) + '</span>'; }
+    tip.className = 'pk-tip ' + st.k; tip.innerHTML = h; tip.style.display = 'block';
+    var r = a.getBoundingClientRect(), w = tip.offsetWidth, hh = tip.offsetHeight;
+    var x = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)), y = r.top - hh - 8;
+    if (y < 8) y = r.bottom + 8;
+    tip.style.left = Math.round(x) + 'px'; tip.style.top = Math.round(y) + 'px';
+    clearTimeout(TIPT); TIPT = setTimeout(tipHide, 4000);
+}
+function edPrevLeft() {
+    var n = 0;
+    (ST.d.prev_pockets || []).forEach(function(p) { var L = ST.ed.cols[p.direction]; if (L && !L.some(function(x) { return !x.del && nkey(x.name) === nkey(p.name); })) n++; });
+    return n;
+}
+function edPrev() {
+    var n = 0;
+    (ST.d.prev_pockets || []).forEach(function(p) {
+        var L = ST.ed.cols[p.direction]; if (!L || L.some(function(x) { return !x.del && nkey(x.name) === nkey(p.name); })) return;
+        L.push({ id: 0, name: p.name, orig: '', is_active: !!p.is_active, orig_active: true, plan: '', orig_plan: '', fact: 0, tasks: 0, del: false, prev: true }); n++;
     });
-    if (ST.plan && ST.plan.pocket_id === p.id && !ST.plan.id) h += planForm(p.id, null);
-    return h + '</div>';
+    msg('📥 Подтянуто из ' + ST.d.prev_year + ' года: ' + n + '. Переименуйте или удалите лишние, задайте план и сохраните');
 }
 function edStart() {
     var cols = {};
     ['корпоративная', 'розничная'].forEach(function(dr) {
         cols[dr] = ST.d.pockets.filter(function(p) { return p.direction === dr; })
-            .map(function(p) { return { id: p.id, name: p.name, orig: p.name, is_active: !!p.is_active, orig_active: !!p.is_active, tasks: p.tasks_total || 0, del: false }; });
+            .map(function(p) { var pl = p.plan_count == null ? '' : String(p.plan_count);
+                return { id: p.id, name: p.name, orig: p.name, is_active: !!p.is_active, orig_active: !!p.is_active, plan: pl, orig_plan: pl, fact: p.fact || 0, tasks: p.tasks_total || 0, del: false }; });
     });
-    ST.ed = { cols: cols, orig: JSON.stringify(cols) };
+    ST.ed = { cols: cols, orig: JSON.stringify(cols), year: ST.year };
 }
 function edSync() {
     // считать значения из инпутов в модель
@@ -510,6 +547,7 @@ function edSync() {
         var it = ST.ed.cols[r.getAttribute('data-dir')][+r.getAttribute('data-i')]; if (!it) return;
         var inp = r.querySelector('input[type=text]'), cb = r.querySelector('input[type=checkbox]');
         if (inp) it.name = inp.value; if (cb) it.is_active = cb.checked;
+        var pi = r.querySelector('[data-edplan]'); if (pi) it.plan = pi.value.trim();
     });
 }
 function edShared() {
@@ -522,7 +560,7 @@ function edChanges() {
     Object.keys(ST.ed.cols).forEach(function(dr) {
         ST.ed.cols[dr].forEach(function(it, i) {
             if (!it.id) { if (nkey(it.name) && !it.del) n++; return; }
-            if (it.del || it.name.trim() !== it.orig || it.is_active !== it.orig_active) n++;
+            if (it.del || itChanged(it)) n++;
         });
     });
     var o = JSON.parse(ST.ed.orig);
@@ -533,37 +571,51 @@ function edChanges() {
     return n;
 }
 function edRender() {
-    var sh = edShared(), h = '<div id="pkEd"><div class="pk-edhint">Перетаскивайте строки за ⋮⋮ или стрелками, чтобы задать порядок в списках выбора. Переименование кармана переносится в его проверки. '
-        + '<span class="pk-shb">⇄ общий</span> — карман с таким же названием есть в другом направлении: удобно для ПВР, МСФО и т. п.</div><div class="pk-ed">';
+    var RO = !ST.d.can_edit, Y = ST.year, sh = edShared();
+    var h = '<div id="pkEd"><div class="pk-edhint">' + (RO ? 'Просмотр: менять справочник и планы может администратор. ' : 'Карманы и план задаются на каждый год отдельно. Порядок — перетаскиванием за ⋮⋮ или стрелками; переименование переносится в проверки ' + Y + ' года. ')
+        + '<b>План</b> — сколько проверок нужно завести в карман за год, <b>факт</b> — проверки ' + Y + ' года с этим карманом (по дате начала, без отменённых). '
+        + '<span class="pk-shb">⇄ общий</span> — такой же карман есть в другом направлении.</div>';
+    var pp = ST.d.prev_pockets || [];
+    if (!RO && ST.d.prev_year && pp.length) {
+        var left = edPrevLeft();
+        h += '<div class="pk-prev"><span>📥 В ' + ST.d.prev_year + ' году карманов: <b>' + pp.length + '</b>' + (left ? ', нет в ' + Y + ': <b>' + left + '</b>' : ' — все уже есть в ' + Y) + '</span>'
+           + (left ? '<button class="pk-btn mini pri" data-act="edprev">Подтянуть из ' + ST.d.prev_year + '</button><span class="pk-mute">добавятся как новые: до сохранения их можно переименовать или удалить, план не переносится</span>' : '') + '</div>';
+    }
+    h += '<div class="pk-ed">';
     ['корпоративная', 'розничная'].forEach(function(dr) {
         var M = DMETA[dr], list = ST.ed.cols[dr], other = dr === 'корпоративная' ? 'розничная' : 'корпоративная';
         var seen = {}, live = list.filter(function(x) { return !x.del && nkey(x.name); });
         list.forEach(function(it) { var k = nkey(it.name); if (k && !it.del) seen[k] = (seen[k] || 0) + 1; });
         h += '<div class="pk-edcol ' + M.cl + '"><h5>' + M.ic + ' ' + M.t + '<span class="pk-mute">' + live.length + ' карм.</span></h5>';
-        if (!list.length) h += '<div class="pk-empty">Список пуст — добавьте первый карман</div>';
+        h += '<div class="pk-edsum" data-sum="' + e(dr) + '">' + sumHtml(dr) + '</div>';
+        if (!list.length) h += '<div class="pk-empty">На ' + Y + ' год карманов нет' + (RO ? '' : ' — добавьте новый' + (pp.length ? ' или подтяните из ' + ST.d.prev_year + ' года' : '')) + '</div>';
         list.forEach(function(it, i) {
             var k = nkey(it.name), cls = 'pk-edrow';
-            if (!it.id) cls += ' pk-new'; else if (it.name.trim() !== it.orig || it.is_active !== it.orig_active) cls += ' pk-chg';
+            if (!it.id) cls += ' pk-new' + (it.prev ? ' pk-fromprev' : ''); else if (itChanged(it)) cls += ' pk-chg';
             if (it.del) cls += ' pk-del'; if (!it.del && k && sh[k]) cls += ' pk-shared'; if (!it.del && k && seen[k] > 1) cls += ' pk-dup';
-            var canDel = !it.tasks;
-            h += '<div class="' + cls + '" draggable="true" data-dir="' + e(dr) + '" data-i="' + i + '">'
-               + '<span class="pk-hd" title="Перетащить">⋮⋮</span>'
-               + '<input type="text" maxlength="100" value="' + e(it.name) + '" data-edname' + (it.del ? ' disabled' : '') + ' placeholder="Название кармана">'
+            var canDel = !it.tasks, st = pstat(it.plan, it.fact || 0), dis = (it.del || RO) ? ' disabled' : '';
+            h += '<div class="' + cls + '"' + (RO ? '' : ' draggable="true"') + ' data-dir="' + e(dr) + '" data-i="' + i + '">'
+               + (RO ? '' : '<span class="pk-hd" title="Перетащить">⋮⋮</span>')
+               + '<input type="text" maxlength="100" value="' + e(it.name) + '" data-edname' + dis + ' placeholder="Название кармана">'
                + (!it.del && k && sh[k] ? '<span class="pk-shb" title="Есть и в направлении «' + e(DMETA[other].t) + '»">⇄ общий</span>' : '')
-               + (!it.del && k && !sh[k] ? '<button class="pk-btn mini" data-act="edcopy" data-dir="' + e(dr) + '" data-i="' + i + '" title="Добавить такой же карман в направление «' + e(DMETA[other].t) + '»">⇄ ' + DMETA[other].ic + '</button>' : '')
-               + '<span class="pk-cnt" title="Проверок с этим карманом">' + (it.id ? it.tasks + ' пров.' : 'новый') + '</span>'
-               + '<label title="Закрытый карман не предлагается при создании проверок"><input type="checkbox"' + (it.is_active ? ' checked' : '') + (it.del ? ' disabled' : '') + '> актив.</label>'
-               + '<button class="pk-btn mini" data-act="edup" data-dir="' + e(dr) + '" data-i="' + i + '" title="Выше"' + (i ? '' : ' disabled') + '>↑</button>'
-               + '<button class="pk-btn mini" data-act="eddown" data-dir="' + e(dr) + '" data-i="' + i + '" title="Ниже"' + (i < list.length - 1 ? '' : ' disabled') + '>↓</button>'
-               + (it.del ? '<button class="pk-btn mini" data-act="edundel" data-dir="' + e(dr) + '" data-i="' + i + '" title="Вернуть">↺</button>'
-                         : '<button class="pk-btn mini" data-act="eddel" data-dir="' + e(dr) + '" data-i="' + i + '"' + (canDel ? ' title="Удалить"' : ' disabled title="Карман указан в проверках — его можно только закрыть (снять «актив.»)"') + '>🗑</button>')
+               + (!RO && !it.del && k && !sh[k] ? '<button class="pk-btn mini" data-act="edcopy" data-dir="' + e(dr) + '" data-i="' + i + '" title="Добавить такой же карман в направление «' + e(DMETA[other].t) + '»">⇄ ' + DMETA[other].ic + '</button>' : '')
+               + '<span class="pk-cnt" title="Проверок ' + Y + ' года с этим карманом">' + (it.id ? 'факт ' + (it.fact || 0) : (it.prev ? 'из ' + ST.d.prev_year : 'новый')) + '</span>'
+               + '<label class="pk-pl" title="План проверок в карман на ' + Y + ' год">план<input type="number" min="0" max="500" step="1" inputmode="numeric" data-edplan value="' + e(it.plan) + '" placeholder="—"' + dis + '></label>'
+               + '<span class="pk-pst ' + st.k + '" data-pst title="' + e(st.t) + '">' + e(st.s) + '</span>'
+               + '<label title="Закрытый карман не предлагается при создании проверок"><input type="checkbox"' + (it.is_active ? ' checked' : '') + dis + '> актив.</label>'
+               + (RO ? '' : '<button class="pk-btn mini" data-act="edup" data-dir="' + e(dr) + '" data-i="' + i + '" title="Выше"' + (i ? '' : ' disabled') + '>↑</button>'
+                   + '<button class="pk-btn mini" data-act="eddown" data-dir="' + e(dr) + '" data-i="' + i + '" title="Ниже"' + (i < list.length - 1 ? '' : ' disabled') + '>↓</button>'
+                   + (it.del ? '<button class="pk-btn mini" data-act="edundel" data-dir="' + e(dr) + '" data-i="' + i + '" title="Вернуть">↺</button>'
+                             : '<button class="pk-btn mini" data-act="eddel" data-dir="' + e(dr) + '" data-i="' + i + '"' + (canDel ? ' title="Удалить"' : ' disabled title="Карман указан в проверках ' + Y + ' года — его можно только закрыть (снять «актив.»)"') + '>🗑</button>'))
                + '</div>';
         });
-        h += '<div class="pk-edadd"><input type="text" maxlength="100" data-edadd="' + e(dr) + '" placeholder="Новый карман (Enter — добавить)"><button class="pk-btn mini" data-act="edadd" data-dir="' + e(dr) + '">+ Добавить</button></div></div>';
+        if (!RO) h += '<div class="pk-edadd"><input type="text" maxlength="100" data-edadd="' + e(dr) + '" placeholder="Новый карман (Enter — добавить)"><button class="pk-btn mini" data-act="edadd" data-dir="' + e(dr) + '">+ Добавить</button></div>';
+        h += '</div>';
     });
-    var n = edChanges(), dup = h.indexOf('pk-dup"') > -1;
-    h += '</div><div class="pk-edbar"><span class="pk-mute">' + (dup ? '⚠ Повтор названия в одном направлении' : (n ? 'Изменений: ' + n : 'Изменений нет')) + '</span>'
-       + '<button class="pk-btn" data-act="edcancel">Отмена</button><button class="pk-btn pri" data-act="edsave"' + (n && !dup ? '' : ' disabled') + '>💾 Сохранить списки</button></div></div>';
+    var n = RO ? 0 : edChanges(), dup = h.indexOf('pk-dup"') > -1;
+    h += '</div><div class="pk-edbar"><span class="pk-mute">' + (RO ? '' : (dup ? '⚠ Повтор названия в одном направлении' : (n ? 'Изменений: ' + n : 'Изменений нет'))) + '</span>'
+       + (RO ? '<button class="pk-btn" data-act="edcancel">← К таблицам</button>'
+             : '<button class="pk-btn" data-act="edcancel">Отмена</button><button class="pk-btn pri" data-act="edsave"' + (n && !dup ? '' : ' disabled') + '>💾 Сохранить</button>') + '</div></div>';
     return h;
 }
 function edRefresh(focusSel) {
@@ -576,7 +628,7 @@ function edAdd(dr, name) {
     if (!name) return false;
     var list = ST.ed.cols[dr];
     if (list.some(function(x) { return !x.del && nkey(x.name) === nkey(name); })) { msg('❌ «' + name + '» уже есть в этом направлении', true); return false; }
-    list.push({ id: 0, name: name, orig: '', is_active: true, orig_active: true, tasks: 0, del: false });
+    list.push({ id: 0, name: name, orig: '', is_active: true, orig_active: true, plan: '', orig_plan: '', fact: 0, tasks: 0, del: false });
     return true;
 }
 function edSave() {
@@ -590,34 +642,27 @@ function edSave() {
             var nm = it.name.trim().replace(/\s+/g, ' '), k = nkey(nm);
             if (!k) { if (it.id) bad = bad || 'Пустое название у кармана «' + it.orig + '»'; return; }
             if (seen[k]) bad = bad || 'Повтор «' + nm + '» в направлении «' + DMETA[dr].t + '»'; seen[k] = 1;
-            payload[dr].items.push({ id: it.id || 0, name: nm, is_active: it.is_active });
+            var pc = pn(it.plan); if (pc === 'x' || (pc !== '' && !(+pc >= 0 && +pc <= 500))) bad = bad || 'План кармана «' + nm + '» — целое число от 0 до 500';
+            payload[dr].items.push({ id: it.id || 0, name: nm, is_active: it.is_active, plan_count: pc });
         });
     });
     if (bad) { msg('❌ ' + bad, true); return; }
-    api('/api/plugins/pockets/bulk', { lists: payload }).then(function(r) {
-        if (r && r.success) { ST.ed = null; done(r, '✅ Списки сохранены' + (r.renamed_in_tasks ? ', обновлено проверок: ' + r.renamed_in_tasks : '')); }
+    api('/api/plugins/pockets/bulk', { year: ST.year, lists: payload }).then(function(r) {
+        if (r && r.success) { done(r, '✅ Справочник и планы на ' + ST.year + ' год сохранены' + (r.renamed_in_tasks ? ', обновлено проверок: ' + r.renamed_in_tasks : '')); }
         else done(r);
     });
 }
 function render() {
     var d = ST.d, ed = d.can_edit;
-    popClose();
-    var bx = document.querySelector('#pkOverlay .pk-box'); if (bx) bx.classList.toggle('pk-box--ed', !!(ST.ed && ed));
-    if (ST.ed && ed) {
-        document.getElementById('pkBody').innerHTML = '<div class="pk-sec"><h4>✎ Редактирование списков карманов</h4>' + edRender() + '</div>';
+    popClose(); head();
+    var bx = document.querySelector('#pkOverlay .pk-box'); if (bx) bx.classList.toggle('pk-box--ed', !!ST.ed);
+    if (ST.ed) {
+        document.getElementById('pkBody').innerHTML = '<div class="pk-sec"><h4>📋 Справочник карманов и планы на ' + ST.year + ' год</h4>' + edRender() + '</div>';
         return;
     }
-    var h = '<div class="pk-sec"><h4>Справочник карманов и планы на ' + ST.year + ' год' + (ed ? '<button class="pk-btn mini" data-act="edopen" title="Добавить, переименовать, упорядочить и закрыть карманы обоих направлений">✎ Редактировать списки</button>' : '') + '</h4><div class="pk-dirs">';
-    DIRS.slice(1).forEach(function(dr) {
-        if (ST.dir && ST.dir !== dr[0]) return;
-        var list = d.pockets.filter(function(p) { return p.direction === dr[0]; });
-        var DM = DMETA[dr[0]];
-        h += '<div class="pk-dir ' + DM.cl + '"><h5>' + DM.ic + ' ' + dr[1] + '</h5>';
-        if (!list.length) h += '<div class="pk-empty">Карманов нет' + (ed ? ' — добавьте через «✎ Редактировать списки»' : '') + '</div>';
-        list.forEach(function(p) { h += pocketRow(p, ed); });
-        h += '</div>';
-    });
-    h += '</div></div>';
+    var h = '';
+    if (!d.pockets.length) h += '<div class="pk-sec"><div class="pk-cell" style="border-color:rgba(240,160,75,.6)"><b>На ' + ST.year + ' год карманов нет.</b> <span class="pk-mute">'
+        + (ed ? 'Откройте «📋 Справочник и планы», чтобы добавить карманы' + (d.prev_year ? ' или подтянуть их из ' + d.prev_year + ' года' : '') : 'Справочник на этот год ещё не заполнен') + '.</span></div></div>';
     h += '<div id="pkCellBox"></div>';
     h += '<div class="pk-legend">Обозначения: <span class="pk-ptag pk-tt pk-tsh">ПВР<b class="pk-sh">⇄</b></span><span class="pk-mute">— общий карман: есть в обоих направлениях</span>' + '<span class="pk-ptag" style="border-left-color:transparent;background:transparent;padding-left:0"><em class="pk-warn" style="margin:0">⚠</em></span> <span class="pk-mute">— значения нет в справочнике, замените в карточке проверки</span>' + '</div>';
     var mm = d.matrices || {};
@@ -708,13 +753,15 @@ function onClick(ev) {
     if (!t) return;
     if (t.hasAttribute('data-cell')) { var cc = t.getAttribute('data-cell'); if (ST.cell === cc && t.classList.contains('pk-cell-on')) { popClose(); return; } showCell(cc, t); return; }
     var a = t.getAttribute('data-act');
+    if (!a && t.parentNode && t.parentNode.id === 'pkDirSeg' && ST.ed) { edSync(); if (edChanges() && !confirm('Несохранённые изменения справочника пропадут. Продолжить?')) return; }
     if (!a && t.parentNode && t.parentNode.id === 'pkDirSeg') { ST.dir = t.getAttribute('data-dir'); try { localStorage.setItem('pk.dir', ST.dir); } catch (x) {} ST.cell = null; head(); load(); return; }
     var id = +t.getAttribute('data-id') || 0;
     if (a === 'close') return close();
+    if ((a === 'yprev' || a === 'ynext') && ST.ed) { edSync(); if (edChanges() && !confirm('Сменить год? Несохранённые изменения справочника пропадут.')) return; }
     if (a === 'yprev' || a === 'ynext') { ST.year += (a === 'ynext' ? 1 : -1); ST.cell = null; head(); load(); return; }
     if (a === 'cellclose') { popClose(); return; }
     if (a === 'opentask') { var tid = t.getAttribute('data-id'); close(); if (window.trkOpenTaskById) window.trkOpenTaskById(tid); return; }
-    if (a === 'edopen') { edStart(); ST.edit = null; ST.plan = null; render(); return; }
+    if (a === 'edopen') { popClose(); edStart(); render(); return; }
     if (ST.ed && a && a.indexOf('ed') === 0) {
         edSync();
         var edr = t.getAttribute('data-dir'), ei = +t.getAttribute('data-i'), L = edr ? ST.ed.cols[edr] : null;
@@ -725,43 +772,11 @@ function onClick(ev) {
         if (a === 'eddel') { if (!L[ei].id) L.splice(ei, 1); else L[ei].del = true; }
         if (a === 'edundel') L[ei].del = false;
         if (a === 'edadd') { var ai = document.querySelector('[data-edadd="' + edr + '"]'); if (!edAdd(edr, ai && ai.value)) { ai && ai.focus(); return; } }
+        if (a === 'edprev') edPrev();
         if (a === 'edcopy') { var oth = edr === 'корпоративная' ? 'розничная' : 'корпоративная'; edAdd(oth, L[ei].name); }
         edRefresh(a === 'edadd' ? '[data-edadd="' + edr + '"]' : null);
         return;
     }
-    if (a === 'add') {
-        var dr = t.getAttribute('data-dir'), inp = t.parentNode.querySelector('[data-f="newname"]');
-        var nm = (inp.value || '').trim(); if (!nm) { inp.focus(); return; }
-        api('/api/plugins/pockets/save', { name: nm, direction: dr, is_active: true }).then(function(r) { done(r, '✅ Карман добавлен'); });
-        return;
-    }
-    if (a === 'ren') { ST.edit = id; ST.plan = null; render(); return; }
-    if (a === 'rencancel') { ST.edit = null; render(); return; }
-    if (a === 'rensave') {
-        var p = ST.d.pockets.filter(function(x) { return x.id === id; })[0];
-        var nn = (val(t.parentNode, 'pname') || '').trim(); if (!nn || !p) return;
-        api('/api/plugins/pockets/save', { id: id, name: nn, direction: p.direction, is_active: !!p.is_active, comment: p.comment || '' }).then(function(r) {
-            ST.edit = null; done(r, r && r.renamed_in_tasks ? '✅ Переименовано, обновлено проверок: ' + r.renamed_in_tasks : '✅ Сохранено');
-        });
-        return;
-    }
-    if (a === 'del') {
-        var pd = ST.d.pockets.filter(function(x) { return x.id === id; })[0];
-        if (!pd || !confirm('Удалить карман «' + pd.name + '» и его планы?')) return;
-        api('/api/plugins/pockets/delete', { id: id }).then(function(r) { done(r, '✅ Карман удалён'); });
-        return;
-    }
-    if (a === 'planadd') { ST.plan = { pocket_id: id, id: 0 }; ST.edit = null; render(); return; }
-    if (a === 'planedit') { var pl = ST.d.plans.filter(function(x) { return x.id === id; })[0]; if (pl) { ST.plan = { pocket_id: pl.pocket_id, id: pl.id }; render(); } return; }
-    if (a === 'plancancel') { ST.plan = null; render(); return; }
-    if (a === 'plansave') {
-        var f = t.parentNode;
-        api('/api/plugins/pockets/plan/save', { id: +t.getAttribute('data-id') || 0, pocket_id: +t.getAttribute('data-pid'),
-            date_from: val(f, 'date_from'), date_to: val(f, 'date_to'), plan_count: val(f, 'plan_count'), comment: val(f, 'comment') })
-            .then(function(r) { if (r && r.success) ST.plan = null; done(r, '✅ План сохранён'); });
-        return;
-    }
-    if (a === 'plandel') { if (!confirm('Удалить план кармана?')) return; api('/api/plugins/pockets/plan/delete', { id: id }).then(function(r) { done(r, '✅ План удалён'); }); return; }
     if (a === 'newtask') { newTask(id); return; }
 }
 function onChange(ev) {
@@ -780,7 +795,7 @@ document.addEventListener('click', function(ev) {
 });
 // Список карманов для формы проверки и песочницы дашбордов
 api('/api/plugins/pockets/data?year=' + ST.year).then(function(d) {
-    if (d && d.success) { window.__trkPocketList = d.pockets; try { if (window.state) window.state.pockets = d.pockets; } catch (x) {} }
+    if (d && d.success) setList(d.all_pockets || d.pockets);
 });
 })();
 """
@@ -819,11 +834,33 @@ def register(app, db, hooks):
         except Exception as _e:
             print(f'[pockets] audit failed: {_e}')
 
-    def _pockets():
+    def _pockets(year=None):
         try:
-            return db.query('SELECT * FROM pockets ORDER BY direction, sort, name')
+            if year is not None:
+                return db.query('SELECT * FROM pockets WHERE year=? ORDER BY direction, sort, name', (int(year),))
+            return db.query('SELECT * FROM pockets ORDER BY year, direction, sort, name')
         except Exception:
             return []
+
+    def _used(name, direction, year):
+        """Сколько проверок года (по дате начала) указывают этот карман."""
+        return db.query_one("SELECT count(*) AS c FROM tasks WHERE trim(pocket)=? AND task_type=? AND substr(start_date,1,4)=?",
+                            (name, direction, str(year)))['c']
+
+    def _year_of(b, old=None):
+        try:
+            y = int((b or {}).get('year') or (old or {}).get('year') or date.today().year)
+            return y if 2000 <= y <= 2100 else date.today().year
+        except Exception:
+            return date.today().year
+
+    def _plan_val(v):
+        if v is None or str(v).strip() == '':
+            return None
+        n = int(str(v).strip())
+        if n < 0 or n > 500:
+            raise ValueError
+        return n
 
     def _plans(year=None):
         try:
@@ -848,14 +885,27 @@ def register(app, db, hooks):
         if direction not in DIRS:
             direction = ''
         data = db.load_all()
-        pockets = _pockets()
-        plans = plan_progress(data, pockets, _plans(year))
+        pockets = _pockets(year)
+        plans = []
         cnt = {}
         for t in _audits(data):
+            if (t.get('start_date') or '')[:4] != str(year):
+                continue
             k = ((t.get('pocket') or '').strip(), t.get('task_type') or '')
             cnt[k] = cnt.get(k, 0) + 1
         for p in pockets:
-            p['tasks_total'] = cnt.get((p['name'], p['direction']), 0)
+            p['tasks_total'] = p['fact'] = cnt.get((p['name'], p['direction']), 0)
+        prev_year, prev_pockets = None, []
+        try:
+            r = db.query_one('SELECT MAX(year) AS y FROM pockets WHERE year<?', (year,))
+            if r and r.get('y'):
+                prev_year = int(r['y'])
+                prev_pockets = [{'name': p['name'], 'direction': p['direction'], 'is_active': p['is_active'],
+                                 'plan_count': p.get('plan_count')} for p in _pockets(prev_year)]
+        except Exception:
+            pass
+        all_pockets = [{'id': p['id'], 'name': p['name'], 'direction': p['direction'],
+                        'is_active': p['is_active'], 'year': p.get('year')} for p in _pockets()]
         mats = {_DIR_KEY[dr]: pockets_compute(data, pockets, year, dr)
                 for dr in DIRS if not direction or dr == direction}
         nodir = []
@@ -868,15 +918,21 @@ def register(app, db, hooks):
                                   'pocket': (t.get('pocket') or '').strip(),
                                   'lead': (emp.get(t.get('lead_employee') or '') or {}).get('name') or ''})
         return jsonify({'success': True, 'can_edit': u.get('role') == 'admin', 'pockets': pockets,
-                        'plans': plans, 'matrices': mats, 'nodir': nodir})
+                        'plans': plans, 'matrices': mats, 'nodir': nodir,
+                        'year': year, 'prev_year': prev_year, 'prev_pockets': prev_pockets, 'all_pockets': all_pockets})
 
     @app.route('/api/plugins/pockets/save', methods=['POST'])
     def _pk_save():
+        """Один карман года: создать, переименовать, открыть/закрыть, задать план."""
         u, err = _admin()
         if err:
             return err
         b = request.get_json(silent=True) or {}
-        pid = b.get('id')
+        pid = int(b.get('id') or 0)
+        old = db.query_one('SELECT * FROM pockets WHERE id=?', (pid,)) if pid else None
+        if pid and not old:
+            return jsonify({'success': False, 'error': 'Карман не найден'}), 404
+        year = _year_of(b, old)
         name = re.sub(r'\s+', ' ', str(b.get('name') or '')).strip()[:100]
         direction = str(b.get('direction') or '').strip()
         active = 1 if b.get('is_active', True) else 0
@@ -885,43 +941,45 @@ def register(app, db, hooks):
             return jsonify({'success': False, 'error': 'Укажите название кармана'}), 400
         if direction not in DIRS:
             return jsonify({'success': False, 'error': 'Выберите направление'}), 400
-        dup = db.query_one('SELECT id FROM pockets WHERE lower(name)=lower(?) AND direction=? AND id<>?',
-                           (name, direction, int(pid or 0)))
+        try:
+            pc = _plan_val(b.get('plan_count')) if 'plan_count' in b else (old or {}).get('plan_count')
+        except Exception:
+            return jsonify({'success': False, 'error': 'План — целое число от 0 до 500'}), 400
+        dup = db.query_one('SELECT id FROM pockets WHERE lower(name)=lower(?) AND direction=? AND year=? AND id<>?',
+                           (name, direction, year, pid))
         if dup:
-            return jsonify({'success': False, 'error': 'Карман «%s» уже есть в этом направлении' % name}), 400
+            return jsonify({'success': False, 'error': 'Карман «%s» уже есть в этом направлении на %d год' % (name, year)}), 400
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        if pid:
-            old = db.query_one('SELECT * FROM pockets WHERE id=?', (int(pid),))
-            if not old:
-                return jsonify({'success': False, 'error': 'Карман не найден'}), 404
-            used = db.query_one("SELECT count(*) AS c FROM tasks WHERE trim(pocket)=? AND task_type=?",
-                                (old['name'], old['direction']))['c']
-            if direction != old['direction'] and used:
-                return jsonify({'success': False, 'error': 'Карман уже указан в %d проверк(ах) — направление поменять нельзя' % used}), 400
-            db.exec('UPDATE pockets SET name=?, direction=?, is_active=?, comment=?, updated_at=? WHERE id=?',
-                    (name, direction, active, comment, now, int(pid)))
+        if old:
+            if direction != old['direction'] and _used(old['name'], old['direction'], old['year']):
+                return jsonify({'success': False, 'error': 'Карман уже указан в проверках — направление поменять нельзя'}), 400
             renamed = 0
-            if name != old['name'] and used:
-                db.exec("UPDATE tasks SET pocket=? WHERE trim(pocket)=? AND task_type=?",
-                        (name, old['name'], old['direction']))
-                renamed = used
-            _audit(u, 'update', pid, {'name': [old['name'], name], 'direction': [old['direction'], direction],
-                                      'is_active': [old['is_active'], active], 'renamed_in_tasks': renamed})
-            return jsonify({'success': True, 'id': int(pid), 'renamed_in_tasks': renamed})
-        mx = db.query_one('SELECT COALESCE(MAX(sort),0) AS m FROM pockets WHERE direction=?', (direction,))['m']
-        new_id = db.exec('INSERT INTO pockets (name, direction, is_active, sort, comment, created_at, updated_at) '
-                         'VALUES (?,?,?,?,?,?,?)', (name, direction, active, (mx or 0) + 1, comment, now, now))
-        _audit(u, 'create', new_id, {'name': name, 'direction': direction})
+            with db.transaction() as tx:
+                tx.exec('UPDATE pockets SET name=?, direction=?, is_active=?, plan_count=?, comment=?, updated_at=? WHERE id=?',
+                        (name, direction, active, pc, comment, now, pid))
+                if name != old['name']:
+                    c = tx.exec('UPDATE tasks SET pocket=? WHERE trim(pocket)=? AND task_type=? AND substr(start_date,1,4)=?',
+                                (name, old['name'], old['direction'], str(old['year']))).rowcount
+                    renamed = max(c or 0, 0)
+            _audit(u, 'update', pid, {'name': [old['name'], name], 'year': old['year'], 'is_active': [old['is_active'], active],
+                                      'plan_count': [old.get('plan_count'), pc], 'renamed_in_tasks': renamed})
+            return jsonify({'success': True, 'id': pid, 'renamed_in_tasks': renamed})
+        mx = db.query_one('SELECT COALESCE(MAX(sort),0) AS m FROM pockets WHERE direction=? AND year=?', (direction, year))['m']
+        new_id = db.exec('INSERT INTO pockets (name, direction, year, is_active, sort, plan_count, comment, created_at, updated_at) '
+                         'VALUES (?,?,?,?,?,?,?,?,?)', (name, direction, year, active, (mx or 0) + 1, pc, comment, now, now))
+        _audit(u, 'create', new_id, {'name': name, 'direction': direction, 'year': year})
         return jsonify({'success': True, 'id': new_id})
 
     @app.route('/api/plugins/pockets/bulk', methods=['POST'])
     def _pk_bulk():
-        """Сохранение списков карманов целиком: порядок, переименования, активность, новые, удалённые."""
+        """Справочник карманов года целиком: порядок, названия, активность, план, новые и удалённые."""
         u, err = _admin()
         if err:
             return err
-        lists = (request.get_json(silent=True) or {}).get('lists') or {}
-        cur = {p['id']: p for p in _pockets()}
+        body = request.get_json(silent=True) or {}
+        year = _year_of(body)
+        lists = body.get('lists') or {}
+        cur = {p['id']: p for p in _pockets(year)}
         plan = {}
         for dr, pack in lists.items():
             if dr not in DIRS:
@@ -936,46 +994,50 @@ def register(app, db, hooks):
                     return jsonify({'success': False, 'error': 'Карман «%s» повторяется в направлении «%s»' % (name, dr)}), 400
                 seen.add(name.lower())
                 if pid and (pid not in cur or cur[pid]['direction'] != dr):
-                    return jsonify({'success': False, 'error': 'Карман #%d не найден — обновите окно' % pid}), 409
-                items.append((pid, name, 1 if it.get('is_active', True) else 0))
+                    return jsonify({'success': False, 'error': 'Карман #%d не найден в %d году — обновите окно' % (pid, year)}), 409
+                try:
+                    pc = _plan_val(it.get('plan_count'))
+                except Exception:
+                    return jsonify({'success': False, 'error': 'План кармана «%s» — целое число от 0 до 500' % name}), 400
+                items.append((pid, name, 1 if it.get('is_active', True) else 0, pc))
             dels = [int(x) for x in (pack or {}).get('deleted') or [] if int(x) in cur and cur[int(x)]['direction'] == dr]
             for pid in dels:
-                old = cur[pid]
-                used = db.query_one('SELECT count(*) AS c FROM tasks WHERE trim(pocket)=? AND task_type=?',
-                                    (old['name'], dr))['c']
+                used = _used(cur[pid]['name'], dr, year)
                 if used:
-                    return jsonify({'success': False, 'error': 'Карман «%s» указан в %d проверк(ах) — его можно только закрыть' % (old['name'], used)}), 400
+                    return jsonify({'success': False, 'error': 'Карман «%s» указан в %d проверк(ах) %d года — его можно только закрыть' % (cur[pid]['name'], used, year)}), 400
             plan[dr] = (items, dels)
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         renamed, log = 0, []
         with db.transaction() as tx:
             for dr, (items, dels) in plan.items():
                 for pid in dels:
-                    tx.exec('DELETE FROM pocket_plans WHERE pocket_id=?', (pid,))
                     tx.exec('DELETE FROM pockets WHERE id=?', (pid,))
-                    log.append(('delete', pid, {'name': cur[pid]['name'], 'direction': dr}))
-                # временные имена, чтобы перестановка/обмен названий не упёрлись в UNIQUE(name, direction)
-                for pid, name, act in items:
-                    if pid and name != cur[pid]['name']:
-                        tx.exec('UPDATE pockets SET name=? WHERE id=?', ('\u0000tmp%d' % pid, pid))
-                for sort, (pid, name, act) in enumerate(items, 1):
+                    log.append(('delete', pid, {'name': cur[pid]['name'], 'direction': dr, 'year': year}))
+                ren = [(pid, name) for pid, name, act, pc in items if pid and name != cur[pid]['name']]
+                # временные имена: перестановка/обмен названий не упрётся в UNIQUE и не склеит проверки двух карманов
+                for pid, name in ren:
+                    tmp = '\u0000tmp%d' % pid
+                    tx.exec('UPDATE pockets SET name=? WHERE id=?', (tmp, pid))
+                    tx.exec('UPDATE tasks SET pocket=? WHERE trim(pocket)=? AND task_type=? AND substr(start_date,1,4)=?',
+                            (tmp, cur[pid]['name'], dr, str(year)))
+                for pid, name in ren:
+                    c = tx.exec('UPDATE tasks SET pocket=? WHERE pocket=? AND task_type=?', (name, '\u0000tmp%d' % pid, dr)).rowcount
+                    renamed += max(c or 0, 0)
+                for sort, (pid, name, act, pc) in enumerate(items, 1):
                     if pid:
                         old = cur[pid]
-                        tx.exec('UPDATE pockets SET name=?, is_active=?, sort=?, updated_at=? WHERE id=?',
-                                (name, act, sort, now, pid))
-                        if name != old['name']:
-                            c = tx.exec('UPDATE tasks SET pocket=? WHERE trim(pocket)=? AND task_type=?',
-                                        (name, old['name'], dr)).rowcount
-                            renamed += max(c or 0, 0)
-                        if name != old['name'] or act != old['is_active']:
-                            log.append(('update', pid, {'name': [old['name'], name], 'is_active': [old['is_active'], act], 'direction': dr}))
+                        tx.exec('UPDATE pockets SET name=?, is_active=?, sort=?, plan_count=?, updated_at=? WHERE id=?',
+                                (name, act, sort, pc, now, pid))
+                        if name != old['name'] or act != old['is_active'] or pc != old.get('plan_count'):
+                            log.append(('update', pid, {'name': [old['name'], name], 'is_active': [old['is_active'], act],
+                                                        'plan_count': [old.get('plan_count'), pc], 'direction': dr, 'year': year}))
                     else:
-                        c = tx.exec('INSERT INTO pockets (name, direction, is_active, sort, comment, created_at, updated_at) '
-                                    'VALUES (?,?,?,?,?,?,?)', (name, dr, act, sort, '', now, now))
-                        log.append(('create', c.lastrowid, {'name': name, 'direction': dr}))
+                        c = tx.exec('INSERT INTO pockets (name, direction, year, is_active, sort, plan_count, comment, created_at, updated_at) '
+                                    'VALUES (?,?,?,?,?,?,?,?,?)', (name, dr, year, act, sort, pc, '', now, now))
+                        log.append(('create', c.lastrowid, {'name': name, 'direction': dr, 'year': year, 'plan_count': pc}))
         for kind, pid, det in log:
             _audit(u, kind, pid, det)
-        return jsonify({'success': True, 'renamed_in_tasks': renamed, 'changes': len(log)})
+        return jsonify({'success': True, 'renamed_in_tasks': renamed, 'changes': len(log), 'year': year})
 
     @app.route('/api/plugins/pockets/delete', methods=['POST'])
     def _pk_delete():
@@ -986,13 +1048,11 @@ def register(app, db, hooks):
         old = db.query_one('SELECT * FROM pockets WHERE id=?', (pid,))
         if not old:
             return jsonify({'success': False, 'error': 'Карман не найден'}), 404
-        used = db.query_one("SELECT count(*) AS c FROM tasks WHERE trim(pocket)=? AND task_type=?",
-                            (old['name'], old['direction']))['c']
+        used = _used(old['name'], old['direction'], old.get('year'))
         if used:
-            return jsonify({'success': False, 'error': 'Карман указан в %d проверк(ах). Закройте его (снимите «активен») или поменяйте карман в проверках' % used}), 400
-        db.exec('DELETE FROM pocket_plans WHERE pocket_id=?', (pid,))
+            return jsonify({'success': False, 'error': 'Карман указан в %d проверк(ах). Закройте его (снимите «актив.») или поменяйте карман в проверках' % used}), 400
         db.exec('DELETE FROM pockets WHERE id=?', (pid,))
-        _audit(u, 'delete', pid, {'name': old['name'], 'direction': old['direction']})
+        _audit(u, 'delete', pid, {'name': old['name'], 'direction': old['direction'], 'year': old.get('year')})
         return jsonify({'success': True})
 
     @app.route('/api/plugins/pockets/plan/save', methods=['POST'])

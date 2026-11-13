@@ -3381,7 +3381,8 @@ function _fillPocketOptions() {
     var dir = $('task_type') ? $('task_type').value : '';
     var cur = sel.getAttribute('data-cur');
     if (cur === null) cur = sel.value || '';
-    var list = (window.__trkPocketList || state.pockets || []).filter(function(p) { return p.direction === dir && p.is_active; });
+    var _py = (($('task_start_date') && $('task_start_date').value) || '').slice(0, 4) || String(new Date().getFullYear());
+    var list = window.trkPocketsFor ? window.trkPocketsFor(dir, _py) : (window.__trkPocketList || state.pockets || []).filter(function(p) { return p.direction === dir && p.is_active; });
     var h = '<option value="">— вне кармана —</option>', found = !cur;
     list.forEach(function(p) { if (p.name === cur) found = true; h += '<option value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</option>'; });
     // Старое значение проверки, которого нет в справочнике, показываем, чтобы не потерять его молча
@@ -3392,11 +3393,11 @@ function _fillPocketOptions() {
     sel.disabled = !dir || !!($('task_type') && $('task_type').disabled);
     var hint = $('taskPocketHint');
     if (hint) hint.textContent = !dir ? 'Сначала выберите направление.'
-        : (list.length ? 'Открытые карманы направления «' + dir + '». Новые задаются в «Планирование → 🗂 Карманы».'
-                       : 'Для направления «' + dir + '» карманов нет — добавьте их в «Планирование → 🗂 Карманы».');
+        : (list.length ? 'Открытые карманы направления «' + dir + '» на ' + _py + ' год (по дате начала). Новые задаются в «🗂 Карманы → 📋 Справочник и планы».'
+                       : 'На ' + _py + ' год для направления «' + dir + '» карманов нет — добавьте их в «🗂 Карманы → 📋 Справочник и планы».');
 }
 window.trkFillPocketOptions = _fillPocketOptions;
-document.addEventListener('change', function(e) { if (e.target && e.target.id === 'task_type') { var s = $('task_pocket'); if (s) s.setAttribute('data-cur', ''); _fillPocketOptions(); } });
+document.addEventListener('change', function(e) { if (e.target && e.target.id === 'task_start_date') { _fillPocketOptions(); return; } if (e.target && e.target.id === 'task_type') { var s = $('task_pocket'); if (s) s.setAttribute('data-cur', ''); _fillPocketOptions(); } });
 
 // Нижняя граница для начала этапа idx: начало ближайшего ЗАПОЛНЕННОГО
 // предыдущего этапа (этап не может идти раньше предшественника),
@@ -19908,7 +19909,7 @@ function renderBankStatsPanel(bank){
         // Список существующих карманов
         function pocketOptsFor(dir){
             var tt = dirTaskType(dir), o = ['<option value="">— Вне кармана —</option>'];
-            (window.__trkPocketList || []).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
+            (window.trkPocketsFor ? window.trkPocketsFor(tt, '') : (window.__trkPocketList || [])).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
             return o.join('');
         }
         var pocketOpts = [pocketOptsFor(defDir)];

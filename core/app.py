@@ -1240,6 +1240,65 @@ def create_app():
             print('[INIT] departments.short_name добавлено')
     except Exception as _e:
         print(f'[INIT] migration pockets: {_e}')
+    # PATCH pockets-year — карманы ведутся по годам: на каждый год свой список и план проверок.
+    # Старый карман переносится в каждый год, где он встречается в проверках или планах (и в текущий, если открыт).
+    try:
+        _pcols = [r['name'] for r in db.query('PRAGMA table_info(pockets)')]
+        if _pcols and 'year' not in _pcols:
+            try:
+                import shutil as _sh
+                _src = Path(db.path)
+                if _src.exists():
+                    _dst = _src.with_name(_src.stem + '.before_pocket_years_' + datetime.now().strftime('%Y%m%d_%H%M%S') + _src.suffix)
+                    _sh.copy2(str(_src), str(_dst))
+                    print(f'[INIT] резервная копия БД перед карманами по годам: {_dst.name}')
+            except Exception as _be:
+                print(f'[INIT] backup before pocket years failed: {_be}')
+            _cy = datetime.now().year
+            _old = db.query('SELECT * FROM pockets ORDER BY id')
+            _opl = db.query('SELECT * FROM pocket_plans')
+            _otk = db.query("SELECT trim(pocket) AS pocket, task_type, substr(start_date,1,4) AS y FROM tasks "
+                            "WHERE trim(coalesce(pocket,''))<>''")
+            _cols = 'name, direction, year, is_active, sort, plan_count, comment, created_at, updated_at'
+            with db.transaction() as tx:
+                tx.exec("""CREATE TABLE pockets_y (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    year INTEGER NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    sort INTEGER DEFAULT 0,
+                    plan_count INTEGER,
+                    comment TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT '',
+                    UNIQUE(name, direction, year))""")
+                _extra = []
+                for _p in _old:
+                    _ys = {int(t['y']) for t in _otk if t['pocket'] == _p['name'] and (t['task_type'] or '') == _p['direction']
+                           and str(t['y'] or '').isdigit()}
+                    _pl = {}
+                    for _x in _opl:
+                        _y = str(_x.get('date_from') or '')[:4]
+                        if _x.get('pocket_id') == _p['id'] and _y.isdigit():
+                            _pl[int(_y)] = _pl.get(int(_y), 0) + int(_x.get('plan_count') or 0)
+                            _ys.add(int(_y))
+                    if _p.get('is_active') or not _ys:
+                        _ys.add(_cy)
+                    for _i, _y in enumerate(sorted(_ys)):
+                        _v = (_p['name'], _p['direction'], _y, _p.get('is_active', 1), _p.get('sort') or 0, _pl.get(_y),
+                              _p.get('comment') or '', _p.get('created_at') or '', _p.get('updated_at') or '')
+                        if _i == 0:
+                            tx.exec('INSERT INTO pockets_y (id, ' + _cols + ') VALUES (?,?,?,?,?,?,?,?,?,?)', (_p['id'],) + _v)
+                        else:
+                            _extra.append(_v)
+                for _v in _extra:
+                    tx.exec('INSERT INTO pockets_y (' + _cols + ') VALUES (?,?,?,?,?,?,?,?,?)', _v)
+                tx.exec('DROP TABLE pockets')
+                tx.exec('ALTER TABLE pockets_y RENAME TO pockets')
+            print(f'[INIT] pockets: карманы по годам ({len(_old)} → {len(_old) + len(_extra)} записей); pocket_plans оставлена как архив')
+    except Exception as _e:
+        print(f'[INIT] migration pocket years: {_e}')
     # PATCH tasks-lead — миграция: руководитель проверки (банк + сотрудник) в tasks
     try:
         cols = [r['name'] for r in db.query('PRAGMA table_info(tasks)')]
@@ -1852,9 +1911,12 @@ def create_app():
                 if not _keep_old:
                     if not task_type:
                         return jsonify({'success': False, 'error': 'Сначала выберите направление, затем карман'}), 400
-                    if not db.query_one('SELECT id FROM pockets WHERE name=? AND direction=? AND is_active=1',
-                                        (pocket, task_type)):
-                        return jsonify({'success': False, 'error': 'Карман «%s» не найден среди открытых карманов направления «%s». Выберите из списка или добавьте его в «🗂 Карманы»' % (pocket, task_type)}), 400
+                    # карманы ведутся по годам: год проверки — по дате начала
+                    _py = str(body.get('start_date', '') or '').strip()[:4]
+                    _py = int(_py) if _py.isdigit() else datetime.now().year
+                    if not db.query_one('SELECT id FROM pockets WHERE name=? AND direction=? AND is_active=1 AND year=?',
+                                        (pocket, task_type, _py)):
+                        return jsonify({'success': False, 'error': 'Карман «%s» не найден среди открытых карманов направления «%s» на %d год. Выберите из списка или добавьте его в «🗂 Карманы → 📋 Справочник и планы»' % (pocket, task_type, _py)}), 400
             except Exception as _pe:
                 print(f'[task_save] pocket check: {_pe}')
         curator = str(body.get('curator', '')).strip()[:100]

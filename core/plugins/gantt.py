@@ -1623,7 +1623,7 @@ function ggTaskLoadPockets() {
     if (ggTaskPocketsCache) return Promise.resolve(ggTaskPocketsCache);
     return fetch('/api/plugins/pockets/data', {credentials:'same-origin'})
         .then(function(r){ return r.json(); })
-        .then(function(d){ ggTaskPocketsCache = (d && d.pockets) || []; return ggTaskPocketsCache; })
+        .then(function(d){ ggTaskPocketsCache = (d && (d.all_pockets || d.pockets)) || []; return ggTaskPocketsCache; })
         .catch(function(){ ggTaskPocketsCache = []; return ggTaskPocketsCache; });
 }
 function ggTaskFillPocket(dir, cur) {
@@ -1631,7 +1631,9 @@ function ggTaskFillPocket(dir, cur) {
     if (!sel) return;
     var hint = document.getElementById('ggFPocketHint');
     var apply = function(list) {
-        var opts = list.filter(function(p){ return dir && p.direction === dir && p.is_active; });
+        // карманы ведутся по годам: берём год даты начала проверки
+        var yr = String(((ggTaskCurrent && ggTaskCurrent.start_date) || '').slice(0, 4) || new Date().getFullYear());
+        var opts = list.filter(function(p){ return dir && p.direction === dir && p.is_active && (p.year == null || String(p.year) === yr); });
         var h = '<option value="">— вне кармана —</option>', found = !cur;
         opts.forEach(function(p){ if (p.name === cur) found = true;
             h += '<option value="' + esc(p.name) + '">' + esc(p.name) + '</option>'; });
@@ -1644,8 +1646,8 @@ function ggTaskFillPocket(dir, cur) {
         if (hint) hint.textContent = !dir
             ? 'Сначала выберите направление.'
             : (warn ? 'Старое значение: карман вне справочника. Выберите из списка.'
-                    : (opts.length ? 'Карманы направления «' + dir + '». Новые — в «Планирование → 🗂 Карманы».'
-                                   : 'Для направления «' + dir + '» карманов нет — добавьте их в «🗂 Карманы».'));
+                    : (opts.length ? 'Карманы направления «' + dir + '» на ' + yr + ' год. Новые — в «🗂 Карманы → 📋 Справочник и планы».'
+                                   : 'На ' + yr + ' год для направления «' + dir + '» карманов нет — добавьте их в «🗂 Карманы».'));
     };
     if (ggTaskPocketsCache) { apply(ggTaskPocketsCache); return; }
     apply([]);
