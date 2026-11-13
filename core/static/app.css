@@ -11054,6 +11054,9 @@ body:not(.trk-theme-light) .plan-act--export{background:rgba(255,255,255,.06);bo
 body:not(.trk-theme-light) .plan-act--export:hover{border-color:rgba(255,255,255,.4);box-shadow:0 4px 12px rgba(0,0,0,.35)}
 body:not(.trk-theme-light) .plan-act--dash{box-shadow:0 3px 12px rgba(124,58,237,.35)}
 @media (max-width:1400px){.plan-act{height:32px;padding:0 11px;font-size:.78rem}}
+.plan-act.plan-act--hero{height:40px;padding:0 18px;font-size:.92rem;border-radius:12px;gap:8px}
+.plan-act.plan-act--hero i{font-size:1.15rem}
+@media (max-width:1400px){.plan-act.plan-act--hero{height:38px;padding:0 16px;font-size:.88rem}}
 
 /* ===== Песочница: кнопка и окно инструкции ===== */
 .dash-help-btn{background:transparent;border:1px solid rgba(124,58,237,.45);color:#6d28d9;border-radius:9px;padding:6px 12px;font-weight:600;margin-right:8px;cursor:pointer}

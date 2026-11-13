@@ -219,6 +219,28 @@ function ptag(name, dir, unk) {
     return '<span class="pk-ptag ' + (m ? m.cl : '') + (unk ? ' pk-old' : '') + (sh ? ' pk-shared' : '') + '" title="' + e((m ? m.t + ' направление' : 'Без направления') + (sh ? ' · общий карман: есть в обоих направлениях' : '') + (unk ? ' · нет в справочнике' : '')) + '">'
         + (m ? '<i>' + m.ic + '</i>' : '') + e(name) + (sh ? '<b class="pk-sh" aria-hidden="true">⇄</b>' : '') + (unk ? '<em class="pk-warn">⚠</em>' : '') + '</span>';
 }
+function ptagT(name, dir, unk) {
+    var sh = !unk && !!DMETA[dir] && isShared(name);
+    return '<span class="pk-ptag pk-tt' + (unk ? ' pk-old' : '') + (sh ? ' pk-tsh' : '') + '" title="' + e((sh ? 'Общий карман: есть в обоих направлениях' : 'Карман') + (unk ? ' · нет в справочнике' : '')) + '">'
+        + e(name) + (sh ? '<b class="pk-sh" aria-hidden="true">⇄</b>' : '') + (unk ? '<em class="pk-warn">⚠</em>' : '') + '</span>';
+}
+function shCol(c) { return c && c.key !== '__none' && !c.unknown && isShared(c.name); }
+function popClose() {
+    ST.cell = null; var p = document.getElementById('pkPop'); if (p) p.style.display = 'none';
+    document.querySelectorAll('#pkOverlay td.pk-cell-on').forEach(function(x) { x.classList.remove('pk-cell-on'); });
+}
+function popPlace(pop, a) {
+    if (!a) return; var r = a.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+    // границы — окно «Карманы» (а не весь экран), чтобы окошко не вылезало на затемнённый фон
+    var bx = document.querySelector('#pkOverlay .pk-box'), br = bx ? bx.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    var L = Math.max(8, br.left + 8), T = Math.max(8, br.top + 8), R = Math.min(window.innerWidth - 8, br.right - 8), B = Math.min(window.innerHeight - 8, br.bottom - 8);
+    var x, y;
+    if (r.right + 8 + pw <= R) { x = r.right + 8; y = r.top - 4; }
+    else if (r.left - 8 - pw >= L) { x = r.left - 8 - pw; y = r.top - 4; }
+    else { x = Math.max(L, Math.min(R - pw, r.left)); y = r.bottom + 6; if (y + ph > B) y = r.top - ph - 6; }
+    if (y + ph > B) y = B - ph; if (y < T) y = T;
+    pop.style.left = Math.round(x) + 'px'; pop.style.top = Math.round(y) + 'px';
+}
 function calcShared(list) {
     var by = {}, out = {};
     (list || []).forEach(function(p) { var k = nkey(p.name); if (!k) return; by[k] = by[k] || {}; by[k][p.direction] = 1; });
@@ -243,7 +265,7 @@ function css() {
     var s = document.createElement('style'); s.id = 'pkCss';
     s.textContent = [
     '.pk-ov{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;padding:3vh 2vw}',
-    '.pk-box{width:min(1320px,96vw);max-height:94vh;display:flex;flex-direction:column;background:#1d2026;color:#e6e6e6;border:1px solid rgba(38,162,105,.55);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.5)}',
+    '.pk-box{width:min(1188px,86vw);max-height:94vh;display:flex;flex-direction:column;background:#1d2026;color:#e6e6e6;border:1px solid rgba(38,162,105,.55);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.5)}',
     'body.trk-theme-light .pk-box{background:#fff;color:#1f2328}',
     '.pk-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(128,128,128,.25)}',
     '.pk-head h3{margin:0;font-size:1.05rem;margin-right:auto}',
@@ -312,7 +334,7 @@ function css() {
     '.pk-d-corp.pk-ptag.pk-shared{background-color:rgba(59,130,246,.14)}.pk-d-retail.pk-ptag.pk-shared{background-color:rgba(217,70,143,.14)}',
     '.pk-ptag b.pk-sh{font-weight:800;color:#a855f7;margin-left:3px;font-size:.85em}body.trk-theme-light .pk-ptag b.pk-sh{color:#7e22ce}',
     '.pk-sec h4 .pk-btn{margin-left:10px;vertical-align:middle}',
-    '.pk-ed{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px}',
+    '.pk-ed{display:flex;flex-direction:column;gap:12px}',
     '.pk-edcol{border:1px solid rgba(128,128,128,.28);border-radius:10px;padding:8px 10px 10px;border-top-width:4px}',
     '.pk-edcol.pk-d-corp{border-top-color:#3b82f6}.pk-edcol.pk-d-retail{border-top-color:#d9468f}',
     '.pk-edcol h5{margin:0 0 8px;font-size:.85rem;display:flex;align-items:center;gap:8px}.pk-edcol h5 .pk-mute{font-weight:500;margin-left:auto}',
@@ -332,7 +354,15 @@ function css() {
     '.pk-edbar{position:sticky;bottom:-18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px 0 4px;background:inherit}',
     '.pk-box .pk-edbar{background:#1d2026}body.trk-theme-light .pk-box .pk-edbar{background:#fff}',
     '.pk-edbar .pk-mute{margin-right:auto}',
-    '.pk-edhint{font-size:.74rem;opacity:.85;margin:0 0 8px}'
+    '.pk-edhint{font-size:.74rem;opacity:.85;margin:0 0 8px}',
+    '.pk-box.pk-box--ed{width:min(720px,94vw)}',
+    '.pk-pop{position:fixed;z-index:20050;display:none;min-width:300px;max-width:min(520px,92vw);max-height:46vh;overflow:auto;padding:8px 10px 10px;border-radius:10px;background:#262a32;color:#e6e6e6;border:1px solid rgba(38,162,105,.7);box-shadow:0 12px 34px rgba(0,0,0,.5);font-size:.82rem}',
+    'body.trk-theme-light .pk-pop{background:#fff;color:#1f2328;box-shadow:0 12px 34px rgba(15,23,42,.22)}',
+    '.pk-pop .pk-cell{margin:0;padding:0;border:0}.pk-pop .pk-plan{margin:5px 0 0}.pk-pop a{cursor:pointer;color:inherit;text-decoration:underline dotted}',
+    '.pk-t td.pk-cell-on{outline:2px solid #26a269;outline-offset:-2px;background:rgba(38,162,105,.16)}',
+    '.pk-ptag.pk-tt{border-left:0;padding:1px 7px;background:rgba(128,128,128,.12)}',
+    '.pk-ptag.pk-tt.pk-tsh{background:rgba(168,85,247,.18);box-shadow:inset 0 0 0 1px rgba(168,85,247,.6);color:#d8b4fe}body.trk-theme-light .pk-ptag.pk-tt.pk-tsh{color:#6b21a8;background:rgba(168,85,247,.12)}',
+    '.pk-t th.pk-thsh,.pk-t td.pk-tdsh,.pk-t tr.pk-trsh>td{box-shadow:inset 0 0 0 999px rgba(168,85,247,.08)}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -352,13 +382,17 @@ function open() {
         ov.addEventListener('dragover', onDragOver);
         ov.addEventListener('drop', onDrop);
         ov.addEventListener('dragend', onDragEnd);
+        document.getElementById('pkBody').addEventListener('scroll', popClose);
+        window.addEventListener('resize', popClose);
     }
     ov.style.display = 'flex';
     document.addEventListener('keydown', onKey);
     head(); load();
 }
-function close() { if (ST.ed && edChanges() && !confirm('Закрыть без сохранения изменений в списках?')) return; ST.ed = null; var ov = document.getElementById('pkOverlay'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey); }
+function close() { if (ST.ed && edChanges() && !confirm('Закрыть без сохранения изменений в списках?')) return; ST.ed = null; popClose(); var ov = document.getElementById('pkOverlay'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey); }
 function onKey(ev) {
+    var pp = document.getElementById('pkPop');
+    if (ev.key === 'Escape' && pp && pp.style.display === 'block') { popClose(); return; }
     if (ev.key === 'Escape') { if (ST.ed) { if (edChanges() && !confirm('Отменить несохранённые изменения?')) return; ST.ed = null; render(); return; } close(); return; }
     var t = ev.target;
     if (ST.ed && ev.key === 'Enter' && t && t.hasAttribute && t.hasAttribute('data-edadd')) {
@@ -442,10 +476,8 @@ function pocketRow(p, ed) {
     if (!p.is_active) h += '<span class="pk-chip">закрыт</span>';
     if (ed) {
         h += '<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'
-           + '<label class="pk-mute" title="Закрытый карман не предлагается в списке при создании проверок"><input type="checkbox" data-act="active" data-id="' + p.id + '"' + (p.is_active ? ' checked' : '') + '> активен</label>'
-           + '<button class="pk-btn mini" data-act="ren" data-id="' + p.id + '" title="Переименовать (название поменяется и в проверках)">✎</button>'
            + '<button class="pk-btn mini" data-act="planadd" data-id="' + p.id + '">+ план</button>'
-           + '<button class="pk-btn mini" data-act="del" data-id="' + p.id + '" title="Удалить">🗑</button></span>';
+           + '</span>';
     }
     h += '</div>';
     plansOf(p.id).forEach(function(pl) {
@@ -569,6 +601,8 @@ function edSave() {
 }
 function render() {
     var d = ST.d, ed = d.can_edit;
+    popClose();
+    var bx = document.querySelector('#pkOverlay .pk-box'); if (bx) bx.classList.toggle('pk-box--ed', !!(ST.ed && ed));
     if (ST.ed && ed) {
         document.getElementById('pkBody').innerHTML = '<div class="pk-sec"><h4>✎ Редактирование списков карманов</h4>' + edRender() + '</div>';
         return;
@@ -579,14 +613,13 @@ function render() {
         var list = d.pockets.filter(function(p) { return p.direction === dr[0]; });
         var DM = DMETA[dr[0]];
         h += '<div class="pk-dir ' + DM.cl + '"><h5>' + DM.ic + ' ' + dr[1] + '</h5>';
-        if (!list.length) h += '<div class="pk-empty">Карманов нет' + (ed ? ' — добавьте ниже' : '') + '</div>';
+        if (!list.length) h += '<div class="pk-empty">Карманов нет' + (ed ? ' — добавьте через «✎ Редактировать списки»' : '') + '</div>';
         list.forEach(function(p) { h += pocketRow(p, ed); });
-        if (ed) h += '<div class="pk-form" style="margin:8px 0 0"><input type="text" data-f="newname" data-dir="' + e(dr[0]) + '" placeholder="Новый карман: ' + (dr[0] === 'корпоративная' ? 'корпоративный' : 'розничный') + '" maxlength="100" style="width:220px"><button class="pk-btn mini" data-act="add" data-dir="' + e(dr[0]) + '">+ Добавить</button></div>';
         h += '</div>';
     });
     h += '</div></div>';
     h += '<div id="pkCellBox"></div>';
-    h += '<div class="pk-legend">Обозначения: ' + ptag('корпоративное', 'корпоративная') + ptag('розничное', 'розничная') + '<span class="pk-ptag" style="border-left-color:transparent;background:transparent;padding-left:0"><em class="pk-warn" style="margin:0">⚠</em></span> <span class="pk-mute">— значения нет в справочнике, замените в карточке проверки</span>' + '</div>';
+    h += '<div class="pk-legend">Обозначения: <span class="pk-ptag pk-tt pk-tsh">ПВР<b class="pk-sh">⇄</b></span><span class="pk-mute">— общий карман: есть в обоих направлениях</span>' + '<span class="pk-ptag" style="border-left-color:transparent;background:transparent;padding-left:0"><em class="pk-warn" style="margin:0">⚠</em></span> <span class="pk-mute">— значения нет в справочнике, замените в карточке проверки</span>' + '</div>';
     var mm = d.matrices || {};
     DIRS.slice(1).forEach(function(dr) {
         if (ST.dir && ST.dir !== dr[0]) return;
@@ -599,7 +632,6 @@ function render() {
     }
     h += '<div class="pk-mute" style="margin-top:8px">Числа — фактические проверки «Карты проверок» с датой начала в ' + ST.year + ' году (кроме отменённых). Банк-участник — банк, выбранный в банках проверки. ПШЕ — нормативная численность направления из карточки банка. Клик по ячейке — список проверок.</div>';
     document.getElementById('pkBody').innerHTML = h;
-    if (ST.cell) showCell(ST.cell);
 }
 function dirTables(m, dir, M) {
     var cols = m.cols, NONE = '__none', pre = M.k + '|';
@@ -608,27 +640,28 @@ function dirTables(m, dir, M) {
     if (!m.total_tasks) h += '<div class="pk-empty">Нет проверок этого направления с датой начала в ' + ST.year + ' году</div>';
     // Таблица 1: банк-руководитель × карман
     h += '<h5>1. Банки-руководители проверок по карманам</h5>';
-    h += '<div class="pk-tw"><table class="pk-t"><thead><tr><th>ТБ</th>' + cols.map(function(c) { return '<th>' + ptag(c.name, c.direction, c.unknown) + '</th>'; }).join('') + '<th>Вне кармана</th><th>Итого</th></tr></thead><tbody>';
+    h += '<div class="pk-tw"><table class="pk-t"><thead><tr><th>ТБ</th>' + cols.map(function(c) { return '<th' + (shCol(c) ? ' class="pk-thsh"' : '') + '>' + ptagT(c.name, c.direction, c.unknown) + '</th>'; }).join('') + '<th>Вне кармана</th><th>Итого</th></tr></thead><tbody>';
     m.banks.forEach(function(b) {
         var row = m.t1[b.id] || {}, tot = 0;
         h += '<tr><td>' + bank(b) + ' <span class="pk-mute">' + e(b.name) + '</span></td>';
-        keys.forEach(function(k) {
+        keys.forEach(function(k, ki) {
             var ids = row[k] || []; tot += ids.length;
-            if (!ids.length) { h += '<td></td>'; return; }
+            var sc = shCol(cols[ki]) ? ' class="pk-tdsh"' : '';
+            if (!ids.length) { h += '<td' + sc + '></td>'; return; }
             var sn = []; ids.forEach(function(id) { var s = m.tasks[id].lead_short; if (s && sn.indexOf(s) < 0) sn.push(s); });
-            h += '<td data-cell="' + pre + 't1|' + e(b.id) + '|' + e(k) + '"><b>' + ids.length + '</b>' + (sn.length ? '<span class="pk-ln">' + e(sn.join(', ')) + '</span>' : '') + '</td>';
+            h += '<td' + sc + ' data-cell="' + pre + 't1|' + e(b.id) + '|' + e(k) + '"><b>' + ids.length + '</b>' + (sn.length ? '<span class="pk-ln">' + e(sn.join(', ')) + '</span>' : '') + '</td>';
         });
         h += '<td><b>' + (tot || '') + '</b></td></tr>';
     });
     var g1 = 0;
-    h += '<tr class="pk-tot"><td>Итого</td>' + keys.map(function(k) { var v = m.t1_total[k] || 0; g1 += v; return '<td>' + (v || '') + '</td>'; }).join('') + '<td>' + (g1 || '') + '</td></tr>';
+    h += '<tr class="pk-tot"><td>Итого</td>' + keys.map(function(k, ki) { var v = m.t1_total[k] || 0; g1 += v; return '<td' + (shCol(cols[ki]) ? ' class="pk-tdsh"' : '') + '>' + (v || '') + '</td>'; }).join('') + '<td>' + (g1 || '') + '</td></tr>';
     h += '</tbody></table></div>';
     // Таблица 2: карман × банк-участник
     h += '<h5>2. Банки-участники: число проверок по карманам</h5>';
     h += '<div class="pk-tw"><table class="pk-t"><thead><tr><th>Карман</th>' + m.banks.map(function(b) { return '<th>' + bank(b) + '</th>'; }).join('') + '<th>Итого</th></tr></thead><tbody>';
     cols.concat([{ key: NONE, name: 'Вне кармана', direction: '' }]).forEach(function(c) {
         var r = m.t2[c.key] || {}, tot = 0;
-        h += '<tr><td>' + (c.key === NONE ? 'Вне кармана' : ptag(c.name, c.direction, c.unknown)) + '</td>';
+        h += '<tr' + (shCol(c) ? ' class="pk-trsh"' : '') + '><td>' + (c.key === NONE ? 'Вне кармана' : ptagT(c.name, c.direction, c.unknown)) + '</td>';
         m.banks.forEach(function(b) { var ids = r[b.id] || []; tot += ids.length; h += ids.length ? '<td data-cell="' + pre + 't2|' + e(b.id) + '|' + e(c.key) + '">' + ids.length + '</td>' : '<td></td>'; });
         h += '<td><b>' + (tot || '') + '</b></td></tr>';
     });
@@ -640,7 +673,7 @@ function dirTables(m, dir, M) {
     h += '</tbody></table></div></div>';
     return h;
 }
-function showCell(c) {
+function showCell(c, anchor) {
     var p = c.split('|'), dk = p[0], tbl = p[1], b = p[2], k = p.slice(3).join('|');
     var m = (ST.d.matrices || {})[dk]; if (!m) return;
     var ids = tbl === 't1' ? ((m.t1[b] || {})[k] || []) : ((m.t2[k] || {})[b] || []);
@@ -650,7 +683,12 @@ function showCell(c) {
     var h = '<div class="pk-cell"><div class="pk-line"><b>' + (tbl === 't1' ? 'Руководит: ' : 'Участвует: ') + '</b>' + bank(bk) + ' · ' + (col ? ptag(col.name, col.direction, col.unknown) : DMETA[dir].ic + ' вне кармана')
         + '<button class="pk-btn mini" data-act="cellclose" style="margin-left:auto">✕</button></div>';
     ids.forEach(function(id) { var t = m.tasks[id]; h += '<div class="pk-plan" style="margin-left:0">• <a data-act="opentask" data-id="' + e(id) + '">' + e(t.name) + '</a><span class="pk-mute">' + e(STL[t.status] || t.status) + ' · ' + fd(t.start) + '–' + fd(t.deadline) + (t.lead ? ' · рук. ' + e(t.lead) : '') + '</span></div>'; });
-    var box = document.getElementById('pkCellBox'); if (box) { box.innerHTML = h + '</div>'; box.scrollIntoView({ block: 'nearest' }); }
+    var ov = document.getElementById('pkOverlay'), pop = document.getElementById('pkPop');
+    if (!pop) { pop = document.createElement('div'); pop.id = 'pkPop'; pop.className = 'pk-pop'; pop.setAttribute('role', 'dialog'); ov.appendChild(pop); }
+    popClose(); ST.cell = c;
+    pop.innerHTML = h + '</div>'; pop.style.display = 'block';
+    if (anchor) anchor.classList.add('pk-cell-on');
+    popPlace(pop, anchor);
 }
 function val(scope, f) { var el = scope.querySelector('[data-f="' + f + '"]'); return el ? el.value : ''; }
 function done(r, ok) { if (r && r.success) { if (ok) msg(ok); load(); } else msg('❌ ' + ((r && r.error) || 'Ошибка'), true); }
@@ -666,14 +704,15 @@ function newTask(pid) {
 }
 function onClick(ev) {
     var t = ev.target.closest ? ev.target.closest('[data-act],[data-dir],[data-cell]') : null;
+    if (!(ev.target.closest && ev.target.closest('#pkPop')) && !(t && t.hasAttribute('data-cell'))) popClose();
     if (!t) return;
-    if (t.hasAttribute('data-cell')) { ST.cell = t.getAttribute('data-cell'); showCell(ST.cell); return; }
+    if (t.hasAttribute('data-cell')) { var cc = t.getAttribute('data-cell'); if (ST.cell === cc && t.classList.contains('pk-cell-on')) { popClose(); return; } showCell(cc, t); return; }
     var a = t.getAttribute('data-act');
     if (!a && t.parentNode && t.parentNode.id === 'pkDirSeg') { ST.dir = t.getAttribute('data-dir'); try { localStorage.setItem('pk.dir', ST.dir); } catch (x) {} ST.cell = null; head(); load(); return; }
     var id = +t.getAttribute('data-id') || 0;
     if (a === 'close') return close();
     if (a === 'yprev' || a === 'ynext') { ST.year += (a === 'ynext' ? 1 : -1); ST.cell = null; head(); load(); return; }
-    if (a === 'cellclose') { ST.cell = null; document.getElementById('pkCellBox').innerHTML = ''; return; }
+    if (a === 'cellclose') { popClose(); return; }
     if (a === 'opentask') { var tid = t.getAttribute('data-id'); close(); if (window.trkOpenTaskById) window.trkOpenTaskById(tid); return; }
     if (a === 'edopen') { edStart(); ST.edit = null; ST.plan = null; render(); return; }
     if (ST.ed && a && a.indexOf('ed') === 0) {
