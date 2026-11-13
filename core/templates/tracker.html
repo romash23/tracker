@@ -126,13 +126,7 @@
             <div class="plan-actions">
             {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-act plan-act--pockets" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ"><i>🗂</i><span>Карманы</span></button>{% endif %}
             <span class="plan-act-sep" aria-hidden="true"></span>
-            <div class="export-menu-wrap" style="position:relative;display:inline-block;">
-                <button class="plan-act plan-act--export" id="exportMenuBtn" type="button"><i>📥</i><span>Экспорт</span><b class="plan-act-caret">▾</b></button>
-                <div id="exportMenuDrop" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:9999;background:#141414;border:1px solid rgba(245,215,110,0.22);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.55);min-width:260px;padding:6px;">
-                    <div class="export-menu-item" data-form="calendar" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">📅 Календарь (полный)</div>
-                    <div class="export-menu-item" data-form="debtors" style="padding:9px 12px;border-radius:8px;cursor:pointer;color:#e8e8e8;font-size:0.9rem;">⚠️ Кто не заполнил отчёт (сегодня)</div>
-                </div>
-            </div>
+            <button class="plan-act plan-act--export" id="exportPlannedBtn" type="button" title="Excel без фильтров: запланированные проверки, карманы × план, проверки по месяцам"><i>📥</i><span>Экспорт</span></button>
             </div>
         </div>
         <div class="plan-tables">
@@ -168,6 +162,9 @@
                     <option value="нет">нет</option>
                 </select>
             </label>
+            <label class="sum-filter" title="Карман"><span>🗂</span>
+                <select id="tskPocketFilter"><option value="">Карман</option></select>
+            </label>
             <div class="tsk-dir-seg" id="tskDirSeg" role="group" aria-label="Направление" title="Направление проверки">
                 <button type="button" data-v="">Все</button>
                 <button type="button" data-v="розничная">Розничное</button>
@@ -192,8 +189,8 @@
                 </select>
             </label>
             <div class="segmented" id="tskViewSeg" title="Вид отображения задач">
-                <button type="button" data-view="tile" title="Плитка">▢ Плитка</button>
                 <button type="button" data-view="list" title="Список: одна задача в строке">📋 Список</button>
+                <button type="button" data-view="tile" title="Плитка">▢ Плитка</button>
             </div>
             <div class="segmented" id="tskViewMode" style="margin-left:auto;">
                 <button class="active" data-mode="all">Все</button>

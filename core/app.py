@@ -2929,6 +2929,312 @@ def create_app():
     # ============================================================
     # API: CALENDAR
     # ============================================================
+    # ============================================================
+    # API: ЭКСПОРТ «Планирование» — запланированные проверки (xlsx, 3 листа, без фильтров)
+    # ============================================================
+    @app.route('/api/tracker/export/planned')
+    @login_required
+    def api_export_planned():
+        """Один файл: «Проверки» (planning/approved/active), «Карманы × план» (по годам),
+        «По месяцам» (сколько проверок стартует в месяц). Фильтры экрана не учитываются."""
+        from datetime import date, datetime as _dt, timedelta as _td
+        from io import BytesIO
+        from flask import send_file
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+        except ImportError:
+            return jsonify({'success': False, 'error': 'openpyxl не установлен: pip install openpyxl'}), 500
+
+        data = db.load_all()
+        today = date.today()
+        PLANNED = ('planning', 'approved', 'active')
+        DIRS = (('корпоративная', 'Корпоративное'), ('розничная', 'Розничное'))
+        DIR_LBL = dict(DIRS)
+        DOC_LBL = {'order': 'Приказ', 'directive': 'Распоряжение', 'sz': 'СЗ', 'other': 'Другое'}
+        ST_FILL = {'planning': 'EDE7F6', 'approved': 'FDEBD0', 'active': 'D6EAF8'}
+        deps = {d_['id']: d_ for d_ in data.get('departments') or []}
+        emps = {e_['id']: e_ for e_ in data.get('employees') or []}
+        hol = data.get('holidays') or {}
+        hol = set(hol.keys()) if isinstance(hol, dict) else set(str(h_.get('date') if isinstance(h_, dict) else h_) for h_ in hol)
+
+        def bank(did, short=False):
+            d_ = deps.get(did) or {}
+            if short:
+                return (d_.get('short_name') or '').strip() or d_.get('name') or ''
+            return d_.get('name') or ''
+
+        def pd(s):
+            try:
+                return _dt.strptime(str(s or '').strip()[:10], '%Y-%m-%d').date()
+            except Exception:
+                return None
+
+        def fmt(dd):
+            return dd.strftime('%d.%m.%Y') if dd else ''
+
+        def workdays(a, b):
+            if not a or not b or b < a:
+                return None
+            n, x = 0, a
+            while x <= b:
+                if x.weekday() < 5 and x.isoformat() not in hol:
+                    n += 1
+                x += _td(days=1)
+            return n
+
+        def end_of(t):
+            return pd(t.get('extended_deadline')) or pd(t.get('deadline'))
+
+        audits = [t for t in data.get('tasks') or [] if (t.get('task_kind') or 'audit') == 'audit']
+        planned = [t for t in audits if t.get('status') in PLANNED]
+        planned.sort(key=lambda t: (t.get('start_date') or '9999', t.get('name') or ''))
+
+        wb = openpyxl.Workbook()
+        thin = Side(style='thin', color='BFC5CD')
+        BRD = Border(left=thin, right=thin, top=thin, bottom=thin)
+        HFILL = PatternFill('solid', fgColor='1F2937')
+        HFONT = Font(bold=True, color='FFFFFF')
+        SUBFILL = PatternFill('solid', fgColor='E5E7EB')
+        TOTFILL = PatternFill('solid', fgColor='F3F4F6')
+        WRAP = Alignment(wrap_text=True, vertical='top')
+        CENTER = Alignment(horizontal='center', vertical='top')
+
+        def title(ws, text, ncols):
+            ws.cell(row=1, column=1, value=text).font = Font(bold=True, size=13)
+            ws.cell(row=2, column=1, value='Сформировано ' + _dt.now().strftime('%d.%m.%Y %H:%M') +
+                    ' · без фильтров экрана').font = Font(italic=True, color='6B7280')
+
+        def header(ws, row, cols):
+            for i, c in enumerate(cols, 1):
+                cell = ws.cell(row=row, column=i, value=c)
+                cell.font, cell.fill, cell.border = HFONT, HFILL, BRD
+                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        # ---------- Лист 1. Проверки ----------
+        ws = wb.active
+        ws.title = 'Проверки'
+        stage_keys = []
+        for t in planned:
+            for s in t.get('stages') or []:
+                if s.get('start') and s['key'] not in [k for k, _ in stage_keys]:
+                    stage_keys.append((s['key'], s.get('label') or s['key']))
+        order = {}
+        for t in audits[:1]:
+            order = {s['key']: i for i, s in enumerate(t.get('stages') or [])}
+        stage_keys.sort(key=lambda kv: order.get(kv[0], 99))
+        cols = ['№', 'Проверка', 'Статус', 'Направление', 'Карман', 'Банк-руководитель', 'Банки-участники',
+                'Руководитель проверки', 'Куратор ЦА', 'Начало', 'Окончание', 'Раб. дней'] + \
+               ['Этап: ' + lbl for _, lbl in stage_keys] + ['Документы', 'Срочная']
+        title(ws, 'Запланированные проверки (планирование, утверждена, активна): ' + str(len(planned)), len(cols))
+        header(ws, 4, cols)
+        r = 5
+        for i, t in enumerate(planned, 1):
+            st = t.get('status') or ''
+            sd, ed = pd(t.get('start_date')), end_of(t)
+            ext = pd(t.get('extended_deadline'))
+            shares = t.get('department_shares') or {}
+            parts = []
+            for did in t.get('department_ids') or []:
+                nm = bank(did)
+                if not nm:
+                    continue
+                sh = shares.get(did)
+                try:
+                    sh = float(sh)
+                except Exception:
+                    sh = 100.0
+                parts.append(nm + ('' if sh >= 100 else ' (' + ('%g' % sh) + '%)'))
+            stages = {s['key']: s for s in t.get('stages') or []}
+            st_cells = []
+            for k, _ in stage_keys:
+                s = stages.get(k) or {}
+                a, b = pd(s.get('start')), pd(s.get('end'))
+                st_cells.append((a.strftime('%d.%m.%y') if a else '') + ('–' + b.strftime('%d.%m.%y') if a and b else ''))
+            docs = []
+            for o in t.get('orders') or []:
+                if not isinstance(o, dict):
+                    continue
+                txt = ' '.join(x for x in [str(o.get('value') or '').strip(), str(o.get('description') or '').strip()] if x)
+                if txt:
+                    docs.append(DOC_LBL.get(o.get('type'), 'Приказ') + ': ' + txt)
+            lead_emp = (emps.get(t.get('lead_employee') or '') or {}).get('name') or ''
+            row = [i, t.get('name') or '', TASK_STATUS_LABELS.get(st, st),
+                   DIR_LBL.get(t.get('task_type') or '', 'Не указано'),
+                   (t.get('pocket') or '').strip() or 'Вне кармана',
+                   bank(t.get('lead_department') or ''), '\n'.join(parts), lead_emp,
+                   (t.get('curator') or '').strip() or 'не указан',
+                   fmt(sd), fmt(ed) + (' (продлена)' if ext else ''), workdays(sd, ed)] + st_cells + \
+                  ['\n'.join(docs), 'да' if t.get('is_urgent') else '']
+            for c, v in enumerate(row, 1):
+                cell = ws.cell(row=r, column=c, value=v)
+                cell.border, cell.alignment = BRD, WRAP
+            ws.cell(row=r, column=3).fill = PatternFill('solid', fgColor=ST_FILL.get(st, 'FFFFFF'))
+            ws.cell(row=r, column=1).alignment = CENTER
+            ws.cell(row=r, column=12).alignment = CENTER
+            r += 1
+        if not planned:
+            ws.cell(row=5, column=1, value='Запланированных проверок нет')
+        widths = [5, 34, 14, 15, 18, 24, 30, 22, 14, 12, 16, 9] + [17] * len(stage_keys) + [30, 9]
+        for c, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(c)].width = w
+        ws.row_dimensions[4].height = 32
+        ws.freeze_panes = 'C5'
+        ws.auto_filter.ref = 'A4:' + get_column_letter(len(cols)) + str(max(r - 1, 4))
+
+        # ---------- Лист 2. Карманы × план ----------
+        ws2 = wb.create_sheet('Карманы × план')
+        try:
+            pk_rows = db.query('SELECT * FROM pockets ORDER BY year, direction, sort, name')
+        except Exception:
+            pk_rows = []
+        years = set()
+        for p in pk_rows:
+            try:
+                years.add(int(p.get('year')))
+            except Exception:
+                pass
+        for t in planned:
+            sd = pd(t.get('start_date'))
+            if sd:
+                years.add(sd.year)
+        live = [t for t in audits if t.get('status') != 'cancelled']
+        title(ws2, 'Карманы: план и заведённые проверки по годам', 7)
+        r = 4
+        cols2 = ['Карман', 'Открыт', 'План', 'Заведено', 'из них запланировано', 'Отклонение', 'Комментарий']
+        if not years:
+            ws2.cell(row=r, column=1, value='Карманы и запланированные проверки не найдены')
+        for y in sorted(years):
+            ys = str(y)
+            ws2.cell(row=r, column=1, value=str(y) + ' год').font = Font(bold=True, size=12)
+            r += 1
+            for dkey, dlbl in DIRS:
+                cell = ws2.cell(row=r, column=1, value=dlbl + ' направление')
+                for c in range(1, len(cols2) + 1):
+                    ws2.cell(row=r, column=c).fill = SUBFILL
+                    ws2.cell(row=r, column=c).border = BRD
+                cell.font = Font(bold=True)
+                r += 1
+                header(ws2, r, cols2)
+                r += 1
+                cnt, cntp = {}, {}
+                for t in live:
+                    if (t.get('start_date') or '')[:4] != ys or (t.get('task_type') or '') != dkey:
+                        continue
+                    k = (t.get('pocket') or '').strip()
+                    cnt[k] = cnt.get(k, 0) + 1
+                    if t.get('status') in PLANNED:
+                        cntp[k] = cntp.get(k, 0) + 1
+                seen = set()
+                tp = tf = tpp = 0
+                has_plan = False
+                for p in pk_rows:
+                    if str(p.get('year')) != ys or p.get('direction') != dkey:
+                        continue
+                    nm = (p.get('name') or '').strip()
+                    seen.add(nm)
+                    plan = p.get('plan_count')
+                    f, fp = cnt.get(nm, 0), cntp.get(nm, 0)
+                    tf += f
+                    tpp += fp
+                    if plan is None or str(plan) == '':
+                        dev = 'план не задан'
+                    else:
+                        plan = int(plan)
+                        tp += plan
+                        has_plan = True
+                        dev = 'нужно ещё ' + str(plan - f) if f < plan else ('✓ план выполнен' if f == plan else 'больше плана на ' + str(f - plan))
+                    row = [nm, 'да' if p.get('is_active') else 'закрыт', plan if plan not in (None, '') else '', f, fp, dev,
+                           p.get('comment') or '']
+                    for c, v in enumerate(row, 1):
+                        ws2.cell(row=r, column=c, value=v).border = BRD
+                    r += 1
+                extra = sorted(k for k in cnt if k not in seen)
+                for k in extra:
+                    row = [k or 'Вне кармана', '', '', cnt[k], cntp.get(k, 0), '', '' if not k else 'нет в справочнике года']
+                    for c, v in enumerate(row, 1):
+                        cell = ws2.cell(row=r, column=c, value=v)
+                        cell.border = BRD
+                        cell.font = Font(italic=True, color='6B7280')
+                    tf += cnt[k]
+                    tpp += cntp.get(k, 0)
+                    r += 1
+                if not seen and not extra:
+                    ws2.cell(row=r, column=1, value='нет карманов и проверок').font = Font(italic=True, color='6B7280')
+                    r += 1
+                tdev = ''
+                if has_plan:
+                    tdev = 'нужно ещё ' + str(tp - tf) if tf < tp else ('✓ план выполнен' if tf == tp else 'больше плана на ' + str(tf - tp))
+                row = ['Итого', '', tp if has_plan else '', tf, tpp, tdev, '']
+                for c, v in enumerate(row, 1):
+                    cell = ws2.cell(row=r, column=c, value=v)
+                    cell.border, cell.fill, cell.font = BRD, TOTFILL, Font(bold=True)
+                r += 2
+        ws2.cell(row=r, column=1, value='«Заведено» — все проверки года по дате начала, кроме отменённых (как в окне «Карманы»); '
+                 '«из них запланировано» — в статусах планирование/утверждена/активна.').font = Font(italic=True, color='6B7280')
+        for c, w in enumerate([30, 10, 8, 10, 14, 20, 30], 1):
+            ws2.column_dimensions[get_column_letter(c)].width = w
+
+        # ---------- Лист 3. По месяцам ----------
+        ws3 = wb.create_sheet('По месяцам')
+        MON = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь',
+               'Октябрь', 'Ноябрь', 'Декабрь']
+        lead_ids = []
+        for t in planned:
+            lid = t.get('lead_department') or ''
+            if lid not in lead_ids:
+                lead_ids.append(lid)
+        lead_ids.sort(key=lambda x: (x == '', bank(x, True)))
+        months = sorted(set((pd(t.get('start_date')).year, pd(t.get('start_date')).month)
+                            for t in planned if pd(t.get('start_date'))))
+        if months:
+            (y0, m0), (y1, m1) = months[0], months[-1]
+            months, (y, m) = [], (y0, m0)
+            while (y, m) <= (y1, m1):
+                months.append((y, m))
+                y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        cols3 = ['Месяц старта', 'Всего', 'Корпоративное', 'Розничное', 'Без направления'] + \
+                [(bank(l, True) or 'Банк не указан') for l in lead_ids]
+        title(ws3, 'Запланированные проверки по месяцам старта (по банкам-руководителям)', len(cols3))
+        header(ws3, 4, cols3)
+        r = 5
+        tot = [0] * (len(cols3) - 1)
+        for (y, m) in months:
+            ts = [t for t in planned if pd(t.get('start_date')) and (pd(t.get('start_date')).year, pd(t.get('start_date')).month) == (y, m)]
+            vals = [len(ts), sum(1 for t in ts if t.get('task_type') == 'корпоративная'),
+                    sum(1 for t in ts if t.get('task_type') == 'розничная'),
+                    sum(1 for t in ts if (t.get('task_type') or '') not in DIR_LBL)] + \
+                   [sum(1 for t in ts if (t.get('lead_department') or '') == l) for l in lead_ids]
+            ws3.cell(row=r, column=1, value=MON[m - 1] + ' ' + str(y)).border = BRD
+            for c, v in enumerate(vals, 2):
+                cell = ws3.cell(row=r, column=c, value=v or None)
+                cell.border, cell.alignment = BRD, CENTER
+                tot[c - 2] += v
+            r += 1
+        nodate = [t for t in planned if not pd(t.get('start_date'))]
+        if nodate:
+            ws3.cell(row=r, column=1, value='Без даты начала').border = BRD
+            ws3.cell(row=r, column=2, value=len(nodate)).border = BRD
+            tot[0] += len(nodate)
+            r += 1
+        cell = ws3.cell(row=r, column=1, value='Итого')
+        cell.font, cell.fill, cell.border = Font(bold=True), TOTFILL, BRD
+        for c, v in enumerate(tot, 2):
+            cell = ws3.cell(row=r, column=c, value=v)
+            cell.font, cell.fill, cell.border, cell.alignment = Font(bold=True), TOTFILL, BRD, CENTER
+        ws3.column_dimensions['A'].width = 18
+        for c in range(2, len(cols3) + 1):
+            ws3.column_dimensions[get_column_letter(c)].width = 14
+        ws3.row_dimensions[4].height = 32
+        ws3.freeze_panes = 'B5'
+
+        out = BytesIO()
+        wb.save(out)
+        out.seek(0)
+        return send_file(out, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True, download_name='planned_audits_' + today.isoformat() + '.xlsx')
+
     @app.route('/api/tracker/export/debtors')
     @login_required
     def api_export_debtors():

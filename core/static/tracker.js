@@ -329,7 +329,7 @@ var state = {
     calendar: null, heatmap: null, summary: null, summaryIsGrid: true,
     currentYM: '', currentEmployee: '', currentDepartment: '', currentTeam: '', currentDay: '',
     calViewMode: 'tasks', tskViewMode: 'all',
-    tskDisplayMode: 'list', tskGridCols: 3, tskView: 'tile',
+    tskDisplayMode: 'list', tskGridCols: 3, tskView: 'list',
     hmYM: '', hmDateFrom: '', hmDateTo: '',
     sumViewMode: 'grid', sumShowDayTotals: true, sumTaskRowMode: 'full',
     today: '', theme: 'dark', maskNames: false,
@@ -919,10 +919,11 @@ function loadState() {
         fillTagFilters();
         // PATCH 1.0.9: читаем сохранённый вид задач
         try {
-            var _tv109 = localStorage.getItem('tracker_tsk_view');
-            if (_tv109 !== 'list') _tv109 = 'tile';
+            // 13.11: по умолчанию «Список»; новый ключ, чтобы старый сохранённый «tile» не перебивал
+            var _tv109 = localStorage.getItem('tracker_tsk_view2');
+            if (_tv109 !== 'tile') _tv109 = 'list';
             state.tskView = _tv109;
-        } catch (e) { state.tskView = 'tile'; }
+        } catch (e) { state.tskView = 'list'; }
         applyPermsToUI();
         try {
             state.tskCompactMode = (localStorage.getItem('tracker_tsk_compact') === '1');
@@ -1706,6 +1707,30 @@ function renderTasksFull() {
     if (state.tskDir) tasks = tasks.filter(function(t) { return (t.task_type || '') === state.tskDir; });
     _tskDirMark();
 
+    // 13.11: фильтр «Карман» — варианты из проверок выбранного направления
+    var _pf = $('tskPocketFilter'), pocket = _pf ? (_pf.value || '') : '';
+    if (_pf) {
+        var _pSeen = {}, _pOpts = [];
+        (state.tasks || []).forEach(function(t) {
+            if (state.tskDir && (t.task_type || '') !== state.tskDir) return;
+            var p = String(t.pocket || '').trim();
+            if (p && !_pSeen[p]) { _pSeen[p] = 1; _pOpts.push(p); }
+        });
+        _pOpts.sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase(), 'ru'); });
+        if (pocket && pocket !== '__none__' && !_pSeen[pocket]) _pOpts.unshift(pocket);
+        var _pKey = _pOpts.join('\u0001');
+        if (_pf._optsKey !== _pKey) {
+            _pf._optsKey = _pKey;
+            var _ph = '<option value="">Карман</option>';
+            _pOpts.forEach(function(p) { _ph += '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>'; });
+            _ph += '<option value="__none__">— без кармана</option>';
+            _pf.innerHTML = _ph;
+            _pf.value = pocket;
+        }
+    }
+    if (pocket === '__none__') tasks = tasks.filter(function(t) { return !String(t.pocket || '').trim(); });
+    else if (pocket) tasks = tasks.filter(function(t) { return String(t.pocket || '').trim() === pocket; });
+
     if (mode === 'planning') tasks = tasks.filter(function(t) { return t.status === 'planning'; });
     else if (mode === 'approved') tasks = tasks.filter(function(t) { return t.status === 'approved'; });
     else if (mode === 'active') tasks = tasks.filter(function(t) { return t.status === 'active'; });
@@ -1744,7 +1769,7 @@ function renderTasksFull() {
     var html = '';
     tasks.forEach(function(t) { html += taskCardRowGrid(t); });
     // PATCH 1.0.9: три режима — плитка / компактно / список
-    var _view = state.tskView || 'tile';
+    var _view = state.tskView || 'list';
     var _cols = parseInt(state.tskGridCols, 10) || 3;
     if (_cols < 1) _cols = 1;
     if (_cols > 5) _cols = 5;
@@ -2122,45 +2147,42 @@ function exportCalendarToExcel() {
     else bindExportCalendar();
 })();
 
-function toggleExportMenu(force) {
-    var drop = document.getElementById('exportMenuDrop');
-    if (!drop) return;
-    var show = (force === true) || drop.style.display === 'none';
-    drop.style.display = show ? 'block' : 'none';
+// «Планирование → 📥 Экспорт»: один файл xlsx (Проверки, Карманы × план, По месяцам), без фильтров экрана.
+function exportPlannedToExcel(btn) {
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    notify('📥 Готовим Excel по запланированным проверкам...', 'info');
+    fetch('/api/tracker/export/planned', { credentials: 'same-origin' }).then(function(r) {
+        var ct = r.headers.get('Content-Type') || '';
+        if (!r.ok || ct.indexOf('spreadsheetml') < 0) {
+            return r.text().then(function(txt) {
+                var msg = 'HTTP ' + r.status;
+                try { var j = JSON.parse(txt); if (j && j.error) msg = j.error; } catch (_) {}
+                throw new Error(msg);
+            });
+        }
+        var cd = r.headers.get('Content-Disposition') || '', m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+        var name = m ? decodeURIComponent(m[1]) : 'planned_audits.xlsx';
+        return r.blob().then(function(bl) {
+            var url = URL.createObjectURL(bl), a = document.createElement('a');
+            a.href = url; a.download = name; document.body.appendChild(a); a.click();
+            setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 1500);
+            notify('✅ Файл ' + name + ' скачан', 'success');
+        });
+    }).catch(function(e) {
+        notify('Не удалось выгрузить Excel: ' + (e && e.message ? e.message : e), 'error');
+    }).then(function() { if (btn) btn.disabled = false; });
 }
-function runExportForm(form) {
-    toggleExportMenu(false);
-    if (form === 'calendar') { if (typeof exportCalendarToExcel === 'function') exportCalendarToExcel(); }
-    else if (form === 'debtors') exportDebtorsToExcel();
-}
-function exportDebtorsToExcel() {
-    var d = new Date();
-    var iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-    var params = new URLSearchParams();
-    params.set('date', iso);
-    var deptFilter = document.getElementById('calDeptFilter');
-    if (deptFilter && deptFilter.value) params.set('department', deptFilter.value);
-    var teamFilter = document.getElementById('calTeamFilter');
-    if (teamFilter && teamFilter.value) params.set('team', teamFilter.value);
-    notify('⚠️ Считаем, кто не заполнил отчёт...', 'info');
-    window.open('/api/tracker/export/debtors?' + params.toString(), '_blank');
-}
+window.exportPlannedToExcel = exportPlannedToExcel;
 (function(){
-    function bindExportMenu() {
+    function bindExportPlanned() {
         document.addEventListener('click', function(e) {
-            var t = e.target;
-            if (!t || !t.closest) return;
-            if (t.closest('#exportMenuBtn')) { toggleExportMenu(); return; }
-            var item = t.closest('.export-menu-item');
-            if (item) { runExportForm(item.getAttribute('data-form')); return; }
-            var drop = document.getElementById('exportMenuDrop');
-            if (drop && drop.style.display !== 'none' && !t.closest('.export-menu-wrap')) {
-                drop.style.display = 'none';
-            }
+            var t = e.target && e.target.closest ? e.target.closest('#exportPlannedBtn') : null;
+            if (t) { e.preventDefault(); exportPlannedToExcel(t); }
         });
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindExportMenu);
-    else bindExportMenu();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindExportPlanned);
+    else bindExportPlanned();
 })();
 
 function renderCalendar() {
@@ -5398,6 +5420,7 @@ function renderEmpDayModal(d) {
    ============================================================ */
 on('tskDeptFilter', 'change', renderTasksFull);
 on('tskCuratorFilter', 'change', renderTasksFull);
+on('tskPocketFilter', 'change', renderTasksFull);
 on('tskSortSelect', 'change', renderTasksFull);
 (function() {
     var seg = $('tskDirSeg'); if (!seg) return;
@@ -17250,16 +17273,15 @@ window.__trkEditTaskFromDay = true;
 if (window.__trkTaskViewV109) return;
 window.__trkTaskViewV109 = true;
 
-var KEY = 'tracker_tsk_view';
+var KEY = 'tracker_tsk_view2';
 var COLS_KEY = 'tracker_tsk_cols';
 
 function _read(){
     try {
         var v = localStorage.getItem(KEY);
-        if (v === 'list') return 'list';
-        if (v) return 'tile';
+        if (v === 'tile') return 'tile';
     } catch(e){}
-    return 'tile';
+    return 'list';
 }
 function _write(v){
     try { localStorage.setItem(KEY, v); } catch(e){}
