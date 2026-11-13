@@ -2945,7 +2945,9 @@ def create_app():
             from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
             from openpyxl.utils import get_column_letter
         except ImportError:
-            return jsonify({'success': False, 'error': 'openpyxl не установлен: pip install openpyxl'}), 500
+            # openpyxl нет в окружении (как у «Текущей загрузки»): пишем xlsx встроенным писателем
+            import xlsx_lite as openpyxl
+            from xlsx_lite import Font, PatternFill, Alignment, Border, Side, get_column_letter
 
         data = db.load_all()
         today = date.today()
