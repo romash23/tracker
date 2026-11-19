@@ -1026,6 +1026,11 @@ def create_app():
                 'static/settings.js',
                 'static/task_modal_wide.js',
                 'static/task_modal_wide.css',
+                'static/tracker_next/00_boot.js',
+                'static/tracker_next/01_core.js',
+                'static/tracker_next/02_ui.js',
+                'static/tracker_next/03_task_card.js',
+                'static/tracker_next/04_tabs.js',
             ):
                 _hv_p = BASE_DIR / _hv_f
                 if _hv_p.exists():

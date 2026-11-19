@@ -822,7 +822,16 @@
 {% endblock %}
 {% block scripts %}
 <script>window.REESTR_PERMS = {{ perms|tojson }};</script>
+{# tracker_next: разбитая на 5 файлов версия tracker.js без старого дневного отчёта.
+   Включается адресом ?js=next (запоминается в cookie trk_js), выключается ?js=old. По умолчанию — прежний tracker.js. #}
+{% set _trk_js = request.args.get('js') or request.cookies.get('trk_js') or '' %}
+<script>(function(){var m=location.search.match(/[?&]js=(next|old)\b/);if(m)document.cookie='trk_js='+m[1]+';path=/;max-age=31536000;SameSite=Lax';})();</script>
+{% if _trk_js == 'next' %}
+{% for _f in ['00_boot', '01_core', '02_ui', '03_task_card', '04_tabs'] %}<script src="{{ url_for('static', filename='tracker_next/' ~ _f ~ '.js') }}?v={{ static_version }}"></script>
+{% endfor %}
+{% else %}
 <script src="{{ url_for('static', filename='tracker.js') }}?v={{ static_version }}"></script>
+{% endif %}
 {% set LP = loaded_plugins or [] %}
 <script>window.REESTR_PLUGINS = {{ LP|tojson }};</script>
 {# Скрипты плагинов подключаются, только если плагин загружен — иначе 404 #}
