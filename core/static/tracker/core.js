@@ -1,5 +1,5 @@
-/* tracker_next/01_core.js — Ядро трекера: состояние, API, отрисовка вкладок (без изменений).
-   Файлы грузятся строго по порядку 00→04. Источник: static/tracker.js. */
+/* tracker/core.js — Ядро трекера: состояние, API, отрисовка вкладок (без изменений).
+   Файлы грузятся строго по порядку: boot → core → ui → task_card → tabs (см. templates/tracker.html). */
 /* Трекер задач — клиентская логика (standalone). v1.4 */
 (function() {
 'use strict';
@@ -1806,33 +1806,6 @@ function loadCalendar() {
         })
         .catch(function(err) { if (err && (err.message || '').indexOf('cancelled') !== -1) return; notify('❌ ' + (err.message || 'Ошибка'), 'error'); });
 }
-function exportCalendarToExcel() {
-    var month = state.calendar ? state.calendar.month : new Date().getMonth() + 1;
-    var year = state.calendar ? state.calendar.year : new Date().getFullYear();
-    var params = new URLSearchParams();
-    params.set('month', month);
-    params.set('year', year);
-    var deptFilter = document.getElementById('calDeptFilter');
-    if (deptFilter && deptFilter.value) params.set('department', deptFilter.value);
-    var teamFilter = document.getElementById('calTeamFilter');
-    if (teamFilter && teamFilter.value) params.set('team', teamFilter.value);
-    var empFilter = document.getElementById('calEmployeeFilter');
-    if (empFilter && empFilter.value) params.set('employee', empFilter.value);
-    notify('📊 Генерируем Excel...', 'info');
-    window.open('/api/tracker/calendar/export?' + params.toString(), '_blank');
-}
-
-(function(){
-    function bindExportCalendar() {
-        document.addEventListener('click', function(e) {
-            var t = e.target && e.target.closest ? e.target.closest('#exportCalendarBtn') : null;
-            if (t) exportCalendarToExcel();
-        });
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindExportCalendar);
-    else bindExportCalendar();
-})();
-
 // «Планирование → 📥 Экспорт»: один файл xlsx (Проверки, Карманы × план, По месяцам), без фильтров экрана.
 function exportPlannedToExcel(btn) {
     if (btn && btn.disabled) return;

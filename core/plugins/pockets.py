@@ -56,10 +56,19 @@ def _readable(c):
     if not r:
         return c
     lum = (0.299 * r[0] + 0.587 * r[1] + 0.114 * r[2]) / 255
-    if lum <= 0.5:
-        return c
-    k = 0.5 / lum
-    return '#%02x%02x%02x' % tuple(int(x * k) for x in r)
+    if lum > 0.5:
+        k = 0.5 / lum
+        r = tuple(int(x * k) for x in r)
+    # белый текст на метке: контраст не ниже 5:1 (WCAG), иначе чуть затемняем
+    while _white_contrast(r) < 5 and max(r) > 0:
+        r = tuple(int(x * 0.94) for x in r)
+    return '#%02x%02x%02x' % tuple(r)
+
+
+def _white_contrast(r):
+    lin = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in (x / 255 for x in r)]
+    lum = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+    return 1.05 / (lum + 0.05)
 
 
 def label_colors(deps):
@@ -315,11 +324,10 @@ function css() {
     '.pk-t tr.pk-tot td{font-weight:700;border-top:2px solid rgba(128,128,128,.4)}',
     '.pk-t tr.pk-calc td{font-weight:600}.pk-t tr.pk-calc td:first-child{font-weight:700}',
     '.pk-t td[data-cell]{text-align:center}.pk-t td[data-cell] .pk-ln{display:block;font-size:.7rem;opacity:.85;font-weight:500;line-height:1.1}',
-    'body:not(.trk-theme-light) .pk-bank{box-shadow:0 0 0 1px rgba(255,255,255,.35)}',
     '.pk-t .pk-unk{color:#f0a04b}body.trk-theme-light .pk-t .pk-unk{color:#a85a00}',
     '.pk-t small{display:block;font-weight:500;opacity:.9;font-size:.7rem}',
-    'body:not(.trk-theme-light) .pk-bank{box-shadow:0 0 0 1px rgba(255,255,255,.35)}',
     '.pk-bank{display:inline-block;min-width:34px;padding:1px 6px;border-radius:6px;color:#fff;font-weight:700;font-size:.72rem;text-align:center;text-shadow:0 1px 1px rgba(0,0,0,.35)}',
+    'body:not(.trk-theme-light) .pk-bank{box-shadow:0 0 0 1.5px rgba(255,255,255,.6);text-shadow:0 0 2px rgba(0,0,0,.75),0 1px 1px rgba(0,0,0,.6)}',
     '.pk-cell{margin:8px 0;padding:8px 10px;border:1px solid rgba(38,162,105,.5);border-radius:10px}',
     '.pk-cell a{cursor:pointer;color:inherit;text-decoration:underline dotted}',
     '.pk-empty{padding:10px;opacity:.75;font-size:.82rem}',
@@ -338,7 +346,7 @@ function css() {
     '.pk-t thead th{vertical-align:middle}',
     '.pk-ptag.pk-shared{border-left-width:0;padding-left:8px;background-image:linear-gradient(rgba(128,128,128,0),rgba(128,128,128,0)),linear-gradient(180deg,#3b82f6 0 50%,#d9468f 50% 100%);background-size:100% 100%,4px 100%;background-repeat:no-repeat;background-position:0 0,0 0;box-shadow:inset 0 0 0 1px rgba(168,85,247,.55)}',
     '.pk-d-corp.pk-ptag.pk-shared{background-color:rgba(59,130,246,.14)}.pk-d-retail.pk-ptag.pk-shared{background-color:rgba(217,70,143,.14)}',
-    '.pk-ptag b.pk-sh{font-weight:800;color:#a855f7;margin-left:3px;font-size:.85em}body.trk-theme-light .pk-ptag b.pk-sh{color:#7e22ce}',
+    '.pk-ptag b.pk-sh{font-weight:800;color:#a855f7;margin-left:3px;font-size:1.05em}body.trk-theme-light .pk-ptag b.pk-sh{color:#7e22ce}',
     '.pk-sec h4 .pk-btn{margin-left:10px;vertical-align:middle}',
     '.pk-ed{display:flex;flex-direction:column;gap:12px}',
     '.pk-edcol{border:1px solid rgba(128,128,128,.28);border-radius:10px;padding:8px 10px 10px;border-top-width:4px}',
