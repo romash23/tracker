@@ -1143,6 +1143,30 @@ function renderBankStatsPanel(bank){
 
     var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0, leadPickerLane:null };
     var MODE_MONTHS = { small:12, medium:6, large:3 };
+    // Compact layout is 60% of the old geometry. User zoom still scales text too.
+    var DASH_DENSITY = 0.6;
+    function dashUserZoom(){
+        try { var z = Number(localStorage.getItem('trk_dash_user_zoom') || 1); return z >= 0.6 && z <= 1.4 ? z : 1; }
+        catch (_) { return 1; }
+    }
+    function dashApplyZoom(){
+        var wrap = document.querySelector('#panel-dashboards .dash-wrap');
+        if (wrap) wrap.style.setProperty('--dash-user-zoom', String(dashUserZoom()));
+    }
+    // Measure actual rendered labels, not an assumed number of pixels per day.
+    function dashFitTicks(){
+        document.querySelectorAll('#dashGanttContainer .dash-tl-axis').forEach(function(axis){
+            var right = -Infinity;
+            axis.querySelectorAll('.dash-tl-tick').forEach(function(tick){
+                tick.style.visibility = '';
+                var r = tick.getBoundingClientRect();
+                if (r.left < right + 8 * dashUserZoom()) tick.style.visibility = 'hidden';
+                else right = r.right;
+            });
+        });
+    }
+    function dashScheduleTicks(){ window.requestAnimationFrame(dashFitTicks); }
+
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
     function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
     function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null,offset:stateDash.globalOffset||0,pinned:false}); switchLane(stateDash.lanes.length-1); return true; }
@@ -1984,6 +2008,7 @@ function renderBankStatsPanel(bank){
         }).join('');
         var addBtn = stateDash.lanes.length < 5 ? '<div class="dash-lanes-foot"><button class="dash-lane-add" type="button" id="dashAddLaneBtn">+ Ось</button></div>' : '';
         c.innerHTML = sliderHtml + lanesHtml + addBtn + renderLeadPicker();
+        dashScheduleTicks();
         var addBtnEl = byId('dashAddLaneBtn');
         if (addBtnEl) addBtnEl.addEventListener('click', function(){ if (addLane()) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } });
         c.querySelectorAll('[data-lane-close]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); if (removeLane(+this.getAttribute('data-lane-close'))) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } }); });
@@ -2124,7 +2149,7 @@ function renderBankStatsPanel(bank){
         }
         var shownDeps = allDeps.filter(function(d){ return depMap[d.id]; })
             .concat(allDeps.filter(function(d){ return !depMap[d.id]; }));
-        var CH = 103; // высота гистограммы (108 − 5%)
+        var CH = Math.round(103 * DASH_DENSITY); // compact geometry; labels keep their original font
         var offsets = dashLoadOffsets();
         var slotGroups = offsets.map(function(off){ return { offset: off, slots: dashSlots(off) }; });
 
@@ -2473,6 +2498,18 @@ function renderBankStatsPanel(bank){
     window.__dashCollectChanges = dashCollectChanges;
 
     function bindControls(){
+        dashApplyZoom();
+        var uiZoom = byId('dashUiZoom');
+        if (uiZoom && !uiZoom.__dashBound) {
+            uiZoom.__dashBound = true;
+            uiZoom.value = String(dashUserZoom());
+            uiZoom.addEventListener('change', function(){
+                try { localStorage.setItem('trk_dash_user_zoom', this.value); } catch (_) {}
+                dashApplyZoom();
+                dashScheduleTicks();
+            });
+        }
+
         var btn = byId('tabDashboardsBtn');
         if (btn && !btn.__dashBound) {
             btn.__dashBound = true;
@@ -2601,6 +2638,10 @@ function renderBankStatsPanel(bank){
     }
 
     function boot(){
+        var main = document.querySelector('#panel-dashboards .dash-main-pane');
+        if (main && window.ResizeObserver) new ResizeObserver(dashScheduleTicks).observe(main);
+        window.addEventListener('resize', dashScheduleTicks);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(dashScheduleTicks);
         ensureDashboardsTab();
         bindControls();
         renderSelector();

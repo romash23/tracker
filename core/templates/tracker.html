@@ -101,13 +101,21 @@
                         </div>
                     </div>
                     <div class="dash-field">
-                        <label class="dash-label">Масштаб</label>
+                        <label class="dash-label">Горизонт</label>
                         <div class="btn-seg" id="dashModeSwitch">
                             <button class="btn-seg-btn" type="button" data-mode="small">Малый (12м)</button>
                             <button class="btn-seg-btn active" type="button" data-mode="medium">Средний (6м)</button>
                             <button class="btn-seg-btn" type="button" data-mode="large">Крупный (3м)</button>
                         </div>
                     </div>
+                </div>
+                <div class="dash-ui-zoom-row">
+                    <label class="dash-label" for="dashUiZoom">Масштаб интерфейса</label>
+                    <select id="dashUiZoom" class="form-control" title="Компактный вид по умолчанию; изменение масштаба увеличивает и текст">
+                        <option value="0.6">60%</option><option value="0.8">80%</option>
+                        <option value="1" selected>100% (компактный)</option>
+                        <option value="1.2">120%</option><option value="1.4">140%</option>
+                    </select>
                 </div>
                 <div id="dashGanttContainer" class="dash-gantt-container"></div>
             </div>

@@ -11099,3 +11099,60 @@ body:not(.trk-theme-light) .dash-help-lead,body:not(.trk-theme-light) .dash-help
 body:not(.trk-theme-light) .task-card-pocket { background: rgba(200,200,200,.10); color: #aab4bb; border-color: rgba(200,200,200,.20); }
 body:not(.trk-theme-light) .task-card-pocket.corp { background: rgba(86,161,214,.16); color: #7cc0ec; border-color: rgba(86,161,214,.34); }
 body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,146,.16); color: #f48fb1; border-color: rgba(240,98,146,.34); }
+
+
+/* Sandbox: compact geometry (60%), original fonts. No page-wide zoom/font rewriting.
+   User-controlled zoom is independent: it scales the compact layout AND its fonts. */
+#panel-dashboards .dash-wrap { zoom:var(--dash-user-zoom,1); padding:12px; gap:10px; }
+#panel-dashboards .dash-wrap.dash-split-wrap { gap:10px!important; }
+#panel-dashboards .dash-main-pane,#panel-dashboards .dash-side-pane { gap:7px!important; }
+#panel-dashboards .dash-gantt-container,#panel-dashboards .dash-load-container { padding:11px; border-radius:10px; }
+#panel-dashboards .dash-lane-block { padding:7px 8px; margin-bottom:8px; border-radius:9px; }
+#panel-dashboards .dash-bank-card { padding:8px; gap:7px; border-radius:10px; }
+#panel-dashboards .dash-bank-grid { gap:8px; }
+#panel-dashboards .dash-lane-header { gap:6px; margin-bottom:5px; }
+#panel-dashboards .dash-load-head { gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+#panel-dashboards .dash-global-slider-wrap { padding:4px 1px; margin-bottom:7px; }
+#panel-dashboards .dash-tl-track { height:37px; }
+#panel-dashboards .dash-seg { height:23px; border-radius:5px; }
+#panel-dashboards .dash-tl-tick::before { height:36px; background:var(--trk-card-border); }
+#panel-dashboards .dash-tl-tick { color:var(--trk-meta); }
+#panel-dashboards .dash-tl-tick:first-child { transform:none; }
+#panel-dashboards .dash-tl-tick:last-child { transform:translateX(-100%); }
+#panel-dashboards .dash-tl-empty-bar { top:2px; height:28px; padding:0 6px; background:var(--trk-input-bg); color:var(--trk-meta); border-color:var(--trk-card-border); overflow:hidden; }
+#panel-dashboards .dash-tl-line { background:var(--trk-card-border); }
+#panel-dashboards .dash-grid-line { border-color:var(--trk-card-border); }
+#panel-dashboards .dash-task-row { flex-wrap:wrap; gap:6px; }
+#panel-dashboards #dashTaskSelector { flex:1 1 160px; width:0; min-width:120px; }
+#panel-dashboards #dashCreateTaskBtn { flex:0 0 auto; width:auto; max-width:none; white-space:nowrap; overflow:visible; }
+#panel-dashboards .dash-toolbar { flex-wrap:wrap; }
+#panel-dashboards .dash-toolbar-right { flex-wrap:wrap; gap:6px; }
+#panel-dashboards .dash-main-pane .dash-topbar { gap:7px!important; }
+#panel-dashboards .dash-field { gap:5px; }
+#panel-dashboards .dash-bank-chips,#panel-dashboards .dash-stage-chips { gap:5px; margin-top:6px; }
+#panel-dashboards .dash-bank-chip,#panel-dashboards .dash-stage-chip { padding:3px 7px; }
+#panel-dashboards .dash-bank-row { gap:6px; margin-top:6px; }
+#panel-dashboards .dash-ui-zoom-row { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+#panel-dashboards #dashUiZoom { width:auto; padding:3px 8px; font-size:.8rem; }
+@media(max-width:900px){
+    #panel-dashboards .dash-wrap.dash-split-wrap { grid-template-columns:minmax(0,1fr)!important; }
+    #panel-dashboards .dash-toolbar-right { margin-left:0; }
+    #panel-dashboards .dash-main-pane .dash-field-task { flex-basis:100%!important; }
+    #panel-dashboards .dash-ui-zoom-row { justify-content:flex-start; }
+}
+
+/* Keep timeline and dialog surfaces theme-aware; today gets its own label row. */
+#panel-dashboards .dash-timeline { background:var(--trk-input-bg); border-color:var(--trk-card-border); padding:10px 6px 6px; }
+#panel-dashboards .dash-tl-axis { margin-bottom:20px; }
+#panel-dashboards .dash-tl-today::after { top:-14px; }
+#panel-dashboards .dash-lane-title,#panel-dashboards .plan-title { color:var(--trk-text); }
+#dashCreateModal .dash-modal { background:var(--trk-card-bg); color:var(--trk-text); }
+#dashCreateModal .dash-modal-head,#dashCreateModal .dash-modal-label { color:var(--trk-text); border-color:var(--trk-card-border); }
+#dashCreateModal .form-control { background:var(--trk-input-bg); color:var(--trk-text); border-color:var(--trk-card-border); }
+#dashCreateModal .dash-modal-foot .btn:not(.btn-primary) { color:var(--trk-text); background:var(--trk-input-bg); }
+
+@media(max-width:900px){
+    #panel-dashboards .dash-task-row { flex-direction:column; align-items:stretch; }
+    #panel-dashboards #dashTaskSelector { flex:0 0 auto; width:100%; min-width:0; height:auto; min-height:30px; }
+    #panel-dashboards #dashCreateTaskBtn { align-self:flex-start; }
+}
