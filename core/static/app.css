@@ -11101,9 +11101,8 @@ body:not(.trk-theme-light) .task-card-pocket.corp { background: rgba(86,161,214,
 body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,146,.16); color: #f48fb1; border-color: rgba(240,98,146,.34); }
 
 
-/* Sandbox: compact geometry (60%), original fonts. No page-wide zoom/font rewriting.
-   User-controlled zoom is independent: it scales the compact layout AND its fonts. */
-#panel-dashboards .dash-wrap { zoom:var(--dash-user-zoom,1); padding:12px; gap:10px; }
+/* Sandbox: compact geometry (60%), original fonts. Scaling uses native browser zoom. */
+#panel-dashboards .dash-wrap { padding:12px; gap:10px; }
 #panel-dashboards .dash-wrap.dash-split-wrap { gap:10px!important; }
 #panel-dashboards .dash-main-pane,#panel-dashboards .dash-side-pane { gap:7px!important; }
 #panel-dashboards .dash-gantt-container,#panel-dashboards .dash-load-container { padding:11px; border-radius:10px; }
@@ -11132,13 +11131,10 @@ body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,14
 #panel-dashboards .dash-bank-chips,#panel-dashboards .dash-stage-chips { gap:5px; margin-top:6px; }
 #panel-dashboards .dash-bank-chip,#panel-dashboards .dash-stage-chip { padding:3px 7px; }
 #panel-dashboards .dash-bank-row { gap:6px; margin-top:6px; }
-#panel-dashboards .dash-ui-zoom-row { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-#panel-dashboards #dashUiZoom { width:auto; padding:3px 8px; font-size:.8rem; }
 @media(max-width:900px){
     #panel-dashboards .dash-wrap.dash-split-wrap { grid-template-columns:minmax(0,1fr)!important; }
     #panel-dashboards .dash-toolbar-right { margin-left:0; }
     #panel-dashboards .dash-main-pane .dash-field-task { flex-basis:100%!important; }
-    #panel-dashboards .dash-ui-zoom-row { justify-content:flex-start; }
 }
 
 /* Keep timeline and dialog surfaces theme-aware; today gets its own label row. */

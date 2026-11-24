@@ -1143,16 +1143,8 @@ function renderBankStatsPanel(bank){
 
     var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0, leadPickerLane:null };
     var MODE_MONTHS = { small:12, medium:6, large:3 };
-    // Compact layout is 60% of the old geometry. User zoom still scales text too.
+    // Compact geometry preserves the original fonts; use native browser zoom.
     var DASH_DENSITY = 0.6;
-    function dashUserZoom(){
-        try { var z = Number(localStorage.getItem('trk_dash_user_zoom') || 1); return z >= 0.6 && z <= 1.4 ? z : 1; }
-        catch (_) { return 1; }
-    }
-    function dashApplyZoom(){
-        var wrap = document.querySelector('#panel-dashboards .dash-wrap');
-        if (wrap) wrap.style.setProperty('--dash-user-zoom', String(dashUserZoom()));
-    }
     // Measure actual rendered labels, not an assumed number of pixels per day.
     function dashFitTicks(){
         document.querySelectorAll('#dashGanttContainer .dash-tl-axis').forEach(function(axis){
@@ -1160,7 +1152,7 @@ function renderBankStatsPanel(bank){
             axis.querySelectorAll('.dash-tl-tick').forEach(function(tick){
                 tick.style.visibility = '';
                 var r = tick.getBoundingClientRect();
-                if (r.left < right + 8 * dashUserZoom()) tick.style.visibility = 'hidden';
+                if (r.left < right + 8) tick.style.visibility = 'hidden';
                 else right = r.right;
             });
         });
@@ -2498,18 +2490,6 @@ function renderBankStatsPanel(bank){
     window.__dashCollectChanges = dashCollectChanges;
 
     function bindControls(){
-        dashApplyZoom();
-        var uiZoom = byId('dashUiZoom');
-        if (uiZoom && !uiZoom.__dashBound) {
-            uiZoom.__dashBound = true;
-            uiZoom.value = String(dashUserZoom());
-            uiZoom.addEventListener('change', function(){
-                try { localStorage.setItem('trk_dash_user_zoom', this.value); } catch (_) {}
-                dashApplyZoom();
-                dashScheduleTicks();
-            });
-        }
-
         var btn = byId('tabDashboardsBtn');
         if (btn && !btn.__dashBound) {
             btn.__dashBound = true;
