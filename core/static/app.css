@@ -11275,3 +11275,126 @@ body:not(.trk-theme-light) .plan-act--year{color:#a5b4fc}
 .yp-hm-f{margin-top:3px;color:var(--yp-mut)}.yp-hm-f .warn{color:#ef4444;font-weight:600}
 .yp-ask-body{max-height:60vh;overflow:auto;margin:6px 0 10px;font-size:13px;line-height:1.45}
 @media (max-width:700px){#panel-yearplan{--yp-lab:150px}.yp-ed{padding-left:8px;max-width:100vw}.yp-sh{max-width:calc(100vw - 16px)}.yp-bk{display:none}.yp-title{width:100%}.yp-heat{left:8px;right:8px;bottom:8px;overflow-x:auto}}
+
+/* ===== Годовой план v2: раскладка по образцу Песочницы (3:2), свой неймспейс ypl-, Песочница не затрагивается ===== */
+#panel-yearplan .ypl-split { display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:14px;align-items:start }
+#panel-yearplan .ypl-main { position:relative;min-width:0 }
+#panel-yearplan .ypl-side { position:sticky;top:8px;min-width:0;border:1px solid var(--trk-card-border,var(--yp-bd));border-radius:12px;padding:10px 12px;background:var(--trk-card-bg,var(--yp-bg));display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 24px);overflow:auto }
+#panel-yearplan .ypl-sh { display:flex;align-items:center;gap:8px }
+#panel-yearplan .ypl-sh b { font-size:1rem }
+#panel-yearplan .ypl-scope { flex:1;color:var(--yp-mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+#panel-yearplan .ypl-open { font-weight:700;font-size:14px;padding:2px 10px }
+#panel-yearplan .ypl-ht { font-weight:600;font-size:12.5px;margin:2px 0 3px }
+#panel-yearplan .ypl-heat .yp-hm-t { width:100%;table-layout:fixed;border-spacing:2px }
+#panel-yearplan .ypl-heat .yp-hm-t th:first-child { width:42px;text-align:left }
+#panel-yearplan .ypl-heat .yp-hm-t thead th { width:auto }
+#panel-yearplan .ypl-heat .yp-hm-t td { width:auto;height:17px }
+#panel-yearplan .ypl-heat .yp-hm-t tr.mine th { color:#6366f1 }
+/* шкала сезонов в шапке левой колонки */
+#panel-yearplan .ypl-scale { position:sticky;top:0;z-index:5;background:var(--trk-card-bg,var(--yp-bg));padding:4px 0 6px;margin-bottom:6px;display:flex;flex-direction:column;gap:4px }
+#panel-yearplan .ypl-seasons { position:relative;height:20px;border-radius:6px;overflow:hidden;border:1px solid var(--yp-bd) }
+#panel-yearplan .yp-legend { gap:2px 10px }
+/* секции и карманы */
+#panel-yearplan .yp-sec { border:0;margin-bottom:8px }
+#panel-yearplan .yp-sh { display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-weight:700;max-width:none }
+#panel-yearplan .yp-shc { color:var(--yp-mut);font-weight:400;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0 }
+#panel-yearplan .yp-grp { border:0;margin:0 0 6px }
+#panel-yearplan .ypl-gh { display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border-radius:8px;background:var(--yp-bg2);min-width:0 }
+#panel-yearplan .ypl-gh .yp-gn { font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto }
+#panel-yearplan .ypl-gh .yp-plan { flex-shrink:0 }
+#panel-yearplan .ypl-gh .yp-cnt { flex-shrink:1;min-width:0;overflow:hidden }
+#panel-yearplan .ypl-gh .yp-ga { margin-left:auto;display:flex;gap:4px;flex-shrink:0 }
+#panel-yearplan .yp-grp.scope .ypl-gh { box-shadow:inset 3px 0 0 #6366f1 }
+#panel-yearplan .ypl-mini { position:relative;height:14px;margin:3px 6px 0;border-radius:4px;background-color:var(--yp-bg2) }
+#panel-yearplan .ypl-mini .yp-bar { top:3px;bottom:3px;cursor:default;padding:0 }
+/* ось — как в Песочнице: карточка, заголовок, шкала, трек 37px, полосы 23px */
+#panel-yearplan .ypl-lane { display:block;min-height:0;border:1px solid var(--trk-card-border,var(--yp-bd));border-radius:9px;padding:3px 8px 3px;margin:4px 0 0;background:var(--trk-card-bg,var(--yp-bg));cursor:pointer }
+#panel-yearplan .ypl-lane.active { border-color:#6366f1;box-shadow:0 0 0 1px #6366f1 inset;cursor:default }
+#panel-yearplan .ypl-lane.k-plan, #panel-yearplan .ypl-lane.k-new { background:var(--yp-bg2) }
+#panel-yearplan .ypl-lh { display:flex;align-items:center;gap:6px;min-width:0;font-size:12.5px;line-height:17px;margin-bottom:1px }
+#panel-yearplan .ypl-lt { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto;color:var(--trk-text,inherit) }
+#panel-yearplan .ypl-stt { font-size:10.5px;padding:0 6px;border-radius:8px;background:rgba(72,201,176,.18);white-space:nowrap;flex-shrink:0 }
+#panel-yearplan .ypl-stt.k-plan, #panel-yearplan .ypl-stt.k-new { background:rgba(148,163,184,.2);color:var(--yp-mut) }
+#panel-yearplan .ypl-dates { font-size:11px;color:var(--yp-mut);white-space:nowrap;flex-shrink:0 }
+#panel-yearplan .ypl-lane .yp-bk { display:flex;gap:3px;flex-shrink:1;min-width:0;overflow:hidden }
+#panel-yearplan .ypl-la { margin-left:auto;display:flex;gap:4px;flex-shrink:0 }
+#panel-yearplan .ypl-x { border:1px solid var(--yp-bd);background:transparent;color:inherit;border-radius:6px;width:22px;height:18px;line-height:14px;padding:0;cursor:pointer }
+#panel-yearplan .ypl-x:hover { border-color:#6366f1 }
+#panel-yearplan .ypl-axis { position:relative;height:12px;margin-bottom:-12px;z-index:1;pointer-events:none;border-radius:6px 6px 0 0;overflow:hidden }
+#panel-yearplan .ypl-tick { position:absolute;top:0;bottom:0;border-left:1px solid var(--yp-sline);font-size:10px;color:var(--yp-mut);padding-left:3px;overflow:hidden;white-space:nowrap;box-sizing:border-box }
+#panel-yearplan .ypl-tick.q1 { background:var(--yp-s-w) } #panel-yearplan .ypl-tick.q2 { background:var(--yp-s-sp) }
+#panel-yearplan .ypl-tick.q3 { background:var(--yp-s-su) } #panel-yearplan .ypl-tick.q4 { background:var(--yp-s-au) }
+#panel-yearplan .ypl-track { position:relative;height:37px;border-radius:6px;background-color:var(--trk-input-bg,var(--yp-bg2));background-size:100% 100%;touch-action:none;user-select:none }
+#panel-yearplan .ypl-bars { position:absolute;inset:0 }
+#panel-yearplan .ypl-track .yp-bar { top:13px;bottom:auto;height:21px;border-radius:5px;font-size:10.5px }
+#panel-yearplan .ypl-today { position:absolute;top:0;bottom:0;width:2px;background:#ef4444;opacity:.7;z-index:2;pointer-events:none }
+#panel-yearplan .yp-empty.ypl-lane { border-style:dashed;background:transparent }
+#panel-yearplan .yp-empty .ypl-track { cursor:pointer }
+#panel-yearplan .yp-empty .ypl-lt { color:var(--yp-mut);font-style:italic }
+#panel-yearplan .yp-empty .yp-etxt { position:absolute;inset:12px 0 0 0;display:flex;align-items:center;justify-content:center;font-size:11.5px;color:var(--yp-mut);opacity:.75 }
+/* чипы — только у активной оси (или кнопкой «Открыть чипы») */
+#panel-yearplan .yp-ed { padding:6px 0 0;display:flex;flex-direction:column;gap:5px;max-width:none }
+#panel-yearplan .ypl-chips { display:flex;flex-wrap:wrap;gap:4px;align-items:center }
+#panel-yearplan .ypl-cl { font-size:10.5px;text-transform:uppercase;color:var(--yp-mut);width:68px;flex-shrink:0 }
+#panel-yearplan .ypl-chips .yp-in { flex:1;min-width:120px }
+#panel-yearplan .ypl-bk { --c:#6366f1;min-width:38px }
+#panel-yearplan .ypl-bk.on { background:rgba(99,102,241,.22);border-color:#6366f1;color:inherit }
+#panel-yearplan .ypl-bk.lead { background:#6366f1;color:#fff }
+/* шторка гистограмм: слева поверх осей, все 11 ТБ на одном экране */
+#panel-yearplan .ypl-dwrap { position:sticky;top:0;height:0;z-index:30 }
+#panel-yearplan .ypl-drawer { position:absolute;left:0;top:0;width:100%;max-height:calc(100vh - 20px);overflow:auto;box-sizing:border-box;
+  background:var(--trk-card-bg,var(--yp-bg));border:1px solid var(--trk-card-border,var(--yp-bd));border-radius:12px;box-shadow:12px 10px 32px rgba(0,0,0,.3);padding:8px 10px;
+  transform:translateX(-105%);opacity:0;pointer-events:none;transition:transform .25s ease,opacity .2s ease }
+#panel-yearplan .ypl-drawer.show { transform:none;opacity:1;pointer-events:auto }
+#panel-yearplan .ypl-dh { display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px }
+#panel-yearplan .ypl-dh > span:first-of-type { color:var(--yp-mut);font-size:12px }
+#panel-yearplan .ypl-dh .yp-ib { margin-left:auto;font-weight:700 }
+#panel-yearplan .ypl-dm, #panel-yearplan .ypl-drow { display:grid;grid-template-columns:44px minmax(0,1fr);align-items:end;gap:6px }
+#panel-yearplan .ypl-dm { grid-template-columns:44px repeat(12,minmax(0,1fr));gap:0 6px;font-size:10px;color:var(--yp-mut);margin-left:0 }
+#panel-yearplan .ypl-dm span { text-align:center;overflow:hidden;white-space:nowrap }
+#panel-yearplan .ypl-dm .q1 { color:#60a5fa } #panel-yearplan .ypl-dm .q2 { color:#22c55e } #panel-yearplan .ypl-dm .q3 { color:#ca8a04 } #panel-yearplan .ypl-dm .q4 { color:#f97316 }
+#panel-yearplan .ypl-drows { display:flex;flex-direction:column;gap:3px }
+#panel-yearplan .ypl-drow { height:clamp(34px, calc((100vh - 190px) / 11), 58px) }
+#panel-yearplan .ypl-drow.mine .ypl-dl { color:#6366f1 }
+#panel-yearplan .ypl-dl { font-size:11.5px;font-weight:700;align-self:center }
+#panel-yearplan .ypl-hist { position:relative;height:100%;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;align-items:end;border-bottom:1px solid var(--yp-sline) }
+#panel-yearplan .ypl-hc { height:100%;display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden }
+#panel-yearplan .ypl-hc i { display:block;flex-shrink:0 }
+#panel-yearplan .ypl-hc.over { box-shadow:inset 0 2px 0 #ef4444 }
+#panel-yearplan .ypl-cap { position:absolute;left:0;right:0;border-top:1.5px dashed #ef4444;opacity:.75;pointer-events:none }
+#panel-yearplan .l-ok { background:#48c9b0 } #panel-yearplan .l-plan { background:rgba(148,163,184,.65) }
+#panel-yearplan .l-other { background:#a78bfa } #panel-yearplan .l-cap { border-top:1.5px dashed #ef4444;height:0!important;width:12px }
+#panel-yearplan .yp-heat { display:none!important }
+/* контраст подписей черновиков */
+#panel-yearplan .yp-bar.k-plan span, #panel-yearplan .yp-bar.k-new span { color:var(--trk-text,#0f172a);text-shadow:0 0 2px var(--trk-card-bg,#fff) }
+body:not(.trk-theme-light) #panel-yearplan .yp-bar.k-plan, body:not(.trk-theme-light) #panel-yearplan .yp-bar.k-new { opacity:.35 }
+@media (max-width: 900px) {
+  #panel-yearplan .ypl-split { grid-template-columns:minmax(0,1fr) }
+  #panel-yearplan .ypl-side { position:static;max-height:none }
+  #panel-yearplan .ypl-dates, #panel-yearplan .ypl-lane .yp-bk { display:none }
+  #panel-yearplan .ypl-cl { width:auto }
+}
+
+/* v2 визуальные правки: непрозрачная шторка, подсказка пустой оси, легенда, сезоны */
+#panel-yearplan .ypl-drawer { background:var(--yp-bg) !important;box-shadow:14px 12px 36px rgba(0,0,0,.45) }
+#panel-yearplan .ypl-dh { display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px }
+#panel-yearplan .ypl-dh .ypl-dx { margin-left:auto;font-size:12px;padding:2px 10px }
+#panel-yearplan .ypl-drows { gap:6px }
+#panel-yearplan .ypl-drow { border-bottom:1px solid var(--yp-bd);padding-bottom:2px }
+#panel-yearplan .yp-empty .yp-etxt { inset:13px 6px 2px 6px;opacity:1;z-index:3;pointer-events:none }
+#panel-yearplan .yp-empty .yp-etxt i { font-style:normal;background:var(--yp-bg);border:1px solid var(--yp-bd);border-radius:9px;padding:1px 9px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+#panel-yearplan .yp-legend span { display:inline-flex;align-items:center;gap:4px }
+#panel-yearplan .yp-legend i { margin:0 }
+#panel-yearplan .yp-legend .k-empty { border:1px dashed var(--yp-mut);background:transparent }
+#panel-yearplan .yp-season span { display:block;max-width:100%;padding:0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+@media (max-width: 600px) { #panel-yearplan .yp-season span { font-size:10px;padding:0 1px } }
+
+/* Годовой план v2: читаемые черновики, подсказка пустой оси не заходит на шкалу месяцев */
+#panel-yearplan .ypl-track .yp-bar.k-plan { opacity:1;filter:none;background:color-mix(in srgb,var(--c) 34%,#ffffff) }
+#panel-yearplan .ypl-track .yp-bar.k-plan span { color:#334155;text-shadow:none }
+body:not(.trk-theme-light) #panel-yearplan .ypl-track .yp-bar.k-plan { opacity:1;background:color-mix(in srgb,var(--c) 30%,#262b31) }
+body:not(.trk-theme-light) #panel-yearplan .ypl-track .yp-bar.k-plan span { color:#cbd5e1;text-shadow:none }
+body:not(.trk-theme-light) #panel-yearplan .ypl-track .yp-bar.k-new { opacity:.6 }
+body:not(.trk-theme-light) #panel-yearplan .ypl-track .yp-bar.k-new span { color:#e2e8f0;text-shadow:0 0 2px #000 }
+#panel-yearplan .yp-empty .yp-etxt { inset:14px 6px 3px 6px }
+#panel-yearplan .yp-empty .yp-etxt i { line-height:16px;padding:0 9px;font-size:11px }

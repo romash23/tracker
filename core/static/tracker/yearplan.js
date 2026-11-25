@@ -56,7 +56,7 @@ function mStart(m){ return Math.round((Date.UTC(YEAR, m, 1) - Y0) / DAY); }
 var SEASONS = [
     { a:0, b:mStart(2), t:'❄ Зима', q:1, v:'--yp-s-w' }, { a:mStart(2), b:mStart(5), t:'🌱 Весна', q:2, v:'--yp-s-sp' },
     { a:mStart(5), b:mStart(8), t:'☀ Лето', q:3, v:'--yp-s-su' }, { a:mStart(8), b:mStart(11), t:'🍂 Осень', q:4, v:'--yp-s-au' },
-    { a:mStart(11), b:NDAYS, t:'❄ Зима', q:1, v:'--yp-s-w' }
+    { a:mStart(11), b:NDAYS, t:'❄ Зима', q:1, v:'--yp-s-w', s:'❄ 1 кв' }
 ];
 function gridBg(){
     var lines = [];
@@ -93,10 +93,10 @@ function possible(dep, d){
 /* ---------- модель: проверка = { key, id, orig, isNew, name, task_type, pocket, status, stages[], department_ids, lead_department } ---------- */
 var S = {
     dir: 'all', collapsed: {}, pockets: [], pocketsLoaded: false, pocketsErr: '',
-    drafts: {}, seq: 0, editKey: null, scope: 'all', withDrafts: true, heatPinned: false, drag: null
+    drafts: {}, seq: 0, editKey: null, scope: 'all', withDrafts: true, chipsAll: false, drawer: false, drag: null
 };
-try { S.dir = localStorage.getItem('yp.dir') || 'all'; S.collapsed = JSON.parse(localStorage.getItem('yp.collapsed') || '{}') || {}; S.heatPinned = localStorage.getItem('yp.heat') === '1'; } catch (e) {}
-function saveUi(){ try { localStorage.setItem('yp.dir', S.dir); localStorage.setItem('yp.collapsed', JSON.stringify(S.collapsed)); localStorage.setItem('yp.heat', S.heatPinned ? '1' : '0'); } catch (e) {} }
+try { S.dir = localStorage.getItem('yp.dir') || 'all'; S.collapsed = JSON.parse(localStorage.getItem('yp.collapsed') || '{}') || {}; S.chipsAll = localStorage.getItem('yp.chips') === '1'; } catch (e) {}
+function saveUi(){ try { localStorage.setItem('yp.dir', S.dir); localStorage.setItem('yp.collapsed', JSON.stringify(S.collapsed)); localStorage.setItem('yp.chips', S.chipsAll ? '1' : '0'); } catch (e) {} }
 
 function normStages(t){
     var out = [];
@@ -228,31 +228,6 @@ function scopeTitle(){
     var p = S.scope.split('|'), g = buildGroups().filter(function(x){ return x.gkey === S.scope; })[0];
     return 'карман «' + (g ? g.name : p[1]) + '» · ' + (DIRS[p[0]] ? DIRS[p[0]].s : '');
 }
-function monthLoad(){
-    var L = loadItems(), res = [];
-    var dirs = S.scope !== 'all' ? [S.scope.split('|')[0]] : (S.dir === 'all' ? ['corp', 'retail'] : [S.dir]);
-    var cap = 0; deps().forEach(function(d){ dirs.forEach(function(x){ cap += possible(d, x); }); });
-    for (var m = 0; m < 12; m++) res.push({ ok:0, plan:0, other:0, days:mStart(m + 1 > 11 ? 11 : m + 1) });
-    L.forEach(function(x){
-        var it = x.it;
-        if (x.audit) { if (!inScope(it)) return; if (!S.withDrafts && x.kind !== 'ok') return; }
-        else { if (S.scope !== 'all') return; if (S.dir !== 'all' && TT2DIR[it.task_type] && TT2DIR[it.task_type] !== S.dir) return; }
-        var slot = !x.audit ? 'other' : (x.kind === 'ok' ? 'ok' : 'plan');
-        var banks = it.department_ids.length ? it.department_ids : [];
-        it.stages.forEach(function(s){
-            var a = Math.max(0, dn(s.start)), b = Math.min(NDAYS - 1, dn(s.end)); if (b < a) return;
-            var w = x.audit ? stageW(s.key) : x.coef; if (!w) return;
-            for (var m = 0; m < 12; m++) {
-                var ma = mStart(m), mb = (m === 11 ? NDAYS : mStart(m + 1)) - 1;
-                var ov = Math.min(b, mb) - Math.max(a, ma) + 1; if (ov <= 0) continue;
-                var f = ov / (mb - ma + 1), sum = 0;
-                banks.forEach(function(bk){ sum += w * (x.audit ? leadMult(it, bk) * shareMult(it, bk) : 1); });
-                res[m][slot] += sum * f;
-            }
-        });
-    });
-    return { months:res, cap:cap };
-}
 /* тепловая карта: сколько проверок одновременно идёт у банка в месяце */
 function heatData(){
     var D = deps(), idx = {}, grid = [];
@@ -278,35 +253,35 @@ function heatData(){
 /* ---------- отрисовка ---------- */
 function panel(){ return $('panel-yearplan'); }
 function head(){
-    var hd = '';
-    hd += '<div class="yp-tb">'
+    return '<div class="yp-tb">'
         + '<button class="yp-btn yp-back" data-yp="back" title="Вернуться к планированию проверок">←</button>'
         + '<div class="yp-title">📆 Годовой план ' + YEAR + ' <span class="yp-exp">эксперимент</span></div>'
-        + '<span class="yp-seg">' + [['all','Все'],['corp','Корпоративное'],['retail','Розничное']].map(function(d){
+        + '<span class="yp-seg">' + [['all','Все'],['corp','Корп'],['retail','Розн']].map(function(d){
             return '<button data-yp="dir" data-v="' + d[0] + '" class="' + (S.dir === d[0] ? 'on' : '') + '">' + d[1] + '</button>'; }).join('') + '</span>'
         + '<button class="yp-btn" data-yp="pockets" title="Справочник карманов и планы на ' + YEAR + ' год (окно поверх вкладки)">✏️ Карманы ' + YEAR + '</button>'
         + '<button class="yp-btn" data-yp="expand" title="Развернуть все карманы">⊞</button>'
         + '<button class="yp-btn" data-yp="collapse" title="Свернуть все карманы">⊟</button>'
-        + '<button class="yp-btn' + (S.heatPinned ? ' on' : '') + '" data-yp="heat" title="Тепловая карта ТБ: число одновременных проверок по месяцам">🔥 ТБ</button>'
+        + '<button class="yp-btn' + (S.chipsAll ? ' on' : '') + '" data-yp="chips" id="ypChipsBtn" title="Показать или скрыть чипы этапов и банков у всех осей. Клик по оси открывает её чипы.">' + (S.chipsAll ? '▴ Скрыть чипы' : '▾ Открыть чипы') + '</button>'
         + '<span class="yp-sp"></span>'
         + '<span class="yp-dirty" id="ypDirty"></span>'
         + '<button class="yp-btn" data-yp="reset" id="ypReset" title="Отменить все несохранённые изменения">Отменить</button>'
         + '<button class="yp-btn yp-save" data-yp="save" id="ypSave">Сохранить изменения</button>'
         + '</div>';
-    return hd;
-}
-function scaleHtml(){
-    var s = '<div class="yp-row yp-scale"><div class="yp-lab yp-lab--scale"><span class="yp-legend"><i class="k-ok"></i>утверждена <i class="k-plan"></i>планирование <i class="k-new"></i>не сохранена</span></div><div class="yp-trk yp-trk--scale">';
-    SEASONS.forEach(function(x){ s += '<div class="yp-season" style="left:' + pct(x.a) + '%;width:' + (pct(x.b) - pct(x.a)) + '%;background:var(' + x.v + '-h)" title="' + x.t.slice(2) + ' — ' + x.q + ' квартал"><span>' + x.t + (x.b - x.a > 40 ? ' · ' + x.q + ' кв' : '') + '</span></div>'; });
-    s += '</div></div><div class="yp-row yp-scale yp-scale--m"><div class="yp-lab yp-lab--scale"></div><div class="yp-trk yp-trk--scale">';
-    for (var m = 0; m < 12; m++) {
-        var a = mStart(m), b = m === 11 ? NDAYS : mStart(m + 1);
-        s += '<div class="yp-month' + (m % 2 ? ' odd' : '') + '" style="left:' + pct(a) + '%;width:' + (pct(b) - pct(a)) + '%">' + MONTHS[m] + '</div>';
-    }
-    s += '</div></div>';
-    return s;
 }
 function seasonQuarter(m){ return [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 1][m]; }
+/* шапка левой колонки: сезоны-кварталы и легенда */
+function scaleHtml(){
+    var s = '<div class="ypl-scale"><div class="ypl-seasons">';
+    SEASONS.forEach(function(x){ s += '<div class="yp-season" style="left:' + pct(x.a) + '%;width:' + (pct(x.b) - pct(x.a)) + '%;background:var(' + x.v + '-h)" title="' + x.t.slice(2) + ' — ' + x.q + ' квартал"><span>' + (x.s || (x.t + ' · ' + x.q + ' кв')) + '</span></div>'; });
+    s += '</div><div class="yp-legend"><span><i class="k-ok"></i>утверждена</span><span><i class="k-plan"></i>планирование</span><span><i class="k-new"></i>не сохранена</span><span><i class="k-empty"></i>свободная ось</span></div></div>';
+    return s;
+}
+function axisHtml(){
+    var h = '<div class="ypl-axis">';
+    for (var m = 0; m < 12; m++) h += '<div class="ypl-tick q' + seasonQuarter(m) + '" style="left:' + pct(mStart(m)) + '%;width:' + (pct(m === 11 ? NDAYS : mStart(m + 1)) - pct(mStart(m))) + '%"><span>' + MONTHS[m] + '</span></div>';
+    return h + '</div>';
+}
+function todayHtml(){ var t = dn(todayIso()); return t != null && t >= 0 && t < NDAYS ? '<div class="ypl-today" style="left:' + pct(t) + '%" title="Сегодня"></div>' : ''; }
 function barsHtml(it, kind, mini){
     var h = '';
     it.stages.forEach(function(s, i){
@@ -316,43 +291,47 @@ function barsHtml(it, kind, mini){
         var cutL = a < 0, cutR = b > NDAYS;
         h += '<div class="yp-bar k-' + kind + (cutL ? ' cutl' : '') + (cutR ? ' cutr' : '') + '" data-key="' + esc(it.key) + '" data-si="' + i + '" style="left:' + l + '%;width:' + w + '%;--c:' + (STAGE_COLORS[s.key] || '#94a3b8') + '"'
             + ' title="' + esc((it.name || 'Без названия') + '\n' + (STAGE_LABELS[s.key] || s.key) + ': ' + fmt(s.start) + ' – ' + fmt(s.end) + ' (' + (dn(s.end) - dn(s.start) + 1) + ' дн)' + '\nСтатус: ' + (it.isNew ? 'не сохранена' : (STL[it.status] || it.status))) + '">'
-            + (mini ? '' : '<span>' + esc(STAGE_SHORT[s.key] || '') + '</span>') + (mini || cutR ? '' : '<b class="yp-rz" data-rz="1"></b>') + '</div>';
+            + (mini ? '' : '<span>' + esc(STAGE_SHORT[s.key] || '') + ' ' + esc(fmt(s.start).slice(0, 5)) + '–' + esc(fmt(s.end).slice(0, 5)) + '</span>') + (mini || cutR ? '' : '<b class="yp-rz" data-rz="1" title="Тянуть конец этапа"></b>') + '</div>';
     });
     return h;
 }
-function rowHtml(it, g){
-    var k = kindOf(it), ed = S.editKey === it.key, dirty = isDirty(it);
-    var banks = it.department_ids.map(function(id){ var d = depById(id); return '<i class="' + (id === leadOf(it) ? 'lead' : '') + '">' + esc(abbr(d)) + '</i>'; }).join('');
-    var h = '<div class="yp-row yp-item k-' + k + (ed ? ' edit' : '') + '" data-key="' + esc(it.key) + '">'
-        + '<div class="yp-lab" data-yp="edit" title="' + esc((it.name || 'Без названия') + ' — ' + (it.isNew ? 'не сохранена' : (STL[it.status] || it.status)) + '\nНажмите, чтобы редактировать этапы и банки') + '">'
-        + '<span class="yp-dot k-' + k + '"></span><span class="yp-nm">' + esc(it.name || 'Без названия') + '</span>'
-        + (dirty ? '<span class="yp-mod" title="Есть несохранённые изменения">●</span>' : '')
-        + '<span class="yp-bk">' + (banks || '<em>нет ТБ</em>') + '</span></div>'
-        + '<div class="yp-trk" style="background-image:' + GRID + '">' + barsHtml(it, k) + '</div></div>';
-    if (ed) h += editorHtml(it);
-    return h;
-}
-function editorHtml(it){
+function chipsHtml(it){
     var have = {}; it.stages.forEach(function(s){ have[s.key] = 1; });
-    var st0 = '<div class="yp-ed-g"><span class="yp-ed-l">Этапы</span>' + STAGE_ORDER.map(function(k){
-        return '<button class="yp-chip' + (have[k] ? ' on' : '') + '" data-yp="stage" data-v="' + k + '" style="--c:' + STAGE_COLORS[k] + '" title="' + esc(STAGE_LABELS[k]) + (have[k] ? ' — убрать этап' : ' — добавить этап (2 недели)') + '">' + esc(STAGE_SHORT[k]) + '</button>'; }).join('') + '</div>';
-    var bk = '<div class="yp-ed-g"><span class="yp-ed-l">ТБ</span>' + deps().map(function(d){
+    var st0 = '<div class="ypl-chips"><span class="ypl-cl">Этапы</span>' + STAGE_ORDER.map(function(k){
+        return '<button class="yp-chip ypl-st' + (have[k] ? ' on' : '') + '" data-yp="stage" data-v="' + k + '" style="--c:' + STAGE_COLORS[k] + '" title="' + esc(STAGE_LABELS[k]) + (have[k] ? ' — убрать этап' : ' — добавить этап (2 недели)') + '">' + esc(STAGE_SHORT[k]) + '</button>'; }).join('') + '</div>';
+    var bk = '<div class="ypl-chips"><span class="ypl-cl">ТБ</span>' + deps().map(function(d){
         var on = it.department_ids.indexOf(d.id) >= 0, ld = on && leadOf(it) === d.id;
-        return '<button class="yp-chip yp-chip--b' + (on ? ' on' : '') + (ld ? ' lead' : '') + '" data-yp="bank" data-v="' + esc(d.id) + '" title="' + esc(d.name) + (on ? (ld ? ' — руководитель' : ' — участник') + ' (клик убирает банк)' : ' — добавить банк') + '">' + (ld ? '★' : '') + esc(abbr(d)) + '</button>'; }).join('')
+        return '<button class="yp-chip ypl-bk' + (on ? ' on' : '') + (ld ? ' lead' : '') + '" data-yp="bank" data-v="' + esc(d.id) + '" title="' + esc(d.name) + (on ? (ld ? ' — руководитель' : ' — участник') + ' (клик убирает банк)' : ' — добавить банк') + '">' + esc(abbr(d)) + (ld ? ' ★' : '') + '</button>'; }).join('')
         + (it.department_ids.length > 1 ? '<label class="yp-lead">★ <select data-yp="lead" title="Банк-руководитель">' + it.department_ids.map(function(id){ return '<option value="' + esc(id) + '"' + (id === leadOf(it) ? ' selected' : '') + '>' + esc(abbr(depById(id))) + '</option>'; }).join('') + '</select></label>' : '')
         + '</div>';
-    var dates = it.stages.map(function(s){ return '<span class="yp-ed-st" style="--c:' + STAGE_COLORS[s.key] + '"><b>' + esc(STAGE_SHORT[s.key]) + '</b> ' + fmt(s.start) + '–' + fmt(s.end) + ' · ' + fnum((dn(s.end) - dn(s.start) + 1) / 7) + ' нед</span>'; }).join('');
     return '<div class="yp-ed" data-key="' + esc(it.key) + '">'
-        + '<div class="yp-ed-g"><input class="yp-in" data-yp="name" value="' + esc(it.name) + '" placeholder="Название проверки" maxlength="200">'
-        + '<span class="yp-ed-st0">' + (it.isNew ? 'новая · Планирование' : (STL[it.status] || it.status)) + '</span>'
-        + (it.isNew ? '<button class="yp-btn yp-del" data-yp="drop" title="Удалить несохранённую проверку">🗑</button>'
-                    : (S.drafts[it.key] ? '<button class="yp-btn" data-yp="revert" title="Вернуть сохранённые значения">↺</button>' : ''))
-        + '<button class="yp-btn" data-yp="close" title="Свернуть редактор">✓</button></div>'
-        + st0 + bk + '<div class="yp-ed-g yp-ed-dates">' + dates + '<span class="yp-hint">Тяните этап — сдвиг всей проверки по неделям, правый край — длительность. Shift — по дням.</span></div></div>';
+        + '<div class="ypl-chips"><span class="ypl-cl">Название</span><input class="yp-in" data-yp="name" value="' + esc(it.name) + '" placeholder="Название проверки" maxlength="200"></div>'
+        + st0 + bk + '<div class="yp-hint">Тяните этап — сдвиг всей проверки по неделям (Shift — по дням), правый край этапа — длительность.</div></div>';
+}
+function laneHtml(it, n){
+    var k = kindOf(it), act = S.editKey === it.key, open = act || S.chipsAll, dirty = isDirty(it);
+    var banks = it.department_ids.map(function(id){ return '<i class="' + (id === leadOf(it) ? 'lead' : '') + '" title="' + esc((depById(id) || {}).name || id) + '">' + esc(abbr(depById(id))) + '</i>'; }).join('');
+    var stl = it.isNew ? 'не сохранена' : (STL[it.status] || it.status);
+    return '<div class="yp-item ypl-lane k-' + k + (act ? ' active' : '') + (open ? ' edit' : '') + '" data-key="' + esc(it.key) + '" data-yp="edit">'
+        + '<div class="ypl-lh"><span class="yp-dot k-' + k + '"></span>'
+        + '<span class="ypl-lt"><b>Ось ' + n + '</b> · <span class="yp-nm">' + esc(it.name || 'Без названия') + '</span></span>'
+        + (dirty ? '<span class="yp-mod" title="Есть несохранённые изменения">●</span>' : '')
+        + '<span class="ypl-stt k-' + k + '">' + esc(stl) + '</span>'
+        + '<span class="ypl-dates">' + fmt(tStart(it)) + ' – ' + fmt(tEnd(it)) + '</span>'
+        + '<span class="yp-bk">' + (banks || '<em>нет ТБ</em>') + '</span>'
+        + '<span class="ypl-la">'
+        + (it.isNew ? '<button class="ypl-x" data-yp="drop" title="Удалить несохранённую проверку">×</button>'
+                    : (S.drafts[it.key] ? '<button class="ypl-x" data-yp="revert" title="Вернуть сохранённые значения">↺</button>' : ''))
+        + (act ? '<button class="ypl-x" data-yp="close" title="Скрыть чипы оси">✓</button>' : '')
+        + '</span></div>'
+        + axisHtml()
+        + '<div class="ypl-track" style="background-image:' + GRID + '">' + todayHtml() + '<div class="ypl-bars">' + barsHtml(it, k) + '</div></div>'
+        + (open ? chipsHtml(it) : '')
+        + '</div>';
 }
 function groupHtml(g, shared){
     var col = !!S.collapsed[g.gkey], need = g.empty;
-    var nm = esc(g.name), pl = g.plan != null ? '<span class="yp-plan">(' + g.plan + ')</span>' : '';
+    var pl = g.plan != null ? '<span class="yp-plan">(' + g.plan + ')</span>' : '';
     var badge = shared ? '<span class="yp-dirb d-' + g.dir + '">' + DIRS[g.dir].s + '</span>' : '';
     var cnt = '<span class="yp-cnt" title="Утверждено / планирование / не сохранено' + (g.plan != null ? ' / не хватает до плана' : '') + '">'
         + '<i class="k-ok">' + g.cnt.ok + '</i><i class="k-plan">' + g.cnt.plan + '</i><i class="k-new">' + g.cnt['new'] + '</i>'
@@ -360,71 +339,112 @@ function groupHtml(g, shared){
         + '</span>';
     var canAdd = !g.nopocket && !g.unknown && g.dir;
     var h = '<div class="yp-grp' + (col ? ' col' : '') + (S.scope === g.gkey ? ' scope' : '') + '" data-g="' + esc(g.gkey) + '">'
-        + '<div class="yp-row yp-gh"><div class="yp-lab" data-yp="toggle" title="' + (col ? 'Развернуть' : 'Свернуть') + ' карман">'
-        + '<span class="yp-car">' + (col ? '▸' : '▾') + '</span>' + badge + '<span class="yp-gn' + (g.unknown ? ' warn' : '') + '" title="' + (g.unknown ? 'Кармана нет в справочнике ' + YEAR + ' года' : esc(g.name) + (g.plan != null ? ' — план ' + g.plan : ' — план не задан')) + '">' + (g.unknown ? '⚠ ' : '') + nm + '</span>' + pl + cnt
+        + '<div class="ypl-gh" data-yp="toggle" title="' + (col ? 'Развернуть' : 'Свернуть') + ' карман">'
+        + '<span class="yp-car">' + (col ? '▸' : '▾') + '</span>' + badge
+        + '<span class="yp-gn' + (g.unknown ? ' warn' : '') + '" title="' + (g.unknown ? 'Кармана нет в справочнике ' + YEAR + ' года' : esc(g.name) + (g.plan != null ? ' — план ' + g.plan : ' — план не задан')) + '">' + (g.unknown ? '⚠ ' : '') + esc(g.name) + '</span>' + pl + cnt
         + '<span class="yp-ga">'
-        + '<button class="yp-ib' + (S.scope === g.gkey ? ' on' : '') + '" data-yp="scope" title="Нагрузка и тепловая карта только по этому карману">📊</button>'
-        + (canAdd ? '<button class="yp-ib" data-yp="add" title="Добавить ось (новую проверку)">＋</button>' : '')
+        + '<button class="yp-ib' + (S.scope === g.gkey ? ' on' : '') + '" data-yp="scope" title="Нагрузка и тепловые карты только по этому карману">📊</button>'
+        + (canAdd ? '<button class="yp-ib" data-yp="add" title="Добавить ось (новую проверку)">＋ Ось</button>' : '')
         + '</span></div>';
     if (col) {
         var mini = ''; g.items.forEach(function(it){ mini += barsHtml(it, kindOf(it), true); });
-        h += '<div class="yp-trk yp-trk--mini" style="background-image:' + GRID + '">' + mini + '</div></div>';
-    } else {
-        h += '<div class="yp-trk yp-trk--gh" style="background-image:' + GRID + '"></div></div>';
-        g.items.forEach(function(it){ h += rowHtml(it, g); });
-        for (var i = 0; i < need; i++) {
-            h += '<div class="yp-row yp-empty" data-yp="fill" title="По плану нужно начать ещё ' + need + ' ' + plw(need, ['проверку','проверки','проверок']) + '">'
-                + '<div class="yp-lab"><span class="yp-dot k-empty"></span><span class="yp-nm">свободная ось</span></div>'
-                + '<div class="yp-trk" style="background-image:' + GRID + '"><span class="yp-etxt">По плану нужно начать ещё ' + need + ' ' + plw(need, ['проверку','проверки','проверок']) + ' · нажмите, чтобы создать</span></div></div>';
-        }
-        if (!g.items.length && !need) h += '<div class="yp-row yp-none"><div class="yp-lab"></div><div class="yp-trk" style="background-image:' + GRID + '"><span class="yp-etxt">Проверок нет' + (g.plan == null ? ', план не задан' : '') + '</span></div></div>';
+        return h + '<div class="ypl-mini" style="background-image:' + GRID + '">' + mini + '</div></div>';
     }
+    var n = 0;
+    g.items.forEach(function(it){ h += laneHtml(it, ++n); });
+    for (var i = 0; i < need; i++) {
+        var tip = 'По плану нужно начать ещё ' + need + ' ' + plw(need, ['проверку','проверки','проверок']);
+        h += '<div class="yp-empty ypl-lane" data-yp="fill" title="' + tip + '"><div class="ypl-lh"><span class="yp-dot k-empty"></span><span class="ypl-lt"><b>Ось ' + (++n) + '</b> · свободная</span></div>'
+            + axisHtml() + '<div class="ypl-track" style="background-image:' + GRID + '"><span class="yp-etxt"><i>' + tip + ' · нажмите, чтобы создать</i></span></div></div>';
+    }
+    if (!g.items.length && !need) h += '<div class="yp-none">Проверок нет' + (g.plan == null ? ', план не задан' : '') + '</div>';
     return h + '</div>';
 }
 var GRID = '';
-function loadHtml(){
-    var d = monthLoad(), max = 1, rows = d.months;
-    rows.forEach(function(r){ var t = r.ok + r.plan + r.other; if (d.cap > 0) max = Math.max(max, t / d.cap * 100, 100); else max = Math.max(max, t); });
-    var bars = rows.map(function(r, m){
-        var f = function(v){ return d.cap > 0 ? v / d.cap * 100 : v; };
-        var a = f(r.ok), b = f(r.plan), c = f(r.other), t = a + b + c;
-        return '<div class="yp-lm" style="left:' + pct(mStart(m)) + '%;width:' + (pct(m === 11 ? NDAYS : mStart(m + 1)) - pct(mStart(m))) + '%" title="' + esc(MONTHS[m] + ': ' + (d.cap > 0 ? fnum(t) + '% от возможной нагрузки' : fnum(t)) + '\nутверждённые проверки ' + fnum(a) + (S.withDrafts ? '\nчерновики ' + fnum(b) : '') + (S.scope === 'all' ? '\nпрочие задачи ' + fnum(c) : '')) + '">'
-            + '<div class="yp-lstack' + (d.cap > 0 && t > 100 ? ' over' : '') + '" style="height:' + Math.min(100, t / max * 100) + '%">'
-            + (c ? '<i class="l-other" style="flex:' + c + '"></i>' : '') + (b ? '<i class="l-plan" style="flex:' + b + '"></i>' : '') + (a ? '<i class="l-ok" style="flex:' + a + '"></i>' : '')
-            + '</div><span class="yp-lv">' + (t ? Math.round(t) + (d.cap > 0 ? '%' : '') : '') + '</span></div>';
-    }).join('');
-    var capLine = d.cap > 0 ? '<div class="yp-cap" style="bottom:' + (100 / max * 100) + '%" title="100% возможной нагрузки ТБ"><span>100%</span></div>' : '';
-    return '<div class="yp-load">'
-        + '<div class="yp-lh"><b>Нагрузка ТБ</b> · ' + esc(scopeTitle())
-        + '<span class="yp-seg yp-seg--s"><button data-yp="scopeall" class="' + (S.scope === 'all' ? 'on' : '') + '">Все проверки</button>'
-        + '<button data-yp="scopehint" class="' + (S.scope !== 'all' ? 'on' : '') + '" title="Выберите карман кнопкой 📊 в его заголовке">Текущий карман</button></span>'
-        + '<label class="yp-chk"><input type="checkbox" data-yp="drafts"' + (S.withDrafts ? ' checked' : '') + '> учитывать черновики</label>'
-        + '<span class="yp-lleg"><i class="l-ok"></i>проверки<i class="l-plan"></i>черновики' + (S.scope === 'all' ? '<i class="l-other"></i>прочие задачи' : '') + '</span></div>'
-        + '<div class="yp-row"><div class="yp-lab yp-lab--load">' + (d.cap > 0 ? '% от возможной<br>(численность × коэф.)' : 'условные единицы<br>(численность не задана)') + '</div>'
-        + '<div class="yp-trk yp-trk--load" style="background-image:' + GRID + '">' + capLine + bars + '</div></div></div>';
+/* нагрузка одного ТБ по месяцам: утверждённые проверки / черновики / прочие задачи */
+function bankLoad(bk){
+    var dirs = S.scope !== 'all' ? [S.scope.split('|')[0]] : (S.dir === 'all' ? ['corp', 'retail'] : [S.dir]);
+    var dep = depById(bk), cap = 0; if (dep) dirs.forEach(function(x){ cap += possible(dep, x); });
+    var res = []; for (var m = 0; m < 12; m++) res.push({ ok:0, plan:0, other:0 });
+    loadItems().forEach(function(x){
+        var it = x.it; if (it.department_ids.indexOf(bk) < 0) return;
+        if (x.audit) { if (!inScope(it)) return; if (!S.withDrafts && x.kind !== 'ok') return; }
+        else { if (S.scope !== 'all') return; if (S.dir !== 'all' && TT2DIR[it.task_type] && TT2DIR[it.task_type] !== S.dir) return; }
+        var slot = !x.audit ? 'other' : (x.kind === 'ok' ? 'ok' : 'plan');
+        it.stages.forEach(function(s){
+            var a = Math.max(0, dn(s.start)), b = Math.min(NDAYS - 1, dn(s.end)); if (b < a) return;
+            var w = x.audit ? stageW(s.key) * leadMult(it, bk) * shareMult(it, bk) : x.coef; if (!w) return;
+            for (var m = 0; m < 12; m++) {
+                var ma = mStart(m), mb = (m === 11 ? NDAYS : mStart(m + 1)) - 1;
+                var ov = Math.min(b, mb) - Math.max(a, ma) + 1; if (ov > 0) res[m][slot] += w * ov / (mb - ma + 1);
+            }
+        });
+    });
+    return { months:res, cap:cap };
 }
-function heatHtml(){
-    var H = heatData(), cur = S.drag ? S.drag.key : S.editKey, it = cur ? getItem(cur) : null;
-    var h = '<div class="yp-hm-h"><b>🔥 Проверки по ТБ</b><span>' + esc(scopeTitle()) + '</span>' + (S.heatPinned ? '<button class="yp-ib" data-yp="heat" title="Скрыть">✕</button>' : '') + '</div>'
-        + '<table class="yp-hm-t"><thead><tr><th></th>' + MONTHS.map(function(m, i){ return '<th class="q' + seasonQuarter(i) + '" title="' + m + '">' + (i + 1) + '</th>'; }).join('') + '</tr></thead><tbody>';
+function drawerHtml(){
+    var D = deps(), cur = S.drag ? S.drag.key : S.editKey, it = cur ? getItem(cur) : null;
+    var h = '<div class="ypl-dh"><b>Нагрузка ТБ по неделям</b><span>' + esc(scopeTitle()) + '</span>'
+        + '<span class="yp-lleg"><i class="l-ok"></i>проверки<i class="l-plan"></i>черновики' + (S.scope === 'all' ? '<i class="l-other"></i>прочие задачи' : '') + '<i class="l-cap"></i>возможная</span>'
+        + '<button class="yp-btn ypl-dx" data-yp="drawer" title="Скрыть гистограммы">× Скрыть</button></div>'
+        + '<div class="ypl-dm"><span></span>' + MONTHS.map(function(m, i){ return '<span class="q' + seasonQuarter(i) + '">' + m + '</span>'; }).join('') + '</div><div class="ypl-drows">';
+    D.forEach(function(d){
+        var L = bankLoad(d.id), max = L.cap || 0;
+        L.months.forEach(function(r){ max = Math.max(max, r.ok + r.plan + r.other); }); if (!(max > 0)) max = 1;
+        var mine = it && it.department_ids.indexOf(d.id) >= 0;
+        h += '<div class="ypl-drow' + (mine ? ' mine' : '') + '"><span class="ypl-dl" title="' + esc(d.name) + '">' + esc(abbr(d)) + '</span><div class="ypl-hist">'
+            + (L.cap > 0 ? '<div class="ypl-cap" style="bottom:' + (L.cap / max * 100) + '%" title="Возможная нагрузка: ' + fnum(L.cap) + '"></div>' : '')
+            + L.months.map(function(r, m){
+                var t = r.ok + r.plan + r.other, over = L.cap > 0 && t > L.cap + 1e-9;
+                return '<div class="ypl-hc' + (over ? ' over' : '') + '" title="' + esc(d.name + ', ' + MONTHS[m] + ': ' + fnum(t) + (L.cap > 0 ? ' из ' + fnum(L.cap) + ' (' + Math.round(t / L.cap * 100) + '%)' : '') + '\nутверждённые проверки ' + fnum(r.ok) + '\nчерновики ' + fnum(r.plan) + (S.scope === 'all' ? '\nпрочие задачи ' + fnum(r.other) : '')) + '">'
+                    + '<i class="l-other" style="height:' + (r.other / max * 100) + '%"></i><i class="l-plan" style="height:' + (r.plan / max * 100) + '%"></i><i class="l-ok" style="height:' + (r.ok / max * 100) + '%"></i></div>';
+            }).join('') + '</div></div>';
+    });
+    return h + '</div>';
+}
+/* тепловые карты: проверки и карманы у ТБ по месяцам */
+function pocketHeat(){
+    var D = deps(), idx = {}, grid = [];
+    D.forEach(function(d, i){ idx[d.id] = i; var r = []; for (var m = 0; m < 12; m++) r.push({ set:{}, cur:false }); grid.push(r); });
+    var cur = S.drag ? S.drag.key : S.editKey;
+    loadItems().forEach(function(x){
+        if (!x.audit || !inScope(x.it)) return;
+        if (!S.withDrafts && x.kind !== 'ok') return;
+        var it = x.it, a = Math.max(0, dn(tStart(it))), b = Math.min(NDAYS - 1, dn(tEnd(it))); if (b < a) return;
+        var pk = (it.pocket || 'без кармана') + (DIRS[TT2DIR[it.task_type]] ? ' · ' + DIRS[TT2DIR[it.task_type]].s : '');
+        for (var m = 0; m < 12; m++) {
+            var ma = mStart(m), mb = (m === 11 ? NDAYS : mStart(m + 1)) - 1; if (b < ma || a > mb) continue;
+            it.department_ids.forEach(function(bk){ var i = idx[bk]; if (i == null) return; grid[i][m].set[pk] = 1; if (it.key === cur) grid[i][m].cur = true; });
+        }
+    });
+    return { deps:D, grid:grid.map(function(r){ return r.map(function(c){ var n = Object.keys(c.set); return { n:n.length, names:n, cur:c.cur }; }); }) };
+}
+function heatTable(H, title, forms, hotN, footId){
+    var cur = S.drag ? S.drag.key : S.editKey, it = cur ? getItem(cur) : null, hot = 0;
+    var h = '<div class="ypl-ht">' + title + '</div><table class="yp-hm-t"><thead><tr><th></th>' + MONTHS.map(function(m, i){ return '<th class="q' + seasonQuarter(i) + '" title="' + m + '">' + m.slice(0, 3) + '</th>'; }).join('') + '</tr></thead><tbody>';
     H.deps.forEach(function(d, i){
         var mine = it && it.department_ids.indexOf(d.id) >= 0;
         h += '<tr' + (mine ? ' class="mine"' : '') + '><th title="' + esc(d.name) + '">' + esc(abbr(d)) + '</th>';
         H.grid[i].forEach(function(c, m){
-            var lv = c.n >= HOT ? 'hot' : 'l' + c.n;
-            h += '<td class="' + lv + (c.cur ? ' cur' : '') + '" title="' + esc(d.name + ', ' + MONTHS[m] + ': ' + c.n + ' ' + plw(c.n, ['проверка','проверки','проверок']) + (c.names.length ? '\n• ' + c.names.join('\n• ') : '')) + '">' + (c.n || '') + '</td>';
+            if (c.n >= hotN) hot++;
+            h += '<td class="' + (c.n >= hotN ? 'hot' : 'l' + c.n) + (c.cur ? ' cur' : '') + '" title="' + esc(d.name + ', ' + MONTHS_G[m] + ': ' + c.n + ' ' + plw(c.n, forms) + (c.names.length ? '\n• ' + c.names.join('\n• ') : '')) + '">' + (c.n || '') + '</td>';
         });
         h += '</tr>';
     });
-    var hot = 0; H.grid.forEach(function(r){ r.forEach(function(c){ if (c.n >= HOT) hot++; }); });
-    h += '</tbody></table><div class="yp-hm-f">' + (hot ? '<span class="warn">⚠ ' + hot + ' ' + plw(hot, ['ячейка','ячейки','ячеек']) + ' с ' + HOT + '+ одновременными проверками</span>' : 'Одновременно ' + HOT + '+ проверок у одного ТБ — нет') + '</div>';
-    return h;
+    return h + '</tbody></table><div class="yp-hm-f"' + (footId ? ' id="' + footId + '"' : '') + '>' + (hot ? '<span class="warn">⚠ ' + hot + ' ' + plw(hot, ['ячейка','ячейки','ячеек']) + ' с ' + hotN + '+ одновременно</span>' : 'Одновременно ' + hotN + '+ — нет') + '</div>';
+}
+function sideHtml(){
+    return '<div class="ypl-sh"><b>Нагрузка на ТБ</b>'
+        + '<span class="ypl-scope">' + esc(scopeTitle()) + (S.scope !== 'all' ? ' <button class="yp-ib" data-yp="scopeall" title="Показать все проверки">✕</button>' : '') + '</span>'
+        + '<button class="yp-btn ypl-open' + (S.drawer ? ' on' : '') + '" data-yp="drawer" id="ypDrawerBtn" title="Гистограммы нагрузки по всем ТБ поверх осей">' + (S.drawer ? '«' : '»') + '</button></div>'
+        + '<label class="yp-chk"><input type="checkbox" data-yp="drafts"' + (S.withDrafts ? ' checked' : '') + '> учитывать черновики</label>'
+        + '<div id="ypHeat" class="ypl-heat">' + heatTable(heatData(), 'Проверки на ТБ', ['проверка','проверки','проверок'], HOT) + '</div>'
+        + '<div id="ypHeatP" class="ypl-heat">' + heatTable(pocketHeat(), 'Карманы на ТБ', ['карман','кармана','карманов'], HOT) + '</div>'
+        + '<div class="yp-hint">Число в ячейке — сколько проверок (карманов) у банка идёт в этом месяце. ' + (S.editKey ? 'Выделены банки редактируемой оси.' : 'Откройте ось — её банки выделятся.') + '</div>';
 }
 function renderHeat(){
-    var box = $('ypHeat'); if (!box) return;
-    var show = S.heatPinned || !!S.drag || !!S.editKey;
-    box.classList.toggle('show', show);
-    if (show) box.innerHTML = heatHtml();
+    var sd = $('ypSide'); if (sd) sd.innerHTML = sideHtml();
+    var dr = $('ypDrawer'); if (dr) { dr.classList.toggle('show', !!S.drawer); if (S.drawer) dr.innerHTML = drawerHtml(); }
 }
 function renderDirty(){
     var n = Object.keys(S.drafts).filter(function(k){ return isDirty(S.drafts[k]); }).length;
@@ -438,7 +458,6 @@ function render(){
     var body = $('ypBody'); if (!body) return;
     if (!S.pocketsLoaded) { body.innerHTML = '<div class="yp-msg">Загрузка карманов ' + YEAR + ' года…</div>'; return; }
     var gs = buildGroups(), secs = sections(gs), h = scaleHtml();
-    var keep = body.querySelector('.yp-scroll'), sl = keep ? keep.scrollLeft : 0, sy = window.scrollY;
     if (!S.pockets.length) {
         h += '<div class="yp-msg">' + (S.pocketsErr ? 'Справочник карманов недоступен: ' + esc(S.pocketsErr) + '. ' : 'На ' + YEAR + ' год карманов пока нет. ')
             + '<button class="yp-btn yp-save" data-yp="pockets">✏️ Задать карманы ' + YEAR + '</button></div>';
@@ -446,14 +465,12 @@ function render(){
     secs.forEach(function(sx){
         if (!sx.groups.length) return;
         var col = !!S.collapsed[sx.skey];
-        h += '<div class="yp-sec' + (sx.shared ? ' shared' : '') + '"><div class="yp-sh" data-yp="toggle" data-s="' + sx.skey + '"><span class="yp-car">' + (col ? '▸' : '▾') + '</span>' + esc(sx.title)
+        h += '<div class="yp-sec' + (sx.shared ? ' shared' : '') + '"><div class="yp-sh" data-yp="toggle" data-s="' + sx.skey + '"><span class="yp-car">' + (col ? '▸' : '▾') + '</span><span class="yp-st">' + esc(sx.title) + '</span>'
             + '<span class="yp-shc">' + sx.groups.length + ' ' + plw(sx.groups.length, ['карман','кармана','карманов']) + ' · план ' + sx.groups.reduce(function(a, g){ return a + (g.plan || 0); }, 0) + ' · проверок ' + sx.groups.reduce(function(a, g){ return a + g.items.length; }, 0) + '</span></div>';
         if (!col) sx.groups.forEach(function(g){ h += groupHtml(g, sx.shared); });
         h += '</div>';
     });
-    h += loadHtml();
-    body.innerHTML = '<div class="yp-scroll"><div class="yp-grid">' + h + '</div></div>';
-    var sc = body.querySelector('.yp-scroll'); if (sc) sc.scrollLeft = sl;
+    body.innerHTML = '<div class="ypl-split"><div class="ypl-main"><div class="ypl-dwrap"><div id="ypDrawer" class="ypl-drawer"></div></div>' + h + '</div><aside class="ypl-side" id="ypSide"></aside></div>';
     renderDirty(); renderHeat();
 }
 function rerenderTop(){ var t = $('ypTop'); if (t) t.innerHTML = head(); }
@@ -546,8 +563,8 @@ function onMove(e){
     if (d) D.moved = true;
     D.trk.innerHTML = barsHtml(it, kindOf(it));
     D.trk.classList.add('drag');
-    var lab = D.trk.parentNode.querySelector('.yp-nm');
-    if (lab) lab.setAttribute('data-tip', fmt(tStart(it)) + ' – ' + fmt(tEnd(it)));
+    var lab = D.trk.closest('.yp-item').querySelector('.ypl-dates');
+    if (lab) lab.textContent = fmt(tStart(it)) + ' – ' + fmt(tEnd(it));
     renderHeat();
 }
 function onUp(){
@@ -649,14 +666,14 @@ function onClick(e){
     case 'expand': case 'collapse':
         buildGroups().forEach(function(x){ S.collapsed[x.gkey] = a === 'collapse'; }); ['s:corp','s:retail','s:shared','s:nodir'].forEach(function(k){ S.collapsed[k] = a === 'collapse'; });
         saveUi(); render(); return;
-    case 'heat': S.heatPinned = !S.heatPinned; saveUi(); rerenderTop(); renderHeat(); return;
+    case 'chips': S.chipsAll = !S.chipsAll; if (!S.chipsAll) S.editKey = null; saveUi(); rerenderTop(); render(); return;
+    case 'drawer': S.drawer = !S.drawer; renderHeat(); return;
     case 'toggle': var k = t.getAttribute('data-s') || gk; S.collapsed[k] = !S.collapsed[k]; saveUi(); render(); return;
     case 'scope': S.scope = S.scope === gk ? 'all' : gk; render(); return;
     case 'scopeall': S.scope = 'all'; render(); return;
-    case 'scopehint': if (S.scope === 'all') notify('Выберите карман кнопкой 📊 в его заголовке', 'info'); return;
     case 'add': addAxis(gk); return;
     case 'fill': var fg = findGroup(gk); if (fg) { newItem(fg); render(); } return;
-    case 'edit': S.editKey = S.editKey === key ? null : key; render(); return;
+    case 'edit': if (S.editKey !== key) { S.editKey = key; render(); } return;   // клик по неактивной оси открывает её чипы
     case 'close': S.editKey = null; render(); return;
     case 'stage': it = ensureDraft(key); if (it) { toggleStage(it, t.getAttribute('data-v')); render(); } return;
     case 'bank': it = ensureDraft(key); if (it) { toggleBank(it, t.getAttribute('data-v')); render(); } return;
@@ -683,12 +700,11 @@ function activate(){
     var p = panel(); if (!p) return;
     if (!inited) {
         inited = true;
-        p.innerHTML = '<div id="ypTop"></div><div id="ypBody"></div><div id="ypHeat" class="yp-heat"></div>';
+        p.innerHTML = '<div id="ypTop"></div><div id="ypBody"></div>';
         p.addEventListener('click', onClick);
         p.addEventListener('input', onInput);
         p.addEventListener('change', onInput);
         p.addEventListener('pointerdown', onDown);
-        $('ypHeat').addEventListener('click', onClick);
         document.addEventListener('trk:pockets-closed', function(){ loadPockets().then(render); });
         window.addEventListener('beforeunload', function(e){
             if (Object.keys(S.drafts).some(function(k){ return isDirty(S.drafts[k]); })) { e.preventDefault(); e.returnValue = ''; }
