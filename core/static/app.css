@@ -10042,6 +10042,19 @@ table.hm-emp-table thead th.hm-emp-name { z-index:4; }
 .dash-wrap{padding:20px;display:flex;flex-direction:column;gap:16px;width:100%;box-sizing:border-box}
 #panel-dashboards .dash-wrap.dash-split-wrap{display:grid!important;grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)!important;gap:16px!important;align-items:start!important;flex-direction:row!important}
 #panel-dashboards .dash-main-pane,#panel-dashboards .dash-side-pane{width:100%!important;min-width:0!important;max-width:100%!important;display:flex!important;flex-direction:column!important;gap:12px!important;box-sizing:border-box!important}
+/* План 2027 — независимый дубль Песочницы: те же две колонки и размеры. */
+#panel-plan2027 .dash-wrap.dash-split-wrap{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:16px!important;align-items:start!important;flex-direction:row!important}
+#panel-plan2027 .dash-main-pane,#panel-plan2027 .dash-side-pane{width:100%!important;min-width:0!important;max-width:100%!important;display:flex!important;flex-direction:column!important;gap:12px!important;box-sizing:border-box!important}
+#panel-plan2027 .dash-main-pane .dash-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;margin:0!important;box-sizing:border-box!important}
+#panel-plan2027 .dash-main-pane .dash-topbar{display:flex!important;flex-wrap:wrap!important;gap:12px!important;align-items:flex-end!important;width:100%!important}
+#panel-plan2027 .dash-main-pane .dash-field-task{flex:1 1 260px!important}
+#panel-plan2027 .dash-main-pane .dash-field{flex:0 1 auto}
+#panel-plan2027 .dash-tl-today::after{top:-30px;transform:translateX(-50%);white-space:nowrap;z-index:6}
+#panel-plan2027 .dash-tl-today{z-index:5}
+#panel-plan2027 .dash-tl-axis{padding-left:22px;padding-right:22px;box-sizing:border-box}
+#panel-plan2027 .dash-tl-tick:first-child{transform:translateX(0)}
+#panel-plan2027 .dash-tl-tick:last-child{transform:translateX(-100%)}
+
 #panel-dashboards .dash-main-pane .dash-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;margin:0!important;box-sizing:border-box!important}
 #panel-dashboards .dash-main-pane .dash-topbar{display:flex!important;flex-wrap:wrap!important;gap:12px!important;align-items:flex-end!important;width:100%!important}
 #panel-dashboards .dash-main-pane .dash-field-task{flex:1 1 260px!important}
@@ -11132,9 +11145,9 @@ body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,14
 #panel-dashboards .dash-bank-chip,#panel-dashboards .dash-stage-chip { padding:3px 7px; }
 #panel-dashboards .dash-bank-row { gap:6px; margin-top:6px; }
 @media(max-width:900px){
-    #panel-dashboards .dash-wrap.dash-split-wrap { grid-template-columns:minmax(0,1fr)!important; }
-    #panel-dashboards .dash-toolbar-right { margin-left:0; }
-    #panel-dashboards .dash-main-pane .dash-field-task { flex-basis:100%!important; }
+    #panel-dashboards .dash-wrap.dash-split-wrap,#panel-plan2027 .dash-wrap.dash-split-wrap { grid-template-columns:minmax(0,1fr)!important; }
+    #panel-dashboards .dash-toolbar-right,#panel-plan2027 .dash-toolbar-right { margin-left:0; }
+    #panel-dashboards .dash-main-pane .dash-field-task,#panel-plan2027 .dash-main-pane .dash-field-task { flex-basis:100%!important; }
 }
 
 /* Keep timeline and dialog surfaces theme-aware; today gets its own label row. */
@@ -11148,9 +11161,9 @@ body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,14
 #dashCreateModal .dash-modal-foot .btn:not(.btn-primary) { color:var(--trk-text); background:var(--trk-input-bg); }
 
 @media(max-width:900px){
-    #panel-dashboards .dash-task-row { flex-direction:column; align-items:stretch; }
-    #panel-dashboards #dashTaskSelector { flex:0 0 auto; width:100%; min-width:0; height:auto; min-height:30px; }
-    #panel-dashboards #dashCreateTaskBtn { align-self:flex-start; }
+    #panel-dashboards .dash-task-row,#panel-plan2027 .dash-task-row { flex-direction:column; align-items:stretch; }
+    #panel-dashboards #dashTaskSelector,#panel-plan2027 #plan2027TaskSelector { flex:0 0 auto; width:100%; min-width:0; height:auto; min-height:30px; }
+    #panel-dashboards #dashCreateTaskBtn,#panel-plan2027 #plan2027CreateTaskBtn { align-self:flex-start; }
 }
 
 /* ===================== Годовой план (эксперимент) — tracker/yearplan.js ===================== */

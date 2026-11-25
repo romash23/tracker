@@ -58,6 +58,7 @@
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>🗺️</span><span>Карта проверок</span></button>{% endif %}
         {# PATCH: «Текущие проверки» вставляется сюда JS-ом buildGanttTab() — сразу после «Задачи» (второй вкладкой) #}
         {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
+        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'plan2027' %} active{% endif %}" data-tab="plan2027"><span>📆</span><span>План 2027</span></button>{% endif %}
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'completed' %} active{% endif %}" data-tab="completed"><span>✅</span><span>Завершенные</span></button>{% endif %}
         <div class="tracker-tab-menu" id="employeesTabMenu">
             <button class="tracker-tab{% if AT in ['heatmap','vacations','dicts'] %} active{% endif %}" type="button" id="employeesTabBtn" data-menu="employees">
@@ -116,6 +117,48 @@
             </div>
             <aside class="dash-side-pane">
                 <div id="dashLoadContainer" class="dash-load-container"></div>
+            </aside>
+        </div>
+    </div>
+<div class="tracker-panel{% if AT == 'plan2027' %} active{% endif %}" id="panel-plan2027">
+        <div class="dash-wrap dash-split-wrap">
+            <div class="dash-main-pane">
+                <div class="plan-toolbar dash-toolbar" id="plan2027Toolbar">
+                    <div class="plan-title">🧪 Песочница планирования</div>
+                    <div class="dash-toolbar-right">
+                        <button class="btn dash-help-btn" id="plan2027HelpBtn" type="button" title="Как пользоваться песочницей">❔ Как пользоваться</button>
+                        <button class="btn dash-save-btn" id="plan2027SaveBtn">Сохранить изменения</button>
+                    </div>
+                </div>
+                <div class="dash-topbar" id="plan2027SelectorRow">
+                    <div class="dash-field dash-field-task">
+                        <label class="dash-label" for="plan2027TaskSelector">Проверка</label>
+                        <div class="dash-task-row">
+                            <select id="plan2027TaskSelector" class="form-control"></select>
+                            <button class="btn btn-secondary" id="plan2027CreateTaskBtn" type="button">+ Создать проверку</button>
+                        </div>
+                    </div>
+                    <div class="dash-field">
+                        <label class="dash-label">Направление</label>
+                        <div class="btn-seg" id="plan2027DirSwitch">
+                            <button class="btn-seg-btn active" type="button" data-dir="all">Все</button>
+                            <button class="btn-seg-btn" type="button" data-dir="corp">Корп</button>
+                            <button class="btn-seg-btn" type="button" data-dir="retail">Розн</button>
+                        </div>
+                    </div>
+                    <div class="dash-field">
+                        <label class="dash-label">Горизонт</label>
+                        <div class="btn-seg" id="plan2027ModeSwitch">
+                            <button class="btn-seg-btn" type="button" data-mode="small">Малый (12м)</button>
+                            <button class="btn-seg-btn active" type="button" data-mode="medium">Средний (6м)</button>
+                            <button class="btn-seg-btn" type="button" data-mode="large">Крупный (3м)</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="plan2027GanttContainer" class="dash-gantt-container"></div>
+            </div>
+            <aside class="dash-side-pane">
+                <div id="plan2027LoadContainer" class="dash-load-container"></div>
             </aside>
         </div>
     </div>
