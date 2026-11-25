@@ -394,10 +394,7 @@ function css() {
     document.head.appendChild(s);
 }
 function bank(b) { return '<span class="pk-bank" style="background:' + e(b.color) + '" title="' + e(b.name) + '">' + e(b.short) + '</span>'; }
-function open(year, edit) {
-    // year/edit — вызов из «Годового плана»: сразу нужный год и режим «Справочник и планы»
-    if (year && isFinite(+year)) { if (ST.ret == null) ST.ret = ST.year; ST.year = +year; }
-    if (edit && !ST.ed) ST.ed = { cols: {}, orig: '{}', year: ST.year };
+function open() {
     css();
     var ov = document.getElementById('pkOverlay');
     if (!ov) {
@@ -419,7 +416,7 @@ function open(year, edit) {
     document.addEventListener('keydown', onKey);
     head(); load();
 }
-function close() { if (ST.ed && edChanges() && !confirm('Закрыть без сохранения изменений в списках?')) return; ST.ed = null; popClose(); var ov = document.getElementById('pkOverlay'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey); var y = ST.year; if (ST.ret != null) { ST.year = ST.ret; ST.ret = null; } try { document.dispatchEvent(new CustomEvent('trk:pockets-closed', { detail: { year: y } })); } catch (x) {} }
+function close() { if (ST.ed && edChanges() && !confirm('Закрыть без сохранения изменений в списках?')) return; ST.ed = null; popClose(); var ov = document.getElementById('pkOverlay'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey); }
 function onKey(ev) {
     var pp = document.getElementById('pkPop');
     if (ev.key === 'Escape' && pp && pp.style.display === 'block') { popClose(); return; }
