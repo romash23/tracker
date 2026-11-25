@@ -2683,7 +2683,13 @@ function setActiveTab(tab){
     if (tab === 'dashboards' && window.__dashRender && typeof window.__dashRender.activate === 'function') {
         try { window.__dashRender.activate(); } catch(e){}
     }
+    if (tab === 'yearplan') {
+        /* «Годовой план» — подвкладка «Планирования»: подсвечиваем вкладку календаря */
+        var cal = document.querySelector('.tracker-tab[data-tab="calendar"]'); if (cal) cal.classList.add('active');
+        if (typeof window.__ypActivate === 'function') { try { window.__ypActivate(); } catch(e){ console.error('[yearplan]', e); } }
+    }
 }
+window.__trkSetActiveTab = setActiveTab;
 
 function closeEmployeesMenu(){
     var wrap = document.getElementById('employeesTabMenu');
@@ -2716,6 +2722,14 @@ document.addEventListener('click', function(e){
     e.preventDefault();
     e.stopPropagation();
     setActiveTab('dashboards');
+}, true);
+
+document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest ? e.target.closest('#openYearPlanBtn') : null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveTab('yearplan');
 }, true);
 })();
 

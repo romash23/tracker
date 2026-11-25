@@ -73,6 +73,9 @@
         {% if P.get('tab.stats') %}<button class="tracker-tab{% if AT == 'stats' %} active{% endif %}" data-tab="stats"><span>📈</span><span>Статистика</span></button>{% endif %}
     </div>
 
+    <!-- ============================== ГОДОВОЙ ПЛАН (эксперимент) ============================== -->
+    <div class="tracker-panel" id="panel-yearplan"></div>
+
     <!-- ============================== ДАШБОРДЫ ============================== -->
     <div class="tracker-panel{% if AT == 'dashboards' %} active{% endif %}" id="panel-dashboards">
         <div class="dash-wrap dash-split-wrap">
@@ -123,6 +126,7 @@
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
             <button class="plan-act plan-act--dash plan-act--hero" id="openDashboardsInlineBtn" type="button" title="Песочница: перетаскивание проверок и нагрузка ТБ в реальном времени"><i>🧪</i><span>Песочница</span></button>
+            <button class="plan-act plan-act--year" id="openYearPlanBtn" type="button" hidden title="Годовой план 2027 (эксперимент): все карманы и проверки года на одной шкале"><i>📆</i><span>Годовой план 2027</span></button>
             <div class="plan-actions">
             {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-act plan-act--pockets" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ"><i>🗂</i><span>Карманы</span></button>{% endif %}
             <span class="plan-act-sep" aria-hidden="true"></span>
@@ -823,7 +827,7 @@
 {% block scripts %}
 <script>window.REESTR_PERMS = {{ perms|tojson }};</script>
 {# Трекер: static/tracker/*.js, порядок загрузки важен (патчи оборачивают функции предыдущих файлов). #}
-{% for _f in ['boot', 'core', 'ui', 'task_card', 'tabs'] %}<script src="{{ url_for('static', filename='tracker/' ~ _f ~ '.js') }}?v={{ static_version }}"></script>
+{% for _f in ['boot', 'core', 'ui', 'task_card', 'tabs', 'yearplan'] %}<script src="{{ url_for('static', filename='tracker/' ~ _f ~ '.js') }}?v={{ static_version }}"></script>
 {% endfor %}
 {% set LP = loaded_plugins or [] %}
 <script>window.REESTR_PLUGINS = {{ LP|tojson }};</script>
