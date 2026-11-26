@@ -58,7 +58,6 @@
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'tasks' %} active{% endif %}" data-tab="tasks"><span>🗺️</span><span>Карта проверок</span></button>{% endif %}
         {# PATCH: «Текущие проверки» вставляется сюда JS-ом buildGanttTab() — сразу после «Задачи» (второй вкладкой) #}
         {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'calendar' %} active{% endif %}" data-tab="calendar"><span>🗓️</span><span>Планирование проверок</span></button>{% endif %}
-        {% if P.get('tab.calendar') %}<button class="tracker-tab{% if AT == 'plan2027' %} active{% endif %}" data-tab="plan2027"><span>📆</span><span>План 2027</span></button>{% endif %}
         {% if P.get('tab.tasks') %}<button class="tracker-tab{% if AT == 'completed' %} active{% endif %}" data-tab="completed"><span>✅</span><span>Завершенные</span></button>{% endif %}
         <div class="tracker-tab-menu" id="employeesTabMenu">
             <button class="tracker-tab{% if AT in ['heatmap','vacations','dicts'] %} active{% endif %}" type="button" id="employeesTabBtn" data-menu="employees">
@@ -121,8 +120,9 @@
         <div class="dash-wrap dash-split-wrap">
             <div class="dash-main-pane">
                 <div class="plan-toolbar dash-toolbar" id="plan2027Toolbar">
-                    <div class="plan-title">🧪 Песочница планирования</div>
+                    <div class="plan-title">📆 План 2027</div>
                     <div class="dash-toolbar-right">
+                        {% if 'pockets' in (loaded_plugins or []) %}<button class="btn p27-pockets-btn" id="plan2027PocketsBtn" type="button" title="Справочник карманов и планы на 2027 год — окно поверх вкладки">✏️ Карманы 2027</button>{% endif %}
                         <button class="btn dash-help-btn" id="plan2027HelpBtn" type="button" title="Как пользоваться песочницей">❔ Как пользоваться</button>
                         <button class="btn dash-save-btn" id="plan2027SaveBtn">Сохранить изменения</button>
                     </div>
@@ -135,6 +135,7 @@
                             <button class="btn btn-secondary" id="plan2027CreateTaskBtn" type="button">+ Создать проверку</button>
                         </div>
                     </div>
+                    <div class="dash-field p27-pocket-field"><label class="dash-label" for="plan2027PocketSelector">Карман</label><select id="plan2027PocketSelector" class="form-control"><option value="">Все карманы</option></select></div>
                     <div class="dash-field">
                         <label class="dash-label">Направление</label>
                         <div class="btn-seg" id="plan2027DirSwitch">
@@ -146,8 +147,9 @@
                     <div class="dash-field">
                         <label class="dash-label">Горизонт</label>
                         <div class="btn-seg" id="plan2027ModeSwitch">
+                            <button class="btn-seg-btn active" type="button" data-mode="year">Год 2027</button>
                             <button class="btn-seg-btn" type="button" data-mode="small">Малый (12м)</button>
-                            <button class="btn-seg-btn active" type="button" data-mode="medium">Средний (6м)</button>
+                            <button class="btn-seg-btn" type="button" data-mode="medium">Средний (6м)</button>
                             <button class="btn-seg-btn" type="button" data-mode="large">Крупный (3м)</button>
                         </div>
                     </div>
@@ -166,6 +168,7 @@
         <div class="plan-toolbar">
             <div class="plan-title">🗓️ Планирование проверок</div>
             <button class="plan-act plan-act--dash plan-act--hero" id="openDashboardsInlineBtn" type="button" title="Песочница: перетаскивание проверок и нагрузка ТБ в реальном времени"><i>🧪</i><span>Песочница</span></button>
+            <button class="plan-act plan-act--dash plan-act--hero plan-act--p27" id="openPlan2027InlineBtn" type="button" title="План 2027: годовое планирование проверок по карманам"><i>📆</i><span>План 2027</span></button>
             <div class="plan-actions">
             {% if 'pockets' in (loaded_plugins or []) %}<button class="plan-act plan-act--pockets" id="openPocketsBtn" type="button" title="Справочник карманов, планы и распределение по ТБ"><i>🗂</i><span>Карманы</span></button>{% endif %}
             <span class="plan-act-sep" aria-hidden="true"></span>
@@ -477,13 +480,13 @@
 <div class="modal" id="departmentModal"><div class="modal-content">
     <h2 id="departmentModalTitle">Новый банк</h2>
     <input type="hidden" id="dep_id">
-    <div class="form-group"><label>Название *</label><input type="text" id="dep_name" maxlength="80"></div>
+    <div class="dep-name-row" style="display:flex;gap:10px;align-items:flex-end;">
+        <div class="form-group" style="flex:1 1 auto;min-width:0;"><label>Название *</label><input type="text" id="dep_name" maxlength="80"></div>
+        <div class="form-group" style="flex:0 0 118px;"><label title="Краткое обозначение для узких таблиц и осей «Плана 2027»">🔤 Кратко</label><input type="text" id="dep_short_name" maxlength="8" placeholder="ПБ" title="Например: ПБ, ВВБ, СибБ"></div>
+    </div>
     <div class="form-group"><label>Цвет</label><input type="color" id="dep_color" value="#00897b" style="height:38px;padding:2px;width:80px;"></div>
     <div class="form-group"><label>👥 Штатная численность (розничное направление)</label>
         <input type="number" id="dep_headcount_retail" min="0" step="0.5" placeholder="например: 2.5">
-    </div>
-    <div class="form-group"><label>🔤 Короткое название (для узких таблиц)</label>
-        <input type="text" id="dep_short_name" maxlength="8" placeholder="например: ПБ">
     </div>
     <div class="form-group"><label>🏢 Штатная численность (корпоративное направление)</label>
         <input type="number" id="dep_headcount_corp" min="0" step="0.5" placeholder="например: 3.5">

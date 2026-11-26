@@ -1244,6 +1244,22 @@ def create_app():
             print('[INIT] departments.short_name добавлено')
     except Exception as _e:
         print(f'[INIT] migration pockets: {_e}')
+    # Краткие обозначения банков по регламенту: заполняем пустые и нечисловые-ошибочные (например «2.5»).
+    try:
+        import re as _re_sn
+        _SN = {'байкальский': 'ББ', 'волговятский': 'ВВБ', 'дальневосточный': 'ДВБ', 'московский': 'МБ',
+               'поволжский': 'ПБ', 'северозападный': 'СЗБ', 'сибирский': 'СибБ', 'среднерусский': 'СрБ',
+               'уральский': 'УБ', 'центральночерноземный': 'ЦЧБ', 'югозападный': 'ЮЗБ'}
+        for _r in db.query('SELECT id, name, short_name FROM departments'):
+            _cur = str(_r['short_name'] or '').strip()
+            if _cur and _re_sn.search('[A-Za-zА-Яа-яЁё]', _cur):
+                continue
+            _k = _re_sn.sub('[^а-я]', '', str(_r['name'] or '').lower().replace('ё', 'е').replace('банк', ''))
+            if _k in _SN:
+                db.exec('UPDATE departments SET short_name=? WHERE id=?', (_SN[_k], _r['id']))
+                print(f"[INIT] short_name {_r['name']} -> {_SN[_k]}")
+    except Exception as _e:
+        print(f'[INIT] short_name banks: {_e}')
     # PATCH pockets-year — карманы ведутся по годам: на каждый год свой список и план проверок.
     # Старый карман переносится в каждый год, где он встречается в проверках или планах (и в текущий, если открыт).
     try:

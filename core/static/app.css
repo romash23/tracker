@@ -11165,3 +11165,191 @@ body:not(.trk-theme-light) .task-card-pocket.retail { background: rgba(240,98,14
     #panel-dashboards #dashTaskSelector,#panel-plan2027 #plan2027TaskSelector { flex:0 0 auto; width:100%; min-width:0; height:auto; min-height:30px; }
     #panel-dashboards #dashCreateTaskBtn,#panel-plan2027 #plan2027CreateTaskBtn { align-self:flex-start; }
 }
+
+/* ===== План 2027: кнопка в «Планировании», шкала года, сезоны градиентом ===== */
+.plan-act--p27{background:linear-gradient(135deg,#0284c7,#2563eb);box-shadow:0 3px 10px rgba(37,99,235,.30)}
+.plan-act--p27:hover{box-shadow:0 6px 16px rgba(37,99,235,.42)}
+#panel-plan2027 .p27-pockets-btn{border:1px solid rgba(13,148,136,.55);background:rgba(13,148,136,.10);color:#0f766e;font-weight:600}
+body:not(.trk-theme-light) #panel-plan2027 .p27-pockets-btn{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.10);color:#5eead4}
+#panel-plan2027 .p27-scale{position:relative}
+#panel-plan2027 .p27-scale>.dash-tl-axis,#panel-plan2027 .p27-scale>.dash-tl-track{z-index:1}
+#panel-plan2027 .p27-year .dash-tl-axis{height:15px;margin-bottom:6px}
+#panel-plan2027 .p27-season{position:absolute;top:-4px;bottom:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(var(--p27c),.42) 0,rgba(var(--p27c),.20) 22px,rgba(var(--p27c),.05) 34px,rgba(var(--p27c),.02) 100%)}
+body.trk-theme-light #panel-plan2027 .p27-season{background:linear-gradient(to bottom,rgba(var(--p27c),.50) 0,rgba(var(--p27c),.22) 22px,rgba(var(--p27c),.06) 34px,rgba(var(--p27c),.025) 100%)}
+#panel-plan2027 .p27-mline{position:absolute;top:-4px;bottom:0;width:0;border-left:1px solid rgba(128,128,128,.38);z-index:1;pointer-events:none}
+#panel-plan2027 .p27-mlab{position:absolute;top:0;transform:translateX(-50%);font-size:.66rem;font-weight:700;line-height:15px;white-space:nowrap;color:var(--trk-text,#334155);opacity:.9}
+#panel-plan2027 .p27-legend{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:6px 2px 2px;font-size:.72rem}
+#panel-plan2027 .p27-leg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+#panel-plan2027 .p27-leg i{display:inline-block;width:18px;height:10px;border-radius:3px;background:linear-gradient(to bottom,rgba(var(--p27c),.6),rgba(var(--p27c),.08))}
+#panel-plan2027 .p27-leg-note{opacity:.65}
+@media (max-width:520px){#panel-plan2027 .p27-mlab{font-size:.58rem}}
+
+/* План 2027: в тулбаре на одну кнопку больше, чем в Песочнице — переносим кнопки на узких экранах */
+#panel-plan2027 .dash-toolbar-right { flex-wrap:wrap; gap:6px; min-width:0; max-width:100%; }
+
+/* План 2027: цвета под тему, как у Песочницы (заголовки в тёмной теме были тёмно-синими) */
+#panel-plan2027 .dash-lane-title,#panel-plan2027 .plan-title { color:var(--trk-text); }
+#panel-plan2027 .dash-tl-tick { color:var(--trk-meta); }
+#panel-plan2027 .dash-tl-line { background:var(--trk-card-border); }
+#panel-plan2027 .dash-grid-line { border-color:var(--trk-card-border); }
+#panel-plan2027 .dash-load-head { gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+#panel-plan2027 #plan2027CreateTaskBtn { flex:0 0 auto; width:auto; max-width:none; white-space:nowrap; }
+#panel-plan2027 #plan2027TaskSelector { flex:1 1 160px; width:0; min-width:120px; }
+#panel-plan2027 .dash-task-row { flex-wrap:wrap; gap:6px; }
+
+/* План 2027: правила контейнеров, как у Песочницы */
+#panel-plan2027 .dash-timeline { background:var(--trk-input-bg); border-color:var(--trk-card-border); }
+#plan2027LoadContainer .dash-load-head{margin-bottom:6px}
+#plan2027LoadContainer .dash-bank-grid{display:flex!important;flex-direction:column;gap:3px!important}
+#plan2027LoadContainer .dash-bank-card{padding:6px 10px 3px!important;gap:3px!important;border-radius:10px!important}
+#plan2027LoadContainer .dash-bank-card.is-collapsed{padding:3px 10px!important}
+#plan2027LoadContainer .dash-bank-head{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;cursor:pointer;user-select:none;min-height:22px}
+#plan2027LoadContainer .dash-bank-name{font-size:.95rem;line-height:1.2;color:var(--trk-text,#0f172a)}
+#plan2027LoadContainer .dash-bank-head .dash-badge.lead{font-size:.7rem;padding:1px 7px;border-radius:999px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;font-weight:700}
+#plan2027LoadContainer .dash-bank-toggle{width:20px;height:20px;flex:0 0 20px;padding:0;border:1px solid var(--trk-card-border,#cbd5e1);border-radius:5px;background:transparent;color:var(--trk-meta,#64748b);font-size:.8rem;line-height:18px;cursor:pointer}
+#plan2027LoadContainer .dash-bank-toggle:hover{border-color:#2563eb;color:#2563eb}
+#plan2027LoadContainer .dash-mini-chart-wrap{margin-top:0!important;min-height:0!important;position:relative}
+#plan2027LoadContainer .dash-mini-chart{min-height:0!important;align-items:flex-end}
+#plan2027LoadContainer .dash-mini-col{height:100%!important;padding-top:0!important;gap:0!important}
+
+/* План 2027: чипы банков и этапов в одну строку */
+#panel-plan2027 .dash-bank-row{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;margin-top:6px!important}
+#panel-plan2027 .dash-bank-chips,#panel-plan2027 .dash-stage-chips{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:4px!important;margin-top:6px!important;min-width:0}
+#panel-plan2027 .dash-bank-row .dash-bank-chips{margin-top:0!important;flex:0 1 auto}
+#panel-plan2027 .dash-bank-chips-lbl{flex:0 0 auto;font-size:.78rem;margin-right:2px;cursor:help}
+#panel-plan2027 .dash-bank-chip,#panel-plan2027 .dash-stage-chip{flex:0 0 auto;padding:2px 7px!important;font-size:.78rem!important;line-height:1.35;white-space:nowrap}
+#panel-plan2027 .dash-lead-picker-btn{padding:3px 8px!important;font-size:.76rem!important;border-radius:8px!important;margin-left:auto}
+@media (max-width:900px){
+#panel-plan2027 .dash-bank-row,#panel-plan2027 .dash-bank-chips,#panel-plan2027 .dash-stage-chips{flex-wrap:wrap!important}
+}
+
+/* План 2027: полосы этапов у нижнего края трека; предварительные проверки светлее */
+#panel-plan2027 .dash-tl-track .dash-seg{top:auto!important;bottom:3px!important}
+#panel-plan2027 .dash-seg.p27-prelim{background:color-mix(in srgb,var(--p27seg) 38%,#ffffff)!important;color:#334155!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--p27seg) 55%,#ffffff) inset!important}
+#panel-plan2027 .dash-seg.p27-prelim.dash-seg-lead{box-shadow:0 0 0 2px color-mix(in srgb,var(--p27seg) 70%,#334155) inset!important}
+#panel-plan2027 .dash-seg.p27-prelim .dash-seg-lab{text-shadow:none!important}
+body:not(.trk-theme-light) #panel-plan2027 .dash-seg.p27-prelim{background:color-mix(in srgb,var(--p27seg) 45%,#cbd5e1)!important;color:#1e293b!important}
+
+/* Plan 2027: compact lanes */
+#panel-plan2027 .dash-lane-block { padding:3px 8px 4px; margin-bottom:4px; border-radius:7px; }
+#panel-plan2027 .dash-lane-header { margin-bottom:2px; min-height:0; }
+#panel-plan2027 .dash-lane-title { font-size:.74rem; font-weight:600; line-height:1.3; }
+#panel-plan2027 .dash-lane-header-actions { gap:2px; }
+#panel-plan2027 .dash-lane-pin, #panel-plan2027 .dash-lane-close { width:20px; height:20px; font-size:.75rem; padding:0; }
+#panel-plan2027 .dash-tl-track { height:26px; }
+#panel-plan2027 .p27-scale { font-size:.64rem; }
+#panel-plan2027 .p27-mlab { font-size:.62rem; }
+/* chips toggle button */
+#panel-plan2027 .p27-chips-toggle { width:20px; height:20px; padding:0; border:1px solid var(--trk-card-border,#cbd5e1); border-radius:5px; background:transparent; color:var(--trk-meta,#64748b); font-size:.78rem; line-height:18px; cursor:pointer; flex:0 0 20px; }
+#panel-plan2027 .p27-chips-toggle:hover { border-color:#2563eb; color:#2563eb; background:rgba(37,99,235,.07); }
+#panel-plan2027 .p27-chips-toggle.active { border-color:#2563eb; color:#fff; background:#2563eb; }
+/* chips wrap: hidden by default */
+#panel-plan2027 .p27-chips-wrap { padding-top:3px; }
+#panel-plan2027 .p27-chips-wrap.p27-chips-hidden { display:none; }
+
+/* Plan 2027: compact lanes v2 (>=10 lanes per screen) */
+#panel-plan2027 .dash-lane-block { padding:3px 8px 3px; margin-bottom:3px; }
+#panel-plan2027 .dash-lane-header { margin-bottom:1px; }
+#panel-plan2027 .dash-timeline.p27-year { margin:1px 0 0 !important; padding:2px 6px 2px !important; }
+#panel-plan2027 .p27-scale .dash-tl-axis { height:12px; margin-bottom:1px; }
+#panel-plan2027 .p27-mlab { line-height:12px; }
+#panel-plan2027 .p27-season, #panel-plan2027 .p27-mline { top:-2px; }
+#panel-plan2027 .p27-season { background:linear-gradient(to bottom,rgba(var(--p27c),.42) 0,rgba(var(--p27c),.16) 12px,rgba(var(--p27c),.04) 18px,rgba(var(--p27c),.02) 100%); }
+body.trk-theme-light #panel-plan2027 .p27-season { background:linear-gradient(to bottom,rgba(var(--p27c),.50) 0,rgba(var(--p27c),.18) 12px,rgba(var(--p27c),.05) 18px,rgba(var(--p27c),.025) 100%); }
+#panel-plan2027 .dash-tl-track { height:24px !important; }
+#panel-plan2027 .dash-tl-track .dash-seg { height:20px !important; top:auto !important; bottom:2px !important; }
+#panel-plan2027 .dash-seg .dash-seg-lab { line-height:20px; font-size:.62rem; }
+#panel-plan2027 .dash-seg-del { top:-5px; right:-5px; bottom:auto; width:14px; height:14px; font-size:10px; visibility:hidden; }
+#panel-plan2027 .dash-seg:hover .dash-seg-del { visibility:visible; }
+
+
+/* Plan 2027 compact acceptance: retain geometry above; all overrides are panel-local. */
+#panel-plan2027 .dash-lane-block .dash-seg {
+  box-sizing:border-box;
+  border:1px solid color-mix(in srgb,var(--p27seg) 70%,#334155);
+}
+/* The renderer currently marks segments; also support the lane-level status hook. */
+#panel-plan2027 .dash-lane-block.p27-prelim .dash-seg,
+#panel-plan2027 .dash-lane-block .dash-seg.p27-prelim {
+  border-style:dashed;
+  border-color:#475569;
+}
+#panel-plan2027 .dash-lead-picker-btn {
+  background:var(--trk-input-bg,#f8fafc);
+  color:var(--trk-text,#334155);
+  border-color:var(--trk-card-border,#cbd5e1);
+}
+#panel-plan2027 .dash-lead-picker-btn:hover {
+  background:var(--trk-card-bg,#fff);
+  border-color:#64748b;
+}
+/* All active stage fills are pastel, so dark text also fixes yellow ОС contrast.
+   !important is necessary only to override the renderer's inline white text. */
+#panel-plan2027 .dash-stage-chip.on { color:#172033!important; }
+#panel-plan2027 .dash-seg .dash-seg-lab { color:#172033; text-shadow:none; }
+/* Eleven short bank names fit without stealing space from the leader control.
+   At smaller widths the existing wrapping remains available (no clipping). */
+#panel-plan2027 .dash-bank-row { gap:4px!important; }
+#panel-plan2027 .dash-bank-row .dash-bank-chips { gap:3px!important; }
+#panel-plan2027 .dash-bank-chip { padding:2px 5px!important; font-size:11px!important; }
+#panel-plan2027 .dash-bank-chips-lbl { font-size:11px; }
+#panel-plan2027 .dash-lead-picker-btn { padding:3px 6px!important; font-size:11px!important; }
+
+/* Plan 2027 stage 3: two compact monthly audit-count heatmaps, or full-column histograms. */
+#panel-plan2027 .dash-side-pane,
+#panel-plan2027 #plan2027LoadContainer { min-width:0; max-width:100%; box-sizing:border-box; }
+#panel-plan2027 #plan2027LoadContainer { width:100%; padding:10px; }
+#panel-plan2027 .p27-load-head { align-items:center; flex-wrap:nowrap; gap:8px; }
+#panel-plan2027 .p27-load-head .dash-load-title { min-width:0; font-size:1rem; }
+#panel-plan2027 .p27-load-toggle { flex:0 0 30px; width:30px; height:28px; padding:0; border:1px solid var(--trk-card-border,#64748b); border-radius:6px; background:var(--trk-input-bg,#182234); color:var(--trk-text,#e2e8f0); font-size:22px; line-height:1; cursor:pointer; }
+#panel-plan2027 .p27-load-toggle:hover { background:var(--trk-card-bg,#263449); }
+#panel-plan2027 .p27-load-toggle:focus-visible { outline:2px solid #60a5fa; outline-offset:2px; }
+#panel-plan2027 .p27-load-body { display:flex; flex-direction:column; gap:10px; min-width:0; width:100%; }
+#panel-plan2027 .p27-load-note { margin:0; color:var(--trk-meta,#94a3b8); font-size:10px; line-height:1.4; overflow-wrap:anywhere; }
+#panel-plan2027 .p27-heatmap { min-width:0; padding:8px 6px; border:1px solid var(--trk-card-border,#475569); border-radius:8px; background:var(--trk-input-bg,#182234); color:var(--trk-text,#e2e8f0); }
+#panel-plan2027 .p27-heatmap h3 { margin:0 0 6px; font-size:12px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
+#panel-plan2027 .p27-load-table { width:100%; max-width:100%; min-width:0; table-layout:fixed; border-collapse:separate; border-spacing:2px; font-size:11px; line-height:1.25; color:var(--trk-text,#e2e8f0); }
+#panel-plan2027 .p27-load-bank-col { width:58px; }
+#panel-plan2027 .p27-load-table th,
+#panel-plan2027 .p27-load-table td { padding:3px 0; border:0; text-align:center; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#panel-plan2027 .p27-load-table thead th { color:var(--trk-text,#e2e8f0); font-size:11px; }
+#panel-plan2027 .p27-load-table tbody th { text-align:left; padding-right:3px; font-weight:600; }
+#panel-plan2027 .p27-load-table td { border-radius:3px; font-variant-numeric:tabular-nums; }
+/* Fixed luminance-ordered palette: higher counts are darker in BOTH themes. */
+#panel-plan2027 .p27-load-table td[data-level="0"] { color:var(--trk-text,#94a3b8); background:var(--trk-card-bg,#263449); }
+#panel-plan2027 .p27-load-table td[data-level="1"] { background:#dbeafe; color:#172033; }
+#panel-plan2027 .p27-load-table td[data-level="2"] { background:#93c5fd; color:#172033; }
+#panel-plan2027 .p27-load-table td[data-level="3"] { background:#2563eb; color:#fff; }
+#panel-plan2027 .p27-load-table td[data-level="4"] { background:#1d4ed8; color:#fff; }
+#panel-plan2027 .p27-load-table td[data-level="5"] { background:#1e40af; color:#fff; }
+#panel-plan2027 .p27-load-empty { padding:18px 5px; color:var(--trk-meta,#94a3b8); text-align:center; font-size:12px; }
+#panel-plan2027 .p27-load-sr { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+#panel-plan2027 .p27-load-histograms .dash-bank-grid { width:100%; min-width:0; }
+#panel-plan2027 .p27-load-histograms .dash-bank-name { min-width:0; overflow-wrap:anywhere; }
+#panel-plan2027 .p27-load-histograms .dash-mini-chart { gap:1px; overflow:hidden; }
+@media (max-width:520px) {
+  #panel-plan2027 #plan2027LoadContainer { padding:7px; }
+  #panel-plan2027 .p27-heatmap { padding:6px 3px; }
+  #panel-plan2027 .p27-load-bank-col { width:48px; }
+  #panel-plan2027 .p27-load-table { border-spacing:1px 2px; font-size:9px; }
+  #panel-plan2027 .p27-load-table thead th { font-size:8px; }
+}
+
+/* Plan 2027: direction is always the first level; identical pocket names never merge. */
+#panel-plan2027 .p27-direction>h3 {font-size:12px;line-height:18px;margin:3px 0;color:var(--trk-text);}
+#panel-plan2027 .p27-pocket-group {border:1px solid var(--trk-card-border);border-radius:6px;margin:3px 0;padding:0 3px;min-width:0;}
+#panel-plan2027 .p27-pocket-group>summary {font-size:11px;font-weight:650;cursor:pointer;padding:3px 5px;color:var(--trk-text);}
+#panel-plan2027 .p27-pocket-empty {font-size:11px;padding:5px;color:var(--trk-meta);}
+#panel-plan2027 .p27-empty-slot {border:1px dashed var(--trk-meta);height:18px;min-height:18px;background:transparent;box-sizing:border-box;}
+#panel-plan2027 .p27-pocket-field {min-width:120px;max-width:100%;}
+#panel-plan2027 #plan2027PocketSelector {max-width:100%;font-size:12px;background:var(--trk-input-bg);color:var(--trk-text);}
+#panel-plan2027 .dash-tl-track {overflow:hidden;}
+
+/* Mobile: a desktop flex-basis must not turn into a 160px-tall select in a column. */
+@media (max-width:900px) {
+  #panel-plan2027 #plan2027TaskSelector { flex:0 0 auto; width:100%; min-width:0; height:32px; min-height:32px; }
+  #panel-plan2027 .p27-pocket-field { width:100%; }
+  #panel-plan2027 .p27-pocket-field select { width:100%; height:32px; }
+  #panel-plan2027 .p27-load-toggle { flex-basis:40px; width:40px; height:40px; }
+}

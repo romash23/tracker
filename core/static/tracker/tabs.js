@@ -2657,15 +2657,29 @@ function renderBankStatsPanel(bank){
     if (window.__trkPlan2027DuplicateV1) return;
     window.__trkPlan2027DuplicateV1 = true;
 
-    var stateDash = { task:null, mode:'medium', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0, leadPickerLane:null };
-    var MODE_MONTHS = { small:12, medium:6, large:3 };
+    var stateDash = { task:null, mode:'year', dir:'all', draft:null, lanes:[{task:null,draft:null,offset:0,pinned:false}], activeLane:0, globalOffset:0, leadPickerLane:null, selectedPocketKey:'', p27PocketFilterKey:'', p27ClosedTaskIds:new Set() };
+    var MODE_MONTHS = { year:12, small:12, medium:6, large:3 };
+    var P27_YEAR = 2027;
+    var P27_MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+    // Сезоны = кварталы плана: зима (дек–фев) 1 кв, весна 2 кв, лето 3 кв, осень (сен–ноя) 4 кв
+    var P27_SEASONS = {
+        winter:{ ico:'❄', name:'Зима', q:'1 кв', rgb:'96,165,250' },
+        spring:{ ico:'🌱', name:'Весна', q:'2 кв', rgb:'74,222,128' },
+        summer:{ ico:'☀', name:'Лето', q:'3 кв', rgb:'250,204,21' },
+        autumn:{ ico:'🍂', name:'Осень', q:'4 кв', rgb:'251,146,60' }
+    };
+    function p27SeasonOf(m){ return (m === 11 || m <= 1) ? 'winter' : (m <= 4 ? 'spring' : (m <= 7 ? 'summer' : 'autumn')); }
+    function p27Short(dep){
+        var s = dep ? String(dep.short_name || '').trim() : '';
+        return (s && /[A-Za-zА-Яа-яЁё]/.test(s)) ? s : (dep ? (dep.name || dep.id) : '');
+    }
     // Compact geometry preserves the original fonts; use native browser zoom.
     var DASH_DENSITY = 0.6;
     // Measure actual rendered labels, not an assumed number of pixels per day.
     function plan2027FitTicks(){
         document.querySelectorAll('#plan2027GanttContainer .dash-tl-axis').forEach(function(axis){
             var right = -Infinity;
-            axis.querySelectorAll('.dash-tl-tick').forEach(function(tick){
+            axis.querySelectorAll('.dash-tl-tick, .p27-mlab').forEach(function(tick){
                 tick.style.visibility = '';
                 var r = tick.getBoundingClientRect();
                 if (r.left < right + 8) tick.style.visibility = 'hidden';
@@ -2675,11 +2689,115 @@ function renderBankStatsPanel(bank){
     }
     function plan2027ScheduleTicks(){ window.requestAnimationFrame(plan2027FitTicks); }
 
+
+    // A pocket is identified by BOTH direction and name, never by its name alone.
+    function p27PocketKey(dir, name){ return dir + '|' + String(name || '').trim(); }
+    function p27DraftKey(d){ return d ? p27PocketKey(plan2027TaskDir(d) || 'other', d.pocket) : ''; }
+    function p27PlanGroups(){
+        var groups = new Map();
+        function group(key, dir, name, plan){
+            if (!groups.has(key)) groups.set(key,{key:key,dir:dir,name:name,plan:0,indices:[],remaining:0});
+            var g=groups.get(key); if(plan!=null) g.plan=Math.max(g.plan,Math.max(0,Number(plan)||0)); return g;
+        }
+        (stateDash.p27Pockets || []).forEach(function(p){
+            if (!p.is_active || (p.year!=null && String(p.year)!==String(P27_YEAR))) return;
+            var dir=plan2027TaskDir({task_type:p.direction})||'other';
+            group(p27PocketKey(dir,p.name),dir,p.name,p.plan_count);
+        });
+        var loaded = new Set();
+        stateDash.lanes.forEach(function(l){ if(l.draft && l.draft.id) loaded.add(String(l.draft.id)); });
+        (st().tasks||[]).forEach(function(d){
+            if ((d.task_kind||'audit')!=='audit' || String(d.start_date||'').slice(0,4)!==String(P27_YEAR) || d.status==='cancelled' || d.status==='archived' || loaded.has(String(d.id)) || stateDash.p27ClosedTaskIds.has(String(d.id))) return;
+            stateDash.lanes.push({task:d,draft:plan2027BuildDraft(d),offset:0,pinned:false}); loaded.add(String(d.id));
+        });
+        stateDash.lanes.forEach(function(l,i){
+            if(!l.draft)return;
+            var dir=plan2027TaskDir(l.draft)||'other', name=String(l.draft.pocket||'').trim();
+            var g=group(p27PocketKey(dir,name),dir,name,null); g.indices.push(i);
+        });
+        // Reuse empty planned slots, so rendering never discards or duplicates a draft.
+        groups.forEach(function(g){
+            var needed=Math.max(0,g.plan-g.indices.length);g.remaining=needed;
+            var empties=[];stateDash.lanes.forEach(function(l,i){if(!l.draft&&l.p27GroupKey===g.key)empties.push(i);});
+            while(empties.length<needed){empties.push(stateDash.lanes.length);stateDash.lanes.push({task:null,draft:null,offset:0,pinned:false,p27GroupKey:g.key});}
+            g.indices=g.indices.concat(empties.slice(0,needed));
+            g.indices.forEach(function(i){stateDash.lanes[i].p27Remaining=needed;});
+        });
+        stateDash.p27Groups=groups;
+        return groups;
+    }
+    function p27PocketFilter(){
+        var sel=byId('plan2027PocketSelector');if(!sel)return;
+        var opts='<option value="">Все карманы</option>';
+        ['corp','retail','other'].forEach(function(dir){
+            if(stateDash.dir!=='all'&&dir!==stateDash.dir)return;
+            var gs=Array.from((stateDash.p27Groups||new Map()).values()).filter(function(g){return g.dir===dir&&g.name;});
+            if(!gs.length)return;
+            opts+='<optgroup label="'+escapeHtml(DASH_DIR_LABEL[dir]||'Без направления')+'">';
+            gs.forEach(function(g){opts+='<option value="'+escapeHtml(g.key)+'">'+escapeHtml(g.name)+' ('+g.plan+')</option>';});opts+='</optgroup>';
+        });
+        sel.innerHTML=opts;sel.value=stateDash.p27PocketFilterKey||'';
+        if(sel.value!==(stateDash.p27PocketFilterKey||'')){stateDash.p27PocketFilterKey='';sel.value='';}
+    }
+    function p27FetchPockets(){
+        if(stateDash.p27PocketRequest)return stateDash.p27PocketRequest;
+        stateDash.p27PocketRequest=apiJson('/api/plugins/pockets/data?year='+P27_YEAR).then(function(r){
+            if(!r||!r.success)throw new Error((r&&(r.error||r.message))||'Не удалось загрузить карманы');
+            stateDash.p27Pockets=r.pockets||[];stateDash.p27PocketError='';renderGantt();renderLoad();
+        }).catch(function(e){stateDash.p27PocketError=e.message;renderGantt();}).then(function(){stateDash.p27PocketRequest=null;});
+        return stateDash.p27PocketRequest;
+    }
+    function p27GroupedLanes(){
+        var groups=p27PlanGroups();p27PocketFilter();var html='';var used=new Set();
+        ['corp','retail','other'].forEach(function(dir){
+            if(stateDash.dir!=='all'&&stateDash.dir!==dir)return;
+            var gs=Array.from(groups.values()).filter(function(g){return g.dir===dir&&(!stateDash.p27PocketFilterKey||g.key===stateDash.p27PocketFilterKey);});
+            if(!gs.length)return;
+            html+='<section class="p27-direction" data-p27-direction="'+dir+'"><h3>'+(dir==='corp'?'🏢 ':dir==='retail'?'👥 ':'')+escapeHtml(DASH_DIR_LABEL[dir]||'Без направления')+'</h3>';
+            gs.forEach(function(g){
+                html+='<details class="p27-pocket-group" data-p27-pocket="'+escapeHtml(g.key)+'"'+(stateDash.p27Collapsed&&stateDash.p27Collapsed[g.key]?'':' open')+'><summary data-p27-select-pocket="'+escapeHtml(g.key)+'">'+escapeHtml(g.name||'Вне кармана')+' ('+g.plan+')</summary>';
+                if(!g.indices.length)html+='<div class="p27-pocket-empty">План проверок не задан</div>';
+                g.indices.forEach(function(i){used.add(i);var l=stateDash.lanes[i];html+=renderLaneBlock(l,i,i===stateDash.activeLane,plan2027TimeBounds(laneOffset(l)),!!l.draft,stateDash.lanes.length>1,!!l.pinned);});
+                html+='</details>';
+            });html+='</section>';
+        });
+        // Unassigned manual axes remain available, but obsolete planned placeholders stay hidden.
+        stateDash.lanes.forEach(function(l,i){
+            if(used.has(i)||l.draft||l.p27GroupKey||stateDash.p27PocketFilterKey)return;
+            if(groups.size&&i===0&&stateDash.lanes.length>1)return;
+            html+=renderLaneBlock(l,i,i===stateDash.activeLane,plan2027TimeBounds(laneOffset(l)),stateDash.lanes.length>1,stateDash.lanes.length>1,!!l.pinned);
+        });
+        return html;
+    }
+
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
-    function switchLane(i){ stateDash.activeLane=i; var l=stateDash.lanes[i]; stateDash.task=l?l.task:null; stateDash.draft=l?l.draft:null; }
-    function addLane(){ if(stateDash.lanes.length>=5) return false; stateDash.lanes.push({task:null,draft:null,offset:stateDash.globalOffset||0,pinned:false}); switchLane(stateDash.lanes.length-1); return true; }
-    function findEmptyLane(){ for (var i=0;i<stateDash.lanes.length;i++){ var l=stateDash.lanes[i]; if (l && !l.task && !l.draft) return i; } return -1; }
-    function removeLane(i){ if(stateDash.lanes.length<=1) return false; stateDash.lanes.splice(i,1); if(stateDash.activeLane>=stateDash.lanes.length) stateDash.activeLane=stateDash.lanes.length-1; switchLane(stateDash.activeLane); return true; }
+    function switchLane(i){ var l=stateDash.lanes[i]; if(!l)return false; stateDash.activeLane=i; stateDash.task=l.task; stateDash.draft=l.draft; stateDash.selectedPocketKey=l.draft?p27DraftKey(l.draft):(l.p27GroupKey||''); return true; }
+    function addLane(){ if(stateDash.lanes.length>=30) return false; stateDash.lanes.push({task:null,draft:null,offset:stateDash.globalOffset||0,pinned:false}); switchLane(stateDash.lanes.length-1); return true; }
+    function findEmptyLane(groupKey){
+        var key=groupKey===undefined?stateDash.selectedPocketKey:groupKey, free=-1;
+        for(var i=0;i<stateDash.lanes.length;i++){
+            var l=stateDash.lanes[i];if(!l||l.task||l.draft)continue;
+            if(key&&l.p27GroupKey===key)return i;
+            if(!l.p27GroupKey&&free<0)free=i;
+        }
+        return free;
+    }
+    function removeLane(i){
+        if(!stateDash.lanes[i])return false;
+        syncLane();
+        var l=stateDash.lanes[i], d=l.draft, id=(d&&d.id)||(l.task&&l.task.id);
+        var orig=id?((st().tasks||[]).find(function(t){return String(t.id)===String(id);})||l.task):null;
+        var dirty=d&&(!orig||JSON.stringify(d)!==JSON.stringify(plan2027BuildDraft(orig)));
+        if(dirty&&!window.confirm('Закрыть ось и потерять несохранённые изменения?'))return false;
+        if(id)stateDash.p27ClosedTaskIds.add(String(id));
+        stateDash.lanes.splice(i,1);
+        if(stateDash.p27ChipsOpen){ var m={}; Object.keys(stateDash.p27ChipsOpen).forEach(function(x){ x=+x; if(x<i) m[x]=stateDash.p27ChipsOpen[x]; else if(x>i) m[x-1]=stateDash.p27ChipsOpen[x]; }); stateDash.p27ChipsOpen=m; }
+        if(!stateDash.lanes.length)stateDash.lanes.push({task:null,draft:null,offset:0,pinned:false});
+        var active=stateDash.activeLane;
+        if(active>i)active--;
+        switchLane(Math.min(active,stateDash.lanes.length-1));
+        return true;
+    }
     function laneOffset(lane){ lane=lane||stateDash.lanes[stateDash.activeLane]||{}; return lane && lane.pinned ? (lane.offset||0) : (stateDash.globalOffset||0); }
     function setLanePinned(i, pinned){ var lane=stateDash.lanes[i]; if(!lane) return; lane.pinned=!!pinned; if(lane.pinned) lane.offset=stateDash.globalOffset||0; }
     var DASH_DIR_LABEL = { retail:'Розничное', corp:'Корпоративное' };
@@ -2797,6 +2915,8 @@ function renderBankStatsPanel(bank){
         return (st().departments || []).find(function(d){ return d.id === id; }) || null;
     }
     function stageLabel(key){ return STAGE_LABELS[key] || key; }
+    var P27_STAGE_SHORT = {'подготовка':'Подг.','проверка_нжя':'НЖЯ','проверка_соглЦА':'Согл. ЦА','ос_проф':'ОС','реализация_возражения':'Реал. возр.','реализация_согласования':'Реал. согл.','запас':'Запас','оценка_тб':'Оценка ТБ'};
+    function p27StageShort(key){ return P27_STAGE_SHORT[key] || stageLabel(key); }
     function stageWeight(key){ return (STAGE_WEIGHTS[key] !== undefined) ? STAGE_WEIGHTS[key] : 1.0; }
     function dirTaskType(dir){ return PLAN_TYPE_MAP[dir] || (dir === 'corp' ? 'корпоративная' : 'розничная'); }
     function plan2027TaskDir(t){
@@ -2923,10 +3043,7 @@ function renderBankStatsPanel(bank){
         draft.task_kind = draft.task_kind || 'audit';
         draft.task_type = draft.task_type || (stateDash.dir !== 'all' ? dirTaskType(stateDash.dir) : 'розничная');
         // Не переключаем фильтр, если выбрано «Все» — просто показываем проверку как есть
-        if (stateDash.dir !== 'all') {
-            if (draft.task_type === 'корпоративная') stateDash.dir = 'corp';
-            else if (draft.task_type === 'розничная') stateDash.dir = 'retail';
-        }
+        // Building an audit draft must never change the active direction filter.
         draft.start_date = draft.start_date || todayISO();
         draft.deadline = draft.deadline || addDaysISO(draft.start_date, 90);
         if (draft.deadline < draft.start_date) draft.deadline = draft.start_date;
@@ -2942,20 +3059,26 @@ function renderBankStatsPanel(bank){
 
     function plan2027CreateDraft(opts){
         opts = opts || {};
-        var emptyIdx = findEmptyLane();
+        var dir = opts.dir === 'corp' ? 'corp' : 'retail';
+        var groupKey = p27PocketKey(dir, opts.pocket);
+        syncLane();
+        var emptyIdx = findEmptyLane(groupKey);
         if (emptyIdx >= 0) {
             switchLane(emptyIdx);
-        } else if (stateDash.lanes.length < 5) {
-            addLane();
+        } else if (!addLane()) {
+            notify('Достигнут лимит осей (30). Закройте ось перед созданием проверки.', 'error');
+            return false;
         }
-        // Новая колбаска: старт через 30 дней от сегодня, длина 2 календарных месяца
-        var start = addDaysISO(todayISO(), DASH_NEW_START_OFFSET_DAYS);
-        var end = addDaysISO(addMonthsISO(start, DASH_NEW_LENGTH_MONTHS), -1);
+        // План 2027: подготовка 14 дней (01.02–14.02) + проверка НЖЯ 6 недель (15.02–28.03)
+        var start = P27_YEAR + '-02-01';
+        var prepEnd = addDaysISO(start, 13);
+        var njStart = addDaysISO(prepEnd, 1);
+        var end = addDaysISO(njStart, 6 * 7 - 1);
         var allDeps = (st().departments || []);
         var firstDepIds = allDeps.length ? [allDeps[0].id] : [];
         var shares = {};
         firstDepIds.forEach(function(id){ shares[id] = 100; });
-        var dir = opts.dir === 'corp' ? 'corp' : 'retail';
+        stateDash.selectedPocketKey=groupKey;
         var draft = {
             id: '',
             name: opts.name,
@@ -2967,18 +3090,21 @@ function renderBankStatsPanel(bank){
             department_ids: firstDepIds,
             department_shares: shares,
             lead_department: firstDepIds[0] || '',
-            stages: [{ key: DASH_STAGE_KEY_DEFAULT, start: start, end: end, weight: 1.0 }]
+            stages: [{ key: 'подготовка', start: start, end: prepEnd, weight: stageWeight('подготовка') },
+                     { key: DASH_STAGE_KEY_DEFAULT, start: njStart, end: end, weight: 1.0 }]
         };
         // Чтобы созданная колбаска не отфильтровалась — выставляем направление фильтра под неё
         if (stateDash.dir !== 'all' && stateDash.dir !== dir) stateDash.dir = 'all';
         stateDash.task = null;
         stateDash.draft = draft;
         syncLane();
+        stateDash.lanes[stateDash.activeLane].p27GroupKey=p27DraftKey(draft);
         syncControls();
         renderSelector();
         renderGantt();
         renderLoad();
-        notify('Черновик «' + draft.name + '» добавлен на ось (' + DASH_DIR_LABEL[dir] + ', ' + DASH_NEW_LENGTH_MONTHS + ' мес: ' + plan2027FmtD(start) + ' → ' + plan2027FmtD(end) + '). В БД он попадёт после «Сохранить изменения»', 'info');
+        notify('Черновик «' + draft.name + '» добавлен на ось (' + DASH_DIR_LABEL[dir] + '): подготовка ' + plan2027FmtD(start) + ' → ' + plan2027FmtD(prepEnd) + ', проверка НЖЯ ' + plan2027FmtD(njStart) + ' → ' + plan2027FmtD(end) + '. В БД он попадёт после «Сохранить изменения»', 'info');
+        return true;
     }
 
     function plan2027CloseCreateModal(){
@@ -2992,11 +3118,12 @@ function renderBankStatsPanel(bank){
         plan2027CloseCreateModal();
         var existingCount = (st().tasks || []).filter(function(t){ return (t.task_kind || 'audit') === 'audit'; }).length;
         var defName = 'Новая проверка ' + (existingCount + 1);
-        var defDir = stateDash.dir === 'corp' ? 'corp' : 'retail';
+        var selectedGroup=stateDash.p27Groups&&stateDash.p27Groups.get(stateDash.selectedPocketKey);
+        var defDir=selectedGroup?selectedGroup.dir:(stateDash.dir==='corp'?'corp':'retail');
         // Список существующих карманов
         function pocketOptsFor(dir){
             var tt = dirTaskType(dir), o = ['<option value="">— Вне кармана —</option>'];
-            (window.trkPocketsFor ? window.trkPocketsFor(tt, '') : (window.__trkPocketList || [])).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
+            (window.trkPocketsFor ? window.trkPocketsFor(tt, String(P27_YEAR)) : (window.__trkPocketList || [])).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
             return o.join('');
         }
         var pocketOpts = [pocketOptsFor(defDir)];
@@ -3025,6 +3152,7 @@ function renderBankStatsPanel(bank){
             +   '</div>'
             + '</div>';
         document.body.appendChild(ov);
+        if(selectedGroup)byId('plan2027CmPocket').value=selectedGroup.name;
 
         var dirSel = defDir;
         var seg = byId('plan2027CmDir');
@@ -3049,13 +3177,29 @@ function renderBankStatsPanel(bank){
     }
 
     function loadDraft(t){
-        stateDash.task = t || null;
-        stateDash.draft = t ? plan2027BuildDraft(t) : null;
         syncLane();
+        var i=t?stateDash.lanes.findIndex(function(l){return (l.draft&&String(l.draft.id)===String(t.id))||(l.task&&String(l.task.id)===String(t.id));}):-1;
+        if(i<0){
+            i=findEmptyLane(t?p27DraftKey(t):undefined);
+            if(i<0){
+                if(!addLane()){
+                    notify('Достигнут лимит осей (30). Закройте ось перед выбором проверки.', 'error');
+                    syncControls();
+                    return false;
+                }
+                i=stateDash.activeLane;
+            }
+            var l=stateDash.lanes[i];
+            l.task=t||null;l.draft=t?plan2027BuildDraft(t):null;
+            if(t)l.p27GroupKey=p27DraftKey(l.draft);
+        }
+        if(t)stateDash.p27ClosedTaskIds.delete(String(t.id));
+        switchLane(i);
         syncControls();
         renderSelector();
         renderGantt();
         renderLoad();
+        return true;
     }
 
     function syncControls(){
@@ -3097,7 +3241,7 @@ function renderBankStatsPanel(bank){
         var auditTasks = allTasks.filter(function(t){ return (t.task_kind || 'audit') === 'audit'; });
         var base = auditTasks.length ? auditTasks : allTasks;
         var list = base.filter(function(t){ return plan2027DirMatch(t); });
-        var opts = ['<option value="">-- Выберите проверку (' + list.length + ') --</option>'];
+        var opts = ['<option value="">Проверки (' + list.length + ')</option>'];
         if (stateDash.draft && !stateDash.draft.id) {
             opts.push('<option value="__new__">✨ ' + escapeHtml(stateDash.draft.name || 'Новая проверка') + ' (черновик)</option>');
         }
@@ -3115,6 +3259,7 @@ function renderBankStatsPanel(bank){
     }
 
     function plan2027GlobalSliderConfig(){
+        if (stateDash.mode === 'year') return { min:-91, max:91 };
         if (stateDash.mode === 'small') return { min:-180, max:360 };
         if (stateDash.mode === 'large') return { min:-45, max:90 };
         return { min:-90, max:180 };
@@ -3129,6 +3274,11 @@ function renderBankStatsPanel(bank){
     }
 
     function plan2027TimeBounds(offsetDays){
+        if (stateDash.mode === 'year') {
+            var ys = addDaysISO(P27_YEAR + '-01-01', offsetDays || 0);
+            var ye = addDaysISO(P27_YEAR + '-12-31', offsetDays || 0);
+            return { startISO: ys, endISO: ye, days: Math.round((parse(ye) - parse(ys)) / 86400000) + 1 };
+        }
         var months = MODE_MONTHS[stateDash.mode] || 6;
         var totalDays = Math.round(months * 30.44);
         var center = addDaysISO(todayISO(), offsetDays || 0);
@@ -3298,7 +3448,9 @@ function renderBankStatsPanel(bank){
         function onMove(e){
             if (!drag || !stateDash.draft) return;
             var dd = pxToDays(e.clientX - drag.x0);
-            if (dd === 0) return;
+            if (stateDash.mode !== 'large') dd = Math.round(dd / 7) * 7;
+            if (dd === (drag.lastDd || 0)) return;
+            drag.lastDd = dd;
             var snap = drag.snap;
             if (drag.type === 'all') {
                 /* Apply delta from snapshot, not from current state */
@@ -3423,19 +3575,40 @@ function renderBankStatsPanel(bank){
             return Math.max(-5, Math.min(105, (dd / totalDays) * 100));
         }
 
-        var ticks = [];
+        var ticks = [], p27Bands = '', p27Lines = '';
+        if (stateDash.mode === 'year') {
+            var mc = parse(rangeStart); mc = new Date(mc.getFullYear(), mc.getMonth(), 1);
+            var endD = parse(rangeEnd), runs = [];
+            while (mc <= endD) {
+                var nx = new Date(mc.getFullYear(), mc.getMonth() + 1, 1);
+                var ms = ymd(mc) < rangeStart ? rangeStart : ymd(mc);
+                var me = ymd(nx) > addDaysISO(rangeEnd, 1) ? addDaysISO(rangeEnd, 1) : ymd(nx);
+                var x0m = Math.max(0, pctX(ms)), x1m = Math.min(100, pctX(me));
+                if (ymd(mc) >= rangeStart) p27Lines += '<div class="p27-mline" style="left:' + x0m + '%"></div>';
+                ticks.push('<div class="p27-mlab" style="left:' + ((x0m + x1m) / 2) + '%">' + P27_MON[mc.getMonth()] + '</div>');
+                var sk = p27SeasonOf(mc.getMonth());
+                if (runs.length && runs[runs.length-1].k === sk) runs[runs.length-1].x1 = x1m;
+                else runs.push({ k: sk, x0: x0m, x1: x1m });
+                mc = nx;
+            }
+            p27Bands = runs.map(function(r){
+                var S = P27_SEASONS[r.k];
+                return '<div class="p27-season p27-s-' + r.k + '" style="left:' + r.x0 + '%;width:' + (r.x1 - r.x0) + '%;--p27c:' + S.rgb + '" title="' + S.ico + ' ' + S.name + ' · ' + S.q + '"></div>';
+            }).join('');
+        }
         var useDays = (stateDash.mode === 'large');
         var step = useDays ? (totalDays > 60 ? 3 : 1) : 7;
-        for (var ti = 0; ti <= totalDays; ti += step) {
+        for (var ti = 0; stateDash.mode !== 'year' && ti <= totalDays; ti += step) {
             var iso = addDaysISO(rangeStart, ti);
             var dt = parse(iso);
             var lbl = String(dt.getDate()).padStart(2,'0') + '.' + String(dt.getMonth()+1).padStart(2,'0');
             ticks.push('<div class="dash-tl-tick" style="left:' + ((ti / totalDays) * 100) + '%"><span>' + escapeHtml(lbl) + '</span></div>');
         }
-        var todayMarker = '<div class="dash-tl-today" style="left:' + pctX(todayISO()) + '%" title="Сегодня"></div>';
+        var todayMarker = (todayISO() >= rangeStart && todayISO() <= rangeEnd) ? '<div class="dash-tl-today" style="left:' + pctX(todayISO()) + '%" title="Сегодня"></div>' : '';
         var header = '<div class="dash-lane-header">'
             + '<div class="dash-lane-title">Ось ' + (laneIdx+1) + (hasDraft ? ' · ' + escapeHtml(d.name || 'Проверка') : '') + '</div>'
             + '<div class="dash-lane-header-actions">'
+            + '<button class="p27-chips-toggle' + ((stateDash.p27ChipsOpen && stateDash.p27ChipsOpen[laneIdx]) ? ' active' : '') + '" type="button" data-p27-chips-toggle="' + laneIdx + '" title="Показать/скрыть банки и этапы">⊞</button>'
             + (canPin ? '<button class="dash-lane-pin' + (isPinned ? ' active' : '') + '" type="button" data-lane-pin="' + laneIdx + '" title="' + (isPinned ? 'Открепить ось' : 'Закрепить ось') + '">📌</button>' : '')
             + (canClose ? '<button class="dash-lane-close" type="button" data-lane-close="' + laneIdx + '" title="Удалить ось">×</button>' : '')
             + '</div></div>';
@@ -3443,29 +3616,32 @@ function renderBankStatsPanel(bank){
         var segs = '';
         if (hasDraft) {
             segs = stages.map(function(s, idx){
-                var x0 = pctX(s.start);
-                var x1 = pctX(s.end || addDaysISO(s.start, 1));
-                var w = Math.max(1.5, x1 - x0);
+                if ((s.end||s.start)<rangeStart || s.start>rangeEnd) return '';
+                var x0 = Math.max(0, Math.min(100,pctX(s.start)));
+                var x1 = Math.max(0, Math.min(100,pctX(addDaysISO(s.end||s.start,1))));
+                var w = Math.max(0, x1 - x0);
                 var col = STAGE_COLORS[s.key] || '#48c9b0';
                 var isDefault = (s.key === DASH_STAGE_KEY_DEFAULT);
+                var p27Prelim = !d.id || !d.status || d.status === 'planning';
                 var tip = stageLabel(s.key) + ': ' + s.start + ' → ' + (s.end || s.start) + ' (вес ' + fmtNum(s.weight) + ')';
-                return '<div class="dash-seg' + (isDefault ? ' dash-seg-lead' : '') + '" data-idx="' + idx + '" title="' + escapeHtml(tip) + '" style="left:' + x0 + '%;width:' + w + '%;background:' + escapeHtml(col) + '">'
+                return '<div class="dash-seg' + (isDefault ? ' dash-seg-lead' : '') + (p27Prelim ? ' p27-prelim' : '') + '" data-idx="' + idx + '" title="' + escapeHtml(tip + (p27Prelim ? ' · предварительная' : '')) + '" style="left:' + x0 + '%;width:' + w + '%;background:' + escapeHtml(col) + ';--p27seg:' + escapeHtml(col) + '">'
                     + '<span class="dash-seg-h dash-seg-h-l" data-idx="' + idx + '" data-edge="start" title="Тянуть начало"></span>'
-                    + '<span class="dash-seg-lab">' + escapeHtml(stageLabel(s.key)) + ' (' + escapeHtml(s.start.slice(8)+'.'+s.start.slice(5,7)) + '–' + escapeHtml((s.end||s.start).slice(8)+'.'+(s.end||s.start).slice(5,7)) + ')</span>'
+                    + '<span class="dash-seg-lab">' + escapeHtml(p27StageShort(s.key)) + '</span>'
                     + '<span class="dash-seg-h dash-seg-h-r" data-idx="' + idx + '" data-edge="end" title="Тянуть конец"></span>'
                     + (isDefault ? '' : '<button class="dash-seg-del" type="button" data-del="' + idx + '" data-lane="' + laneIdx + '" title="Удалить этап">×</button>')
                     + '</div>';
             }).join('');
         } else {
-            segs = '<div class="dash-tl-empty-bar">Пустая линия жизни (' + escapeHtml(rangeStart) + ' → ' + escapeHtml(rangeEnd) + '). Выберите проверку или нажмите «+ Создать проверку».</div>';
+            segs = '<div class="dash-tl-empty-bar p27-empty-slot"'+(lane.p27GroupKey?' title="По плану нужно начать ещё '+lane.p27Remaining+' '+(lane.p27Remaining%10===1&&lane.p27Remaining%100!==11?'проверку':lane.p27Remaining%10>=2&&lane.p27Remaining%10<=4&&(lane.p27Remaining%100<12||lane.p27Remaining%100>14)?'проверки':'проверок')+'"':'')+'></div>';
         }
         var trackId = isActive ? ' id="plan2027TlTrack"' : '';
         return '<div class="dash-lane-block" data-lane-block="' + laneIdx + '">'
             + header
-            + '<div class="dash-timeline">'
+            + '<div class="dash-timeline' + (stateDash.mode === 'year' ? ' p27-year' : '') + '">'
+            + '<div class="p27-scale">' + p27Bands + p27Lines
             + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
             + '<div class="dash-tl-track"' + trackId + ' data-lane-track="' + laneIdx + '">' + todayMarker + segs + '</div>'
-            + '</div>'
+            + '</div></div>'
             + renderLaneControls(lane, laneIdx)
             + '</div>';
     }
@@ -3478,30 +3654,31 @@ function renderBankStatsPanel(bank){
         var curIds = d.department_ids || [];
 
         /* Bank chips: white -> blue (on), lead -> yellow */
-        var bankChips = '<div class="dash-bank-row"><div class="dash-bank-chips"><span class="dash-bank-chips-lbl">\u0411\u0430\u043d\u043a\u0438 \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b):</span>'
+        var bankChips = '<div class="dash-bank-row"><div class="dash-bank-chips"><span class="dash-bank-chips-lbl" title="Клик по банку — включить/выключить">Банки:</span>'
             + allDeps.map(function(dep){
                 var on = curIds.indexOf(dep.id) >= 0;
                 var isLead = (d.lead_department === dep.id);
                 var sh = (d.department_shares && d.department_shares[dep.id] != null) ? d.department_shares[dep.id] : 100;
-                return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" data-lane="' + laneIdx + '" title="' + escapeHtml(dep.name + (isLead ? ' (\u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c)' : '') + (on ? ' \u00b7 \u0434\u043e\u043b\u044f ' + sh + '%' : '')) + '">' + escapeHtml(dep.name) + (isLead ? ' \u2605' : '') + '</button>';
+                return '<button class="dash-bank-chip' + (on ? ' on' : '') + (isLead ? ' lead' : '') + '" type="button" data-toggle-bank="' + escapeHtml(dep.id) + '" data-lane="' + laneIdx + '" title="' + escapeHtml(dep.name + (isLead ? ' (\u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044c)' : '') + (on ? ' \u00b7 \u0434\u043e\u043b\u044f ' + sh + '%' : '')) + '">' + escapeHtml(p27Short(dep)) + (isLead ? ' \u2605' : '') + '</button>';
             }).join('')
             + '</div>'
-            + '<button class="dash-lead-picker-btn" type="button" data-open-lead-picker="' + laneIdx + '">\u0421\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u0435\u043b\u044f</button></div>';
+            + '<button class="dash-lead-picker-btn" type="button" data-open-lead-picker="' + laneIdx + '" title="Сменить руководителя">★ Руководитель</button></div>';
 
         /* Stage chips: white -> stage color (on) */
         var existing = {};
         plan2027NormalizeStages(d).forEach(function(s){ existing[s.key] = true; });
-        var stageChips = '<div class="dash-stage-chips"><span class="dash-bank-chips-lbl">\u042d\u0442\u0430\u043f\u044b \u0432 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435 (\u043a\u043b\u0438\u043a \u2014 \u0432\u043a\u043b/\u0432\u044b\u043a\u043b):</span>'
+        var stageChips = '<div class="dash-stage-chips"><span class="dash-bank-chips-lbl" title="Клик по этапу — включить/выключить">Этапы:</span>'
             + STAGE_ORDER.map(function(k){
                 var on = !!existing[k];
                 var col = STAGE_COLORS[k] || '#48c9b0';
                 var isDefault = (k === DASH_STAGE_KEY_DEFAULT);
                 var style = on ? ('style="background:' + col + ';border-color:' + col + ';color:#fff"') : '';
-                return '<button class="dash-stage-chip' + (on ? ' on' : '') + (isDefault ? ' is-default' : '') + '" type="button" data-toggle-stage="' + escapeHtml(k) + '" data-lane="' + laneIdx + '" ' + style + ' title="' + escapeHtml(stageLabel(k) + (isDefault ? ' (\u0431\u0430\u0437\u043e\u0432\u044b\u0439, \u043d\u0435\u043b\u044c\u0437\u044f \u0432\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c)' : '') + ' \u00b7 \u0432\u0435\u0441 ' + stageWeight(k)) + '">' + escapeHtml(stageLabel(k)) + '</button>';
+                return '<button class="dash-stage-chip' + (on ? ' on' : '') + (isDefault ? ' is-default' : '') + '" type="button" data-toggle-stage="' + escapeHtml(k) + '" data-lane="' + laneIdx + '" ' + style + ' title="' + escapeHtml(stageLabel(k) + (isDefault ? ' (\u0431\u0430\u0437\u043e\u0432\u044b\u0439, \u043d\u0435\u043b\u044c\u0437\u044f \u0432\u044b\u043a\u043b\u044e\u0447\u0438\u0442\u044c)' : '') + ' \u00b7 \u0432\u0435\u0441 ' + stageWeight(k)) + '">' + escapeHtml(p27StageShort(k)) + '</button>';
             }).join('')
             + '</div>';
 
-        return bankChips + stageChips;
+        var p27Open = !!(stateDash.p27ChipsOpen && stateDash.p27ChipsOpen[laneIdx]);
+        return '<div class="p27-chips-wrap' + (p27Open ? '' : ' p27-chips-hidden') + '" id="p27ChipsWrap' + laneIdx + '">' + bankChips + stageChips + '</div>';
     }
 
     function renderGantt(){
@@ -3510,12 +3687,13 @@ function renderBankStatsPanel(bank){
         stateDash.globalOffset = plan2027ClampGlobalOffset(stateDash.globalOffset || 0);
         var sliderCfg = plan2027GlobalSliderConfig();
         var sliderHtml = '<div class="dash-global-slider-wrap"><input type="range" id="plan2027GlobalSlider" class="dash-global-slider" min="' + sliderCfg.min + '" max="' + sliderCfg.max + '" step="1" value="' + (stateDash.globalOffset || 0) + '"></div>';
-        var lanesHtml = stateDash.lanes.map(function(l, i){
-            var isActive = (i === stateDash.activeLane);
-            return renderLaneBlock(l, i, isActive, plan2027TimeBounds(laneOffset(l)), stateDash.lanes.length > 1, stateDash.lanes.length > 1, !!l.pinned);
-        }).join('');
-        var addBtn = stateDash.lanes.length < 5 ? '<div class="dash-lanes-foot"><button class="dash-lane-add" type="button" id="plan2027AddLaneBtn">+ Ось</button></div>' : '';
-        c.innerHTML = sliderHtml + lanesHtml + addBtn + renderLeadPicker();
+        var lanesHtml = p27GroupedLanes();
+        var addBtn = stateDash.lanes.length < 30 ? '<div class="dash-lanes-foot"><button class="dash-lane-add" type="button" id="plan2027AddLaneBtn">+ Ось</button></div>' : '';
+        var p27Legend = stateDash.mode === 'year' ? ('<div class="p27-legend">' + ['winter','spring','summer','autumn'].map(function(k){
+            var S = P27_SEASONS[k];
+            return '<span class="p27-leg" style="--p27c:' + S.rgb + '"><i></i>' + S.ico + ' ' + S.name + ' · ' + S.q + '</span>';
+        }).join('') + '<span class="p27-leg-note">зима — дек–фев, осень — сен–ноя</span></div>') : '';
+        c.innerHTML = sliderHtml + p27Legend + lanesHtml + addBtn + renderLeadPicker();
         plan2027ScheduleTicks();
         var addBtnEl = byId('plan2027AddLaneBtn');
         if (addBtnEl) addBtnEl.addEventListener('click', function(){ if (addLane()) { renderSelector(); syncControls(); renderGantt(); renderLoad(); } });
@@ -3544,7 +3722,8 @@ function renderBankStatsPanel(bank){
             gs.addEventListener('pointercancel', releaseSlider);
             gs.addEventListener('lostpointercapture', function(){ gs.classList.remove('is-grabbing'); });
         }
-        c.querySelectorAll('[data-lane-block]').forEach(function(el){ el.addEventListener('pointerdown', function(e){ if (e.target.closest('[data-lane-close]') || e.target.closest('[data-lane-pin]')) return; var li = +this.getAttribute('data-lane-block'); if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); } }, true); });
+        c.querySelectorAll('[data-lane-block]').forEach(function(el){ el.addEventListener('pointerdown', function(e){ if (e.target.closest('[data-lane-close]') || e.target.closest('[data-lane-pin]') || e.target.closest('[data-p27-chips-toggle]')) return; var li = +this.getAttribute('data-lane-block'); if (li !== stateDash.activeLane) { switchLane(li); renderSelector(); syncControls(); renderGantt(); renderLoad(); } }, true); });
+        c.querySelectorAll('[data-p27-chips-toggle]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var li = +this.getAttribute('data-p27-chips-toggle'); var wrap = document.getElementById('p27ChipsWrap' + li); if (wrap) { var hidden = wrap.classList.toggle('p27-chips-hidden'); this.classList.toggle('active', !hidden); stateDash.p27ChipsOpen = stateDash.p27ChipsOpen || {}; stateDash.p27ChipsOpen[li] = !hidden; } }); });
         c.querySelectorAll('[data-lane-name]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-name'); var L=stateDash.lanes[li]; if (L && L.draft) { L.draft.name = this.value; if (li===stateDash.activeLane){stateDash.draft.name=this.value;} renderSelector(); } }); });
         c.querySelectorAll('[data-lane-start]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-start'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.start_date=this.value; var stg=plan2027NormalizeStages(L.draft); if(stg.length)stg[0].start=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
         c.querySelectorAll('[data-lane-end]').forEach(function(inp){ inp.addEventListener('change', function(){ var li=+this.getAttribute('data-lane-end'); var L=stateDash.lanes[li]; if (!L||!L.draft||!this.value) return; L.draft.deadline=this.value; var stg=plan2027NormalizeStages(L.draft); if(stg.length)stg[stg.length-1].end=this.value; L.draft.stages=stg; switchLane(li); renderGantt(); renderLoad(); }); });
@@ -3589,7 +3768,7 @@ function renderBankStatsPanel(bank){
                 else {
                     var lastEnd=stateDash.draft.deadline||stateDash.draft.start_date||todayISO(); stg.forEach(function(x){ if((x.end||x.start)>lastEnd) lastEnd=x.end||x.start; });
                     var ns, ne;
-                    if (key === 'подготовка') { var ngStg = stg.filter(function(x){ return x.key === DASH_STAGE_KEY_DEFAULT; })[0]; var ngStart = ngStg ? (ngStg.start || stateDash.draft.start_date) : (stateDash.draft.start_date || todayISO()); ne = addDaysISO(ngStart, -1); ns = addDaysISO(ne, -6); }
+                    if (key === 'подготовка') { var ngStg = stg.filter(function(x){ return x.key === DASH_STAGE_KEY_DEFAULT; })[0]; var ngStart = ngStg ? (ngStg.start || stateDash.draft.start_date) : (stateDash.draft.start_date || todayISO()); ne = addDaysISO(ngStart, -1); ns = addDaysISO(ne, -13); }
                     else { ns=addDaysISO(lastEnd,1); ne=addDaysISO(ns,13); }
                     stg.push({key:key,start:ns,end:ne,weight:stageWeight(key)}); if (ne>stateDash.draft.deadline) stateDash.draft.deadline=ne;
                 }
@@ -3599,6 +3778,8 @@ function renderBankStatsPanel(bank){
             });
         });
         c.querySelectorAll('[data-del]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var idx=+this.getAttribute('data-del'); var stg=plan2027NormalizeStages(stateDash.draft); if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); } }); });
+        c.querySelectorAll('[data-p27-select-pocket]').forEach(function(btn){btn.addEventListener('click',function(){stateDash.selectedPocketKey=this.getAttribute('data-p27-select-pocket');renderLoad();});});
+        c.querySelectorAll('.p27-pocket-group').forEach(function(el){el.addEventListener('toggle',function(){stateDash.p27Collapsed=stateDash.p27Collapsed||{};stateDash.p27Collapsed[this.getAttribute('data-p27-pocket')]=!this.open;});});
         plan2027AttachDrag(c);
     }
 
@@ -3634,8 +3815,138 @@ function renderBankStatsPanel(bank){
         renderGantt();
     }
 
+    // Load view API: selectedPocketKey = direction + '|' + pocket; empty means no selection.
+    // A lane draft replaces its persisted audit (including when cancelled or moved out of 2027).
+    function plan2027LoadAudits(){
+        var saved = new Map(), fresh = [], seenFresh = new Set();
+        function put(t){
+            if (!t) return;
+            if (t.id !== undefined && t.id !== null && String(t.id) !== '') saved.set(String(t.id), t);
+            else if (!seenFresh.has(t)) { seenFresh.add(t); fresh.push(t); }
+        }
+        (st().tasks || []).forEach(put);
+        plan2027DraftsForLoad().forEach(put);
+        if (stateDash.draft) put(stateDash.draft); // Active lane wins if a caller has not synced it yet.
+        return Array.from(saved.values()).concat(fresh).filter(function(t){
+            return (t.task_kind || 'audit') === 'audit' && t.status !== 'cancelled' && t.status !== 'archived';
+        });
+    }
+
+    function plan2027LoadAuditBounds(t){
+        function iso(value){
+            var s = String(value || '').slice(0, 10);
+            return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)) ? s : '';
+        }
+        // Draft stage edges reflect unsaved moves/resizes, even if task-level dates are stale.
+        var stages = Array.isArray(t.stages) ? t.stages.filter(function(s){ return s && iso(s.start); }) : [];
+        var start = iso(t.start_date), end = iso(t.deadline);
+        if (stages.length) {
+            start = stages.reduce(function(a,s){ var v = iso(s.start); return !a || v < a ? v : a; }, '');
+            end = stages.reduce(function(a,s){ var v = iso(s.end) || iso(s.start); return v > a ? v : a; }, '');
+        } else if (t.stages && typeof t.stages === 'object') {
+            Object.keys(t.stages).forEach(function(k){
+                var v = iso(t.stages[k]);
+                if (v && (!start || v < start)) start = v;
+                if (v && (!end || v > end)) end = v;
+            });
+        }
+        start = start || end;
+        end = end || start;
+        return start && end && start <= end ? { start:start, end:end } : null;
+    }
+
+    function plan2027LoadMatrix(audits, deps, pocketKey){
+        var rows = deps.map(function(dep){ return { dep:dep, counts:Array(12).fill(0) }; });
+        var rowById = new Map();
+        rows.forEach(function(row){ rowById.set(String(row.dep.id), row); });
+        audits.forEach(function(t){
+            if (pocketKey && plan2027TaskDir(t) + '|' + String(t.pocket || '').trim() !== pocketKey) return;
+            var bounds = plan2027LoadAuditBounds(t);
+            if (!bounds) return;
+            var ids = Array.isArray(t.department_ids) && t.department_ids.length ? t.department_ids : [t.lead_department];
+            // One audit contributes at most once per bank/month, regardless of stages/shares/lead coefficient.
+            new Set(ids.filter(function(id){ return id !== undefined && id !== null && id !== ''; }).map(String)).forEach(function(id){
+                var row = rowById.get(id);
+                if (!row) return;
+                for (var m = 0; m < 12; m++) {
+                    var first = P27_YEAR + '-' + String(m + 1).padStart(2, '0') + '-01';
+                    var last = P27_YEAR + '-' + String(m + 1).padStart(2, '0') + '-' + new Date(P27_YEAR, m + 1, 0).getDate();
+                    if (bounds.start <= last && bounds.end >= first) row.counts[m]++;
+                }
+            });
+        });
+        return rows;
+    }
+
+    function plan2027LoadHeatmap(title, rows, maxCount, key){
+        var html = '<section class="p27-heatmap" data-load-scope="' + key + '"><h3>' + escapeHtml(title) + '</h3>';
+        if (!rows.length) return html + '<div class="p27-load-empty">Справочник банков пуст — данные загружаются…</div></section>';
+        html += '<table class="p27-load-table"><caption class="p27-load-sr">' + escapeHtml(title) + ' — число проверок по банкам и месяцам 2027 года</caption>'
+            + '<colgroup><col class="p27-load-bank-col"><col span="12"></colgroup><thead><tr><th scope="col">ТБ</th>';
+        P27_MON.forEach(function(month){ html += '<th scope="col">' + escapeHtml(month) + '</th>'; });
+        html += '</tr></thead><tbody>';
+        rows.forEach(function(row){
+            var name = row.dep.name || row.dep.id;
+            html += '<tr><th scope="row" title="' + escapeHtml(name) + '">' + escapeHtml(p27Short(row.dep)) + '</th>';
+            row.counts.forEach(function(count,m){
+                var level = count ? Math.max(1, Math.ceil(count / Math.max(1, maxCount) * 5)) : 0;
+                var label = name + ' · ' + P27_MON[m] + ' 2027: ' + count;
+                html += '<td data-count="' + count + '" data-level="' + level + '" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">' + count + '</td>';
+            });
+            html += '</tr>';
+        });
+        return html + '</tbody></table></section>';
+    }
+
     function renderLoad(){
         var box = byId('plan2027LoadContainer');
+        if (!box) return;
+        var histogram = stateDash.plan2027LoadView === 'histograms';
+        box.classList.toggle('p27-load-histograms', histogram);
+        box.classList.toggle('p27-load-heatmaps', !histogram);
+        box.innerHTML = '<div class="dash-load-head p27-load-head"><div class="dash-load-title">Нагрузка на ТБ</div>'
+            + '<button id="plan2027LoadToggle" class="p27-load-toggle" type="button" aria-expanded="' + histogram + '" aria-controls="plan2027LoadBody"'
+            + ' title="' + (histogram ? 'Вернуться к тепловым картам' : 'Показать гистограммы') + '" aria-label="'
+            + (histogram ? 'Вернуться к тепловым картам' : 'Показать гистограммы') + '">' + (histogram ? '«' : '»') + '</button></div>'
+            + '<div id="plan2027LoadBody" class="p27-load-body"></div>';
+        var body = byId('plan2027LoadBody');
+        if (histogram) {
+            // Legacy weighted calculators close over global state and have no pocket argument.
+            // Keep their behaviour explicit rather than offer a selector that cannot filter correctly.
+            body.innerHTML = '<p class="p27-load-note">Гистограммы · все карманы. Взвешенная нагрузка по текущим фильтрам; фильтр кармана не применяется.</p>';
+            var holder = document.createElement('div');
+            renderHistograms(holder);
+            var oldHead = holder.querySelector('.dash-load-head');
+            if (oldHead) oldHead.remove();
+            while (holder.firstChild) body.appendChild(holder.firstChild); // Preserve histogram event handlers.
+        } else {
+            var allDeps = st().departments || [];
+            var deps = allDeps.slice(0, 11);
+            var audits = plan2027LoadAudits();
+            var key = String(stateDash.selectedPocketKey || '');
+            var allRows = plan2027LoadMatrix(audits, deps, '');
+            var maxCount = allRows.reduce(function(max,row){ return Math.max.apply(Math, [max].concat(row.counts)); }, 0);
+            body.innerHTML = '<p class="p27-load-note">2027 · число проверок · темнее = больше. С учётом черновиков.</p>'
+                + plan2027LoadHeatmap('Все проверки · все направления', allRows, maxCount, 'all');
+            if (key) {
+                var split = key.indexOf('|');
+                var dir = key.slice(0, split), pocket = key.slice(split + 1);
+                body.insertAdjacentHTML('beforeend', plan2027LoadHeatmap('Карман: ' + (pocket || 'Без кармана') + ' · ' + (DASH_DIR_LABEL[dir] || dir), plan2027LoadMatrix(audits, deps, key), maxCount, 'pocket'));
+            } else {
+                body.insertAdjacentHTML('beforeend', '<section class="p27-heatmap" data-load-scope="pocket"><h3>Выбранный карман</h3><div class="p27-load-empty">Выберите карман слева</div></section>');
+            }
+            if (allDeps.length > deps.length) body.insertAdjacentHTML('beforeend', '<p class="p27-load-note">Показаны первые 11 банков из ' + allDeps.length + '.</p>');
+        }
+        byId('plan2027LoadToggle').onclick = function(){
+            stateDash.plan2027LoadView = histogram ? 'heatmaps' : 'histograms';
+            renderLoad();
+            var toggle = byId('plan2027LoadToggle');
+            if (toggle) toggle.focus();
+        };
+    }
+
+    function renderHistograms(target){
+        var box = target || byId('plan2027LoadContainer');
         if (!box) return;
         var allDeps = st().departments || [];
         if (!allDeps.length) {
@@ -3943,6 +4254,7 @@ function renderBankStatsPanel(bank){
         var saved = [], failed = null;
         var chain = Promise.resolve();
         items.forEach(function(it){
+            var lane=stateDash.lanes[it.lane], draft=lane&&lane.draft;
             chain = chain.then(function(){
                 if (failed) return;
                 return apiJson('/api/tracker/task/save', {
@@ -3951,7 +4263,11 @@ function renderBankStatsPanel(bank){
                     body: JSON.stringify(it.payload)
                 }).then(function(r){
                     if (!r || !r.success) throw new Error((r && (r.message || r.error)) || 'Ошибка сохранения');
-                    saved.push({ lane: it.lane, id: r.id || it.payload.id });
+                    var id=r.id||it.payload.id;
+                    if(!id)throw new Error('Сервер не вернул ID сохранённой проверки');
+                    it.payload.id=id;
+                    if(draft)draft.id=id;
+                    saved.push({ lane: lane, draft: draft, id: id });
                 }).catch(function(err){
                     failed = '«' + it.name + '»: ' + ((err && err.message) || 'Ошибка сохранения');
                 });
@@ -3963,9 +4279,9 @@ function renderBankStatsPanel(bank){
             return (typeof refreshFn === 'function' ? Promise.resolve(refreshFn()) : Promise.resolve()).then(function(){
                 var keep = stateDash.activeLane;
                 saved.forEach(function(sv){
-                    var nt = (st().tasks || []).find(function(t){ return t.id === sv.id; });
-                    var l = stateDash.lanes[sv.lane];
-                    if (nt && l) { l.task = nt; l.draft = plan2027BuildDraft(nt); }
+                    var nt = (st().tasks || []).find(function(t){ return String(t.id) === String(sv.id); });
+                    var l = sv.lane;
+                    if (nt && l && stateDash.lanes.indexOf(l)>=0 && l.draft===sv.draft) { l.task = nt; l.draft = plan2027BuildDraft(nt); }
                 });
                 switchLane(Math.min(keep, stateDash.lanes.length - 1));
                 syncControls(); renderSelector(); renderGantt(); renderLoad();
@@ -4006,6 +4322,9 @@ function renderBankStatsPanel(bank){
     window.__dashCollectChanges = plan2027CollectChanges;
 
     function bindControls(){
+        var pocketSel=byId('plan2027PocketSelector');
+        if(pocketSel&&!pocketSel.__p27Bound){pocketSel.__p27Bound=true;pocketSel.addEventListener('change',function(){syncLane();stateDash.p27PocketFilterKey=this.value;stateDash.selectedPocketKey=this.value;renderGantt();renderLoad();});}
+
         var btn = byId('tabPlan2027Btn');
         if (btn && !btn.__dashBound) {
             btn.__dashBound = true;
@@ -4022,8 +4341,8 @@ function renderBankStatsPanel(bank){
                 var tid = this.value;
                 if (!tid) { loadDraft(null); return; }
                 if (tid === '__new__') return;
-                var task = (st().tasks || []).find(function(x){ return x.id === tid; });
-                loadDraft(task || null);
+                var task = (st().tasks || []).find(function(x){ return String(x.id) === String(tid); });
+                if(task)loadDraft(task);else syncControls();
             });
         }
         var createBtn = byId('plan2027CreateTaskBtn');
@@ -4040,14 +4359,10 @@ function renderBankStatsPanel(bank){
             dirBox.addEventListener('click', function(e){
                 var b = e.target && e.target.closest ? e.target.closest('[data-dir]') : null;
                 if (!b) return;
+                syncLane();
                 stateDash.dir = b.getAttribute('data-dir') || 'all';
-                // Сброс выбранной проверки, если её направление не совпадает с фильтром
-                if (stateDash.task && !plan2027DirMatch(stateDash.task)) {
-                    stateDash.task = null; stateDash.draft = null;
-                    var l = stateDash.lanes[stateDash.activeLane]; if (l) { l.task = null; l.draft = null; }
-                }
-                // task_type драфта подстраиваем только для конкретного направления
-                if (stateDash.draft && stateDash.dir !== 'all') stateDash.draft.task_type = dirTaskType(stateDash.dir);
+                stateDash.selectedPocketKey='';
+                stateDash.p27PocketFilterKey='';
                 syncControls();
                 renderSelector();
                 renderGantt();
@@ -4075,6 +4390,15 @@ function renderBankStatsPanel(bank){
                 syncControls();
                 renderGantt();
                 renderLoad();
+            });
+        }
+        var pkBtn = byId('plan2027PocketsBtn');
+        if (pkBtn && !pkBtn.__dashBound) {
+            pkBtn.__dashBound = true;
+            pkBtn.addEventListener('click', function(e){
+                e.preventDefault();
+                if (typeof window.trkOpenPockets === 'function') window.trkOpenPockets({ year: P27_YEAR, editor: true });
+                else notify('Плагин «Карманы» не загружен', 'error');
             });
         }
         var saveBtn = byId('plan2027SaveBtn');
@@ -4139,6 +4463,7 @@ function renderBankStatsPanel(bank){
         window.addEventListener('resize', plan2027ScheduleTicks);
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(plan2027ScheduleTicks);
         ensurePlan2027Tab();
+        p27FetchPockets();
         bindControls();
         renderSelector();
         syncControls();
@@ -4147,6 +4472,14 @@ function renderBankStatsPanel(bank){
         renderLoad();
         waitStateAndRefresh();
     }
+    window.__plan2027Render = { activate: function(){
+        p27FetchPockets();
+        bindControls(); renderSelector(); syncControls(); renderPlan2027Layout(); renderGantt(); renderLoad();
+    } };
+    document.addEventListener('trk:pockets-changed', function(){
+        p27FetchPockets();
+        if (byId('panel-plan2027') && byId('panel-plan2027').classList.contains('active')) { renderSelector(); renderGantt(); renderLoad(); }
+    });
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
 
@@ -4237,6 +4570,14 @@ document.addEventListener('click', function(e){
     e.preventDefault();
     e.stopPropagation();
     setActiveTab('dashboards');
+}, true);
+
+document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest ? e.target.closest('#openPlan2027InlineBtn') : null;
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveTab('plan2027');
 }, true);
 
 document.addEventListener('click', function(e){

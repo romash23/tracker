@@ -394,7 +394,11 @@ function css() {
     document.head.appendChild(s);
 }
 function bank(b) { return '<span class="pk-bank" style="background:' + e(b.color) + '" title="' + e(b.name) + '">' + e(b.short) + '</span>'; }
-function open() {
+function open(opts) {
+    opts = (opts && typeof opts === 'object' && !opts.target) ? opts : {};
+    if (opts.year) { if (!ST.forcedYear) ST.prevYear = ST.year; ST.year = +opts.year; ST.forcedYear = true; }
+    else if (ST.forcedYear) { ST.year = ST.prevYear || new Date().getFullYear(); ST.forcedYear = false; }
+    ST.openEd = !!opts.editor;
     css();
     var ov = document.getElementById('pkOverlay');
     if (!ov) {
@@ -483,7 +487,7 @@ function load() {
         ST.d = d;
         ST.shared = calcShared(d.pockets);
         setList(d.all_pockets || d.pockets);
-        if (ST.ed) edStart();
+        if (ST.ed || ST.openEd) { ST.openEd = false; edStart(); }
         render();
     });
 }
@@ -744,7 +748,7 @@ function showCell(c, anchor) {
     popPlace(pop, anchor);
 }
 function val(scope, f) { var el = scope.querySelector('[data-f="' + f + '"]'); return el ? el.value : ''; }
-function done(r, ok) { if (r && r.success) { if (ok) msg(ok); load(); } else msg('❌ ' + ((r && r.error) || 'Ошибка'), true); }
+function done(r, ok) { if (r && r.success) { if (ok) msg(ok); load(); try { document.dispatchEvent(new CustomEvent('trk:pockets-changed', { detail: { year: ST.year } })); } catch (x) {} } else msg('❌ ' + ((r && r.error) || 'Ошибка'), true); }
 function newTask(pid) {
     var p = ST.d.pockets.filter(function(x) { return x.id === pid; })[0]; if (!p) return;
     close();
