@@ -139,19 +139,23 @@
                     <div class="dash-field">
                         <label class="dash-label">Направление</label>
                         <div class="btn-seg" id="plan2027DirSwitch">
-                            <button class="btn-seg-btn active" type="button" data-dir="all">Все</button>
-                            <button class="btn-seg-btn" type="button" data-dir="corp">Корп</button>
-                            <button class="btn-seg-btn" type="button" data-dir="retail">Розн</button>
+                            <button class="btn-seg-btn active" type="button" data-dir="all" title="Все направления">Все</button>
+                            <button class="btn-seg-btn" type="button" data-dir="corp" title="Корпоративное направление">Корп</button>
+                            <button class="btn-seg-btn" type="button" data-dir="retail" title="Розничное направление">Розн</button>
                         </div>
                     </div>
-                    <div class="dash-field">
-                        <label class="dash-label">Горизонт</label>
-                        <div class="btn-seg" id="plan2027ModeSwitch">
-                            <button class="btn-seg-btn active" type="button" data-mode="year">Год 2027</button>
-                            <button class="btn-seg-btn" type="button" data-mode="small">Малый (12м)</button>
-                            <button class="btn-seg-btn" type="button" data-mode="medium">Средний (6м)</button>
-                            <button class="btn-seg-btn" type="button" data-mode="large">Крупный (3м)</button>
-                        </div>
+                    <div class="dash-field p27-sort-field">
+                        <label class="dash-label" for="plan2027SortSelector">Сортировка</label>
+                        <select id="plan2027SortSelector" class="form-control" title="Порядок карманов на осях">
+                            <option value="dir">По направлению</option>
+                            <option value="name_asc">Карман А → Я</option>
+                            <option value="name_desc">Карман Я → А</option>
+                            <option value="count_desc">Проверок ↓</option>
+                            <option value="count_asc">Проверок ↑</option>
+                            <option value="remaining_desc">Осталось начать ↓</option>
+                            <option value="plan_desc">План ↓</option>
+                            <option value="carry_desc">Переходящих из 2026 ↓</option>
+                        </select>
                     </div>
                 </div>
                 <div id="plan2027GanttContainer" class="dash-gantt-container"></div>

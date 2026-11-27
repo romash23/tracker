@@ -2663,10 +2663,10 @@ function renderBankStatsPanel(bank){
     var P27_MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
     // Сезоны = кварталы плана: зима (дек–фев) 1 кв, весна 2 кв, лето 3 кв, осень (сен–ноя) 4 кв
     var P27_SEASONS = {
-        winter:{ ico:'❄', name:'Зима', q:'1 кв', rgb:'96,165,250' },
-        spring:{ ico:'🌱', name:'Весна', q:'2 кв', rgb:'74,222,128' },
-        summer:{ ico:'☀', name:'Лето', q:'3 кв', rgb:'250,204,21' },
-        autumn:{ ico:'🍂', name:'Осень', q:'4 кв', rgb:'251,146,60' }
+        winter:{ ico:'❄', name:'Зима', q:'1 кв', mon:'дек–фев', rgb:'96,165,250' },
+        spring:{ ico:'🌱', name:'Весна', q:'2 кв', mon:'мар–май', rgb:'74,222,128' },
+        summer:{ ico:'☀', name:'Лето', q:'3 кв', mon:'июн–авг', rgb:'250,204,21' },
+        autumn:{ ico:'🍂', name:'Осень', q:'4 кв', mon:'сен–ноя', rgb:'251,146,60' }
     };
     function p27SeasonOf(m){ return (m === 11 || m <= 1) ? 'winter' : (m <= 4 ? 'spring' : (m <= 7 ? 'summer' : 'autumn')); }
     function p27Short(dep){
@@ -2687,22 +2687,50 @@ function renderBankStatsPanel(bank){
             });
         });
     }
-    function plan2027ScheduleTicks(){ window.requestAnimationFrame(plan2027FitTicks); }
+    // Labels that do not fit their bar: try the short form, otherwise hide (the full text stays in the tooltip).
+    function plan2027FitLabels(){
+        document.querySelectorAll('#plan2027GanttContainer .dash-seg-lab, #plan2027GanttContainer .p27-carry-lab').forEach(function(lab){
+            if (lab.dataset.p27Full == null) lab.dataset.p27Full = lab.textContent;
+            lab.textContent = lab.dataset.p27Full; lab.style.visibility = '';
+            if (lab.scrollWidth <= lab.clientWidth + 1) return;
+            var sh = lab.dataset.p27Short;
+            if (sh) { lab.textContent = sh; if (lab.scrollWidth <= lab.clientWidth + 1) return; }
+            lab.style.visibility = 'hidden';
+        });
+    }
+    function plan2027ScheduleTicks(){ window.requestAnimationFrame(function(){ plan2027FitTicks(); plan2027FitLabels(); }); }
 
 
     // A pocket is identified by BOTH direction and name, never by its name alone.
     function p27PocketKey(dir, name){ return dir + '|' + String(name || '').trim(); }
     function p27DraftKey(d){ return d ? p27PocketKey(plan2027TaskDir(d) || 'other', d.pocket) : ''; }
+    var P27_YEAR_START = P27_YEAR + '-01-01';
+    function p27DraftStart(d){ var b=d?plan2027LoadAuditBounds(d):null; return b?b.start:String((d&&d.start_date)||'').slice(0,10); }
+    // Audits started before 2027 that still run in 2027: read-only start-of-year load, never counted in the 2027 plan.
+    function p27CarryTasks(loaded){
+        var out=[];
+        (st().tasks||[]).forEach(function(t){
+            if(!t||(t.task_kind||'audit')!=='audit'||t.status==='cancelled'||t.status==='archived')return;
+            if(loaded.has(String(t.id))||!t.start_date||String(t.start_date).slice(0,10)>=P27_YEAR_START)return;
+            var d=plan2027BuildDraft(t), b=plan2027LoadAuditBounds(d);
+            if(!b)return;
+            var dl=String(t.deadline||'').slice(0,10), end=dl>b.end?dl:b.end;
+            if(end<P27_YEAR_START)return;
+            var dir=plan2027TaskDir(d)||'other', name=String(d.pocket||'').trim();
+            out.push({id:String(t.id),task:t,draft:d,dir:dir,name:name,key:p27PocketKey(dir,name),start:b.start,end:end});
+        });
+        return out.sort(function(x,y){return x.end<y.end?-1:x.end>y.end?1:0;});
+    }
     function p27PlanGroups(){
         var groups = new Map();
         function group(key, dir, name, plan){
-            if (!groups.has(key)) groups.set(key,{key:key,dir:dir,name:name,plan:0,indices:[],remaining:0});
+            if (!groups.has(key)) groups.set(key,{key:key,dir:dir,name:name,plan:0,indices:[],remaining:0,countable:0,carry:[],is2027:false});
             var g=groups.get(key); if(plan!=null) g.plan=Math.max(g.plan,Math.max(0,Number(plan)||0)); return g;
         }
         (stateDash.p27Pockets || []).forEach(function(p){
             if (!p.is_active || (p.year!=null && String(p.year)!==String(P27_YEAR))) return;
             var dir=plan2027TaskDir({task_type:p.direction})||'other';
-            group(p27PocketKey(dir,p.name),dir,p.name,p.plan_count);
+            group(p27PocketKey(dir,p.name),dir,String(p.name||'').trim(),p.plan_count).is2027=true;
         });
         var loaded = new Set();
         stateDash.lanes.forEach(function(l){ if(l.draft && l.draft.id) loaded.add(String(l.draft.id)); });
@@ -2710,31 +2738,88 @@ function renderBankStatsPanel(bank){
             if ((d.task_kind||'audit')!=='audit' || String(d.start_date||'').slice(0,4)!==String(P27_YEAR) || d.status==='cancelled' || d.status==='archived' || loaded.has(String(d.id)) || stateDash.p27ClosedTaskIds.has(String(d.id))) return;
             stateDash.lanes.push({task:d,draft:plan2027BuildDraft(d),offset:0,pinned:false}); loaded.add(String(d.id));
         });
+        var carries=p27CarryTasks(loaded), carryIds=new Set(carries.map(function(c){return c.id;}));
         stateDash.lanes.forEach(function(l,i){
+            l.p27Carry=null;
+            if(l.p27CarryId&&!carryIds.has(l.p27CarryId))delete l.p27CarryId;
             if(!l.draft)return;
             var dir=plan2027TaskDir(l.draft)||'other', name=String(l.draft.pocket||'').trim();
             var g=group(p27PocketKey(dir,name),dir,name,null); g.indices.push(i);
+            if(p27DraftStart(l.draft)>=P27_YEAR_START) g.countable++;
         });
+        carries.forEach(function(c){ group(c.key,c.dir,c.name,null).carry.push(c); });
         // Reuse empty planned slots, so rendering never discards or duplicates a draft.
+        // A carry-over audit stays on its axis; a 2027 audit may follow it on the same axis.
         groups.forEach(function(g){
-            var needed=Math.max(0,g.plan-g.indices.length);g.remaining=needed;
-            var empties=[];stateDash.lanes.forEach(function(l,i){if(!l.draft&&l.p27GroupKey===g.key)empties.push(i);});
-            while(empties.length<needed){empties.push(stateDash.lanes.length);stateDash.lanes.push({task:null,draft:null,offset:0,pinned:false,p27GroupKey:g.key});}
-            g.indices=g.indices.concat(empties.slice(0,needed));
-            g.indices.forEach(function(i){stateDash.lanes[i].p27Remaining=needed;});
+            var lanes=stateDash.lanes, needed=Math.max(0,g.plan-g.countable);
+            g.remaining=needed;
+            var empties=[];lanes.forEach(function(l,i){if(!l.draft&&l.p27GroupKey===g.key)empties.push(i);});
+            var hosts=g.indices.concat(empties);
+            function free(i){ return !lanes[i].p27Carry; }
+            g.carry.forEach(function(c){
+                var host=-1;
+                hosts.forEach(function(i){ if(host<0&&free(i)&&lanes[i].p27CarryId===c.id) host=i; });
+                if(host<0) g.indices.forEach(function(i){ if(host<0&&free(i)&&!lanes[i].p27CarryId&&p27DraftStart(lanes[i].draft)>c.end) host=i; });
+                if(host<0) empties.forEach(function(i){ if(host<0&&free(i)&&!lanes[i].p27CarryId) host=i; });
+                if(host<0){ host=lanes.length; lanes.push({task:null,draft:null,offset:0,pinned:false,p27GroupKey:g.key}); empties.push(host); }
+                lanes[host].p27Carry=c; lanes[host].p27CarryId=c.id;
+            });
+            var withCarry=empties.filter(function(i){return !free(i);}), plain=empties.filter(free);
+            var extra=Math.max(0,needed-withCarry.length);
+            while(plain.length<extra){plain.push(lanes.length);lanes.push({task:null,draft:null,offset:0,pinned:false,p27GroupKey:g.key});}
+            g.indices=g.indices.concat(withCarry.concat(plain.slice(0,extra)).sort(function(x,y){return x-y;}));
+            g.indices.forEach(function(i){lanes[i].p27Remaining=needed;});
         });
         stateDash.p27Groups=groups;
         return groups;
+    }
+    // Default: every pocket is collapsed except the active one (selected pocket / filter); manual opens persist.
+    function p27PocketOpen(key){
+        var o=stateDash.p27Open||{};
+        return o[key]===true || key===stateDash.p27PocketFilterKey || (o[key]!==false && !!key && key===stateDash.selectedPocketKey);
+    }
+    // Audits visible in a pocket: 2027 drafts on its axes plus carry-over audits from 2026.
+    function p27GroupCount(g){ return g.indices.filter(function(i){ return stateDash.lanes[i] && !!stateDash.lanes[i].draft; }).length + g.carry.length; }
+    var P27_SORTS = {
+        dir:null,
+        name_asc:function(a,b){ return a.name.localeCompare(b.name,'ru'); },
+        name_desc:function(a,b){ return b.name.localeCompare(a.name,'ru'); },
+        count_desc:function(a,b){ return p27GroupCount(b)-p27GroupCount(a); },
+        count_asc:function(a,b){ return p27GroupCount(a)-p27GroupCount(b); },
+        remaining_desc:function(a,b){ return (b.remaining||0)-(a.remaining||0); },
+        plan_desc:function(a,b){ return (b.plan||0)-(a.plan||0); },
+        carry_desc:function(a,b){ return b.carry.length-a.carry.length; }
+    };
+    function p27SortMode(){ return P27_SORTS.hasOwnProperty(stateDash.p27Sort) ? stateDash.p27Sort : 'dir'; }
+    var P27_DIR_ORDER = { corp:0, retail:1, other:2 };
+    // «Без кармана» is always last; ties keep direction order, then the original order.
+    function p27SortGroups(gs, mode){
+        var cmp = P27_SORTS[mode || 'dir'];
+        return gs.map(function(g,i){return [g,i];}).sort(function(x,y){
+            return ((x[0].name?0:1)-(y[0].name?0:1)) || (cmp ? cmp(x[0],y[0]) : 0)
+                || ((P27_DIR_ORDER[x[0].dir]||0)-(P27_DIR_ORDER[y[0].dir]||0)) || (x[1]-y[1]);
+        }).map(function(x){return x[0];});
+    }
+    function p27PocketSummary(g){
+        var audits=g.indices.filter(function(i){return !!stateDash.lanes[i].draft;}).length;
+        var meta=[];
+        if(!g.name) meta.push('проверок: '+(audits+g.carry.length));
+        if(g.carry.length) meta.push('↪ из 2026: '+g.carry.length);
+        if(g.name&&!g.is2027) meta.push('нет в плане 2027');
+        var tip=g.name?('План 2027: '+g.plan+' · начато в 2027: '+g.countable+(g.carry.length?' · переходящих из 2026: '+g.carry.length+' (в план не входят)':'')):'Проверки без кармана';
+        var dirTag = p27SortMode()!=='dir' ? '<span class="p27-pocket-dir p27-dir-'+g.dir+'">'+escapeHtml(g.dir==='corp'?'Корп':g.dir==='retail'?'Розн':'—')+'</span>' : '';
+        meta.unshift('проверок: '+p27GroupCount(g)); if(!g.name) meta.splice(1,1);
+        return {tip:tip, html:dirTag+'<span class="p27-pocket-name">'+escapeHtml(g.name||'Без кармана')+'</span>'+(g.name?'<span class="p27-pocket-count">('+g.plan+')</span>':'')+(meta.length?'<span class="p27-pocket-meta">'+escapeHtml(meta.join(' · '))+'</span>':'')};
     }
     function p27PocketFilter(){
         var sel=byId('plan2027PocketSelector');if(!sel)return;
         var opts='<option value="">Все карманы</option>';
         ['corp','retail','other'].forEach(function(dir){
             if(stateDash.dir!=='all'&&dir!==stateDash.dir)return;
-            var gs=Array.from((stateDash.p27Groups||new Map()).values()).filter(function(g){return g.dir===dir&&g.name;});
+            var gs=p27SortGroups(Array.from((stateDash.p27Groups||new Map()).values()).filter(function(g){return g.dir===dir;}));
             if(!gs.length)return;
             opts+='<optgroup label="'+escapeHtml(DASH_DIR_LABEL[dir]||'Без направления')+'">';
-            gs.forEach(function(g){opts+='<option value="'+escapeHtml(g.key)+'">'+escapeHtml(g.name)+' ('+g.plan+')</option>';});opts+='</optgroup>';
+            gs.forEach(function(g){opts+='<option value="'+escapeHtml(g.key)+'">'+escapeHtml(g.name||'Без кармана')+(g.name?' ('+g.plan+')':'')+'</option>';});opts+='</optgroup>';
         });
         sel.innerHTML=opts;sel.value=stateDash.p27PocketFilterKey||'';
         if(sel.value!==(stateDash.p27PocketFilterKey||'')){stateDash.p27PocketFilterKey='';sel.value='';}
@@ -2749,13 +2834,18 @@ function renderBankStatsPanel(bank){
     }
     function p27GroupedLanes(){
         var groups=p27PlanGroups();p27PocketFilter();var html='';var used=new Set();
-        ['corp','retail','other'].forEach(function(dir){
-            if(stateDash.dir!=='all'&&stateDash.dir!==dir)return;
-            var gs=Array.from(groups.values()).filter(function(g){return g.dir===dir&&(!stateDash.p27PocketFilterKey||g.key===stateDash.p27PocketFilterKey);});
+        var mode=p27SortMode();
+        // «По направлению»: direction → pocket. Other sorts: one flat list across the visible directions.
+        var sections=mode==='dir'?['corp','retail','other']:['all'];
+        sections.forEach(function(dir){
+            if(dir!=='all'&&stateDash.dir!=='all'&&stateDash.dir!==dir)return;
+            var gs=p27SortGroups(Array.from(groups.values()).filter(function(g){return (dir==='all'?(stateDash.dir==='all'||g.dir===stateDash.dir):g.dir===dir)&&(!stateDash.p27PocketFilterKey||g.key===stateDash.p27PocketFilterKey);}),mode);
             if(!gs.length)return;
-            html+='<section class="p27-direction" data-p27-direction="'+dir+'"><h3>'+(dir==='corp'?'🏢 ':dir==='retail'?'👥 ':'')+escapeHtml(DASH_DIR_LABEL[dir]||'Без направления')+'</h3>';
+            var sel=byId('plan2027SortSelector'), sortName=sel&&sel.selectedOptions[0]?sel.selectedOptions[0].textContent:'';
+            html+='<section class="p27-direction" data-p27-direction="'+dir+'"><h3>'+(dir==='all'?escapeHtml('Все карманы · '+sortName):(dir==='corp'?'🏢 ':dir==='retail'?'👥 ':'')+escapeHtml(DASH_DIR_LABEL[dir]||'Без направления'))+'</h3>';
             gs.forEach(function(g){
-                html+='<details class="p27-pocket-group" data-p27-pocket="'+escapeHtml(g.key)+'"'+(stateDash.p27Collapsed&&stateDash.p27Collapsed[g.key]?'':' open')+'><summary data-p27-select-pocket="'+escapeHtml(g.key)+'">'+escapeHtml(g.name||'Вне кармана')+' ('+g.plan+')</summary>';
+                var sm=p27PocketSummary(g);
+                html+='<details class="p27-pocket-group'+(g.name?'':' p27-no-pocket')+'" data-p27-pocket="'+escapeHtml(g.key)+'"'+(p27PocketOpen(g.key)?' open':'')+'><summary data-p27-select-pocket="'+escapeHtml(g.key)+'" title="'+escapeHtml(sm.tip)+'">'+sm.html+'</summary>';
                 if(!g.indices.length)html+='<div class="p27-pocket-empty">План проверок не задан</div>';
                 g.indices.forEach(function(i){used.add(i);var l=stateDash.lanes[i];html+=renderLaneBlock(l,i,i===stateDash.activeLane,plan2027TimeBounds(laneOffset(l)),!!l.draft,stateDash.lanes.length>1,!!l.pinned);});
                 html+='</details>';
@@ -2771,7 +2861,7 @@ function renderBankStatsPanel(bank){
     }
 
     function syncLane(){ var l=stateDash.lanes[stateDash.activeLane]; if(l){ l.task=stateDash.task; l.draft=stateDash.draft; } }
-    function switchLane(i){ var l=stateDash.lanes[i]; if(!l)return false; stateDash.activeLane=i; stateDash.task=l.task; stateDash.draft=l.draft; stateDash.selectedPocketKey=l.draft?p27DraftKey(l.draft):(l.p27GroupKey||''); return true; }
+    function switchLane(i){ var l=stateDash.lanes[i]; if(!l)return false; stateDash.activeLane=i; stateDash.task=l.task; stateDash.draft=l.draft; stateDash.selectedPocketKey=l.draft?p27DraftKey(l.draft):(l.p27GroupKey||''); if(stateDash.p27Open&&stateDash.p27Open[stateDash.selectedPocketKey]===false)delete stateDash.p27Open[stateDash.selectedPocketKey]; return true; }
     function addLane(){ if(stateDash.lanes.length>=30) return false; stateDash.lanes.push({task:null,draft:null,offset:stateDash.globalOffset||0,pinned:false}); switchLane(stateDash.lanes.length-1); return true; }
     function findEmptyLane(groupKey){
         var key=groupKey===undefined?stateDash.selectedPocketKey:groupKey, free=-1;
@@ -3122,7 +3212,7 @@ function renderBankStatsPanel(bank){
         var defDir=selectedGroup?selectedGroup.dir:(stateDash.dir==='corp'?'corp':'retail');
         // Список существующих карманов
         function pocketOptsFor(dir){
-            var tt = dirTaskType(dir), o = ['<option value="">— Вне кармана —</option>'];
+            var tt = dirTaskType(dir), o = ['<option value="">— Без кармана —</option>'];
             (window.trkPocketsFor ? window.trkPocketsFor(tt, String(P27_YEAR)) : (window.__trkPocketList || [])).forEach(function(p){ if (p.direction === tt && p.is_active) o.push('<option value="'+escapeHtml(p.name)+'">'+escapeHtml(p.name)+'</option>'); });
             return o.join('');
         }
@@ -3606,7 +3696,7 @@ function renderBankStatsPanel(bank){
         }
         var todayMarker = (todayISO() >= rangeStart && todayISO() <= rangeEnd) ? '<div class="dash-tl-today" style="left:' + pctX(todayISO()) + '%" title="Сегодня"></div>' : '';
         var header = '<div class="dash-lane-header">'
-            + '<div class="dash-lane-title">Ось ' + (laneIdx+1) + (hasDraft ? ' · ' + escapeHtml(d.name || 'Проверка') : '') + '</div>'
+            + '<div class="dash-lane-title">Ось ' + (laneIdx+1) + (hasDraft ? ' · ' + escapeHtml(d.name || 'Проверка') : '') + (lane.p27Carry ? ' · <span class="p27-carry-title" title="Переходящая из 2026: ' + escapeHtml(lane.p27Carry.draft.name || 'Проверка') + '">↪ ' + escapeHtml(lane.p27Carry.draft.name || 'Проверка') + ' (2026)</span>' : '') + '</div>'
             + '<div class="dash-lane-header-actions">'
             + '<button class="p27-chips-toggle' + ((stateDash.p27ChipsOpen && stateDash.p27ChipsOpen[laneIdx]) ? ' active' : '') + '" type="button" data-p27-chips-toggle="' + laneIdx + '" title="Показать/скрыть банки и этапы">⊞</button>'
             + (canPin ? '<button class="dash-lane-pin' + (isPinned ? ' active' : '') + '" type="button" data-lane-pin="' + laneIdx + '" title="' + (isPinned ? 'Открепить ось' : 'Закрепить ось') + '">📌</button>' : '')
@@ -3632,7 +3722,26 @@ function renderBankStatsPanel(bank){
                     + '</div>';
             }).join('');
         } else {
-            segs = '<div class="dash-tl-empty-bar p27-empty-slot"'+(lane.p27GroupKey?' title="По плану нужно начать ещё '+lane.p27Remaining+' '+(lane.p27Remaining%10===1&&lane.p27Remaining%100!==11?'проверку':lane.p27Remaining%10>=2&&lane.p27Remaining%10<=4&&(lane.p27Remaining%100<12||lane.p27Remaining%100>14)?'проверки':'проверок')+'"':'')+'></div>';
+            var rem = lane.p27Remaining || 0;
+            var slotTip = !lane.p27GroupKey ? '' : (rem > 0 ? 'По плану нужно начать ещё ' + rem + ' ' + (rem%10===1&&rem%100!==11?'проверку':rem%10>=2&&rem%10<=4&&(rem%100<12||rem%100>14)?'проверки':'проверок') : '');
+            segs = '<div class="dash-tl-empty-bar p27-empty-slot"' + (slotTip ? ' title="' + escapeHtml(slotTip) + '"' : '') + '></div>';
+        }
+        var carrySegs = '';
+        if (lane.p27Carry) {
+            var cy = lane.p27Carry, cst = plan2027NormalizeStages(cy.draft), firstLab = true;
+            if (!cst.length) cst = [{ key:'', start:cy.start, end:cy.end }];
+            carrySegs = cst.map(function(s){
+                var se = s.end || s.start;
+                if (se < rangeStart || s.start > rangeEnd) return '';
+                var x0 = Math.max(0, Math.min(100, pctX(s.start)));
+                var x1 = Math.max(0, Math.min(100, pctX(addDaysISO(se, 1))));
+                if (x1 <= x0) return '';
+                var col = STAGE_COLORS[s.key] || '#94a3b8';
+                var lab = (firstLab ? '2026 · ' : '') + (s.key ? p27StageShort(s.key) : (cy.draft.name || ''));
+                firstLab = false;
+                var tip = 'Переходящая из 2026: «' + (cy.draft.name || 'Проверка') + '»' + (s.key ? ' · ' + stageLabel(s.key) : '') + ': ' + s.start + ' → ' + se + (cy.task.status === 'done' ? ' · завершена' : '') + ' · в план 2027 не входит';
+                return '<div class="p27-carry-seg" data-p27-carry="' + escapeHtml(cy.id) + '" title="' + escapeHtml(tip) + '" style="left:' + x0 + '%;width:' + (x1 - x0) + '%;--p27seg:' + escapeHtml(col) + '"><span class="p27-carry-lab" data-p27-short="' + escapeHtml(lab.indexOf('2026') === 0 ? '2026' : '') + '">' + escapeHtml(lab) + '</span></div>';
+            }).join('');
         }
         var trackId = isActive ? ' id="plan2027TlTrack"' : '';
         return '<div class="dash-lane-block" data-lane-block="' + laneIdx + '">'
@@ -3640,7 +3749,7 @@ function renderBankStatsPanel(bank){
             + '<div class="dash-timeline' + (stateDash.mode === 'year' ? ' p27-year' : '') + '">'
             + '<div class="p27-scale">' + p27Bands + p27Lines
             + '<div class="dash-tl-axis">' + ticks.join('') + '</div>'
-            + '<div class="dash-tl-track"' + trackId + ' data-lane-track="' + laneIdx + '">' + todayMarker + segs + '</div>'
+            + '<div class="dash-tl-track"' + trackId + ' data-lane-track="' + laneIdx + '">' + todayMarker + carrySegs + segs + '</div>'
             + '</div></div>'
             + renderLaneControls(lane, laneIdx)
             + '</div>';
@@ -3686,13 +3795,16 @@ function renderBankStatsPanel(bank){
         if (!c) return;
         stateDash.globalOffset = plan2027ClampGlobalOffset(stateDash.globalOffset || 0);
         var sliderCfg = plan2027GlobalSliderConfig();
-        var sliderHtml = '<div class="dash-global-slider-wrap"><input type="range" id="plan2027GlobalSlider" class="dash-global-slider" min="' + sliderCfg.min + '" max="' + sliderCfg.max + '" step="1" value="' + (stateDash.globalOffset || 0) + '"></div>';
+        var gOff = stateDash.globalOffset || 0;
+        var sliderHtml = '<div class="dash-global-slider-wrap p27-slider-wrap"><label class="p27-slider-lab" for="plan2027GlobalSlider">Сдвиг шкалы</label>'
+            + '<input type="range" id="plan2027GlobalSlider" class="dash-global-slider" min="' + sliderCfg.min + '" max="' + sliderCfg.max + '" step="1" value="' + gOff + '" title="Сдвинуть шкалу незакреплённых осей (±3 месяца)">'
+            + '<span class="p27-slider-val">' + (gOff ? (gOff > 0 ? '+' : '−') + Math.abs(gOff) + ' дн.' : 'с 1 января') + '</span></div>';
         var lanesHtml = p27GroupedLanes();
         var addBtn = stateDash.lanes.length < 30 ? '<div class="dash-lanes-foot"><button class="dash-lane-add" type="button" id="plan2027AddLaneBtn">+ Ось</button></div>' : '';
         var p27Legend = stateDash.mode === 'year' ? ('<div class="p27-legend">' + ['winter','spring','summer','autumn'].map(function(k){
             var S = P27_SEASONS[k];
-            return '<span class="p27-leg" style="--p27c:' + S.rgb + '"><i></i>' + S.ico + ' ' + S.name + ' · ' + S.q + '</span>';
-        }).join('') + '<span class="p27-leg-note">зима — дек–фев, осень — сен–ноя</span></div>') : '';
+            return '<span class="p27-leg" style="--p27c:' + S.rgb + '" title="Сезонный квартал: ' + S.mon + '"><i></i>' + S.ico + ' ' + S.q + ' · ' + S.mon + '</span>';
+        }).join('') + '</div>') : '';
         c.innerHTML = sliderHtml + p27Legend + lanesHtml + addBtn + renderLeadPicker();
         plan2027ScheduleTicks();
         var addBtnEl = byId('plan2027AddLaneBtn');
@@ -3778,8 +3890,7 @@ function renderBankStatsPanel(bank){
             });
         });
         c.querySelectorAll('[data-del]').forEach(function(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var li=+this.getAttribute('data-lane'); switchLane(li); if (!stateDash.draft) return; var idx=+this.getAttribute('data-del'); var stg=plan2027NormalizeStages(stateDash.draft); if (stg[idx] && stg[idx].key!==DASH_STAGE_KEY_DEFAULT){ stg.splice(idx,1); stateDash.draft.stages=stg; syncLane(); renderGantt(); renderLoad(); } }); });
-        c.querySelectorAll('[data-p27-select-pocket]').forEach(function(btn){btn.addEventListener('click',function(){stateDash.selectedPocketKey=this.getAttribute('data-p27-select-pocket');renderLoad();});});
-        c.querySelectorAll('.p27-pocket-group').forEach(function(el){el.addEventListener('toggle',function(){stateDash.p27Collapsed=stateDash.p27Collapsed||{};stateDash.p27Collapsed[this.getAttribute('data-p27-pocket')]=!this.open;});});
+        c.querySelectorAll('[data-p27-select-pocket]').forEach(function(btn){btn.addEventListener('click',function(){var k=this.getAttribute('data-p27-select-pocket'),det=this.parentElement,opening=!(det&&det.open);stateDash.p27Open=stateDash.p27Open||{};stateDash.p27Open[k]=opening;if(opening)stateDash.selectedPocketKey=k;renderLoad();});});
         plan2027AttachDrag(c);
     }
 
@@ -3926,7 +4037,7 @@ function renderBankStatsPanel(bank){
             var key = String(stateDash.selectedPocketKey || '');
             var allRows = plan2027LoadMatrix(audits, deps, '');
             var maxCount = allRows.reduce(function(max,row){ return Math.max.apply(Math, [max].concat(row.counts)); }, 0);
-            body.innerHTML = '<p class="p27-load-note">2027 · число проверок · темнее = больше. С учётом черновиков.</p>'
+            body.innerHTML = '<p class="p27-load-note">2027 · число проверок · зелёный = свободно, тёмно-красный = максимум. С учётом черновиков.</p>'
                 + plan2027LoadHeatmap('Все проверки · все направления', allRows, maxCount, 'all');
             if (key) {
                 var split = key.indexOf('|');
@@ -4367,6 +4478,16 @@ function renderBankStatsPanel(bank){
                 renderSelector();
                 renderGantt();
                 renderLoad();
+            });
+        }
+        var sortSel = byId('plan2027SortSelector');
+        if (sortSel && !sortSel.__dashBound) {
+            sortSel.__dashBound = true;
+            sortSel.value = p27SortMode();
+            sortSel.addEventListener('change', function(){
+                syncLane();
+                stateDash.p27Sort = P27_SORTS.hasOwnProperty(this.value) ? this.value : 'dir';
+                renderGantt();
             });
         }
         var modeBox = byId('plan2027ModeSwitch');

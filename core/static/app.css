@@ -11353,3 +11353,112 @@ body.trk-theme-light #panel-plan2027 .p27-season { background:linear-gradient(to
   #panel-plan2027 .p27-pocket-field select { width:100%; height:32px; }
   #panel-plan2027 .p27-load-toggle { flex-basis:40px; width:40px; height:40px; }
 }
+
+/* PLAN2027 pockets v3: crisp pocket headers, carry-over 2026 audits */
+#panel-plan2027 .p27-direction>h3 {font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--trk-meta);margin:6px 0 2px;}
+#panel-plan2027 .p27-pocket-group {border-left:3px solid #14b8a6;background:rgba(20,184,166,.05);}
+#panel-plan2027 .p27-pocket-group>summary {display:flex;align-items:baseline;gap:6px;font-size:14px;font-weight:700;line-height:20px;color:#0f766e;padding:3px 6px;}
+#panel-plan2027 .p27-pocket-count {font-size:12px;font-weight:600;opacity:.75;}
+#panel-plan2027 .p27-pocket-meta {font-size:11px;font-weight:500;color:var(--trk-meta);margin-left:4px;}
+#panel-plan2027 .p27-pocket-group.p27-no-pocket {border-left-color:#94a3b8;background:rgba(148,163,184,.07);}
+#panel-plan2027 .p27-pocket-group.p27-no-pocket>summary {color:#475569;}
+body:not(.trk-theme-light) #panel-plan2027 .p27-pocket-group {background:rgba(45,212,191,.06);}
+body:not(.trk-theme-light) #panel-plan2027 .p27-pocket-group>summary {color:#5eead4;}
+body:not(.trk-theme-light) #panel-plan2027 .p27-pocket-group.p27-no-pocket>summary {color:#cbd5e1;}
+#panel-plan2027 .p27-carry-seg {position:absolute;bottom:2px;height:20px;box-sizing:border-box;border-radius:4px;overflow:hidden;white-space:nowrap;z-index:1;cursor:default;
+  background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--p27seg) 32%,#e2e8f0) 0 5px,color-mix(in srgb,var(--p27seg) 16%,#f8fafc) 5px 10px);
+  border:1px solid color-mix(in srgb,var(--p27seg) 50%,#94a3b8);}
+#panel-plan2027 .p27-carry-lab {display:block;font-size:.62rem;line-height:18px;padding:0 4px;color:#475569;overflow:hidden;text-overflow:clip;}
+body:not(.trk-theme-light) #panel-plan2027 .p27-carry-seg {background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--p27seg) 35%,#334155) 0 5px,color-mix(in srgb,var(--p27seg) 18%,#1e293b) 5px 10px);border-color:color-mix(in srgb,var(--p27seg) 45%,#475569);}
+body:not(.trk-theme-light) #panel-plan2027 .p27-carry-lab {color:#cbd5e1;}
+#panel-plan2027 .dash-tl-track .dash-seg {z-index:2;}
+#panel-plan2027 .p27-carry-title {color:var(--trk-meta);font-weight:500;}
+
+
+/* ===== p27 toolbar v4 + layout 60/40 (только «План 2027») =====
+   Шапка и фильтры — одна компактная карточка; справа «Нагрузка на ТБ» 40 %,
+   клетки тепловой карты квадратные (высота = ширина через container query). */
+#panel-plan2027 .dash-main-pane{gap:8px!important}
+#panel-plan2027 .dash-main-pane .dash-toolbar,
+#panel-plan2027 .dash-main-pane .dash-topbar{background:var(--trk-card-bg);border:1px solid var(--trk-card-border);box-sizing:border-box!important}
+#panel-plan2027 .dash-main-pane .dash-toolbar{padding:7px 10px 5px!important;border-bottom:0;border-radius:12px 12px 0 0;gap:8px!important;min-height:0}
+#panel-plan2027 .dash-main-pane .dash-topbar{margin-top:-8px!important;padding:5px 10px 8px!important;border-top:0;border-radius:0 0 12px 12px;gap:6px 14px!important;align-items:center!important;box-shadow:var(--trk-shadow-soft)}
+#panel-plan2027 .dash-toolbar .plan-title{font-size:15px;font-weight:700;line-height:28px;margin:0;white-space:nowrap}
+#panel-plan2027 .dash-toolbar-right{gap:6px;align-items:center;flex-wrap:wrap}
+#panel-plan2027 .dash-toolbar-right .btn{height:28px;min-height:28px;padding:0 10px!important;margin:0!important;font-size:12px;line-height:26px;border-radius:8px!important;box-sizing:border-box;white-space:nowrap}
+#panel-plan2027 .dash-topbar .dash-field{flex-direction:row!important;align-items:center!important;gap:6px!important;min-width:0}
+#panel-plan2027 .dash-topbar .dash-field-task{flex:1 1 300px!important}
+#panel-plan2027 .dash-topbar .dash-label{margin:0;font-size:10px!important;font-weight:700;letter-spacing:.06em;line-height:1;color:var(--trk-meta);white-space:nowrap}
+#panel-plan2027 .dash-topbar .dash-task-row{flex:1 1 auto;min-width:0;gap:6px}
+#panel-plan2027 .dash-topbar select.form-control{height:28px!important;min-height:28px!important;padding:0 26px 0 9px!important;font-size:12px!important;line-height:26px;border:1px solid var(--trk-card-border)!important;border-radius:8px!important;background-color:var(--trk-input-bg)!important;color:var(--trk-text)!important;box-sizing:border-box;-webkit-appearance:none;appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2394a3b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")!important;background-repeat:no-repeat!important;background-position:right 9px center!important;background-size:10px 6px!important}
+#panel-plan2027 .dash-topbar #plan2027TaskSelector{flex:1 1 auto;min-width:140px;width:auto}
+#panel-plan2027 .dash-topbar #plan2027PocketSelector{min-width:130px;max-width:220px}
+#panel-plan2027 .dash-topbar select.form-control:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
+#panel-plan2027 #plan2027CreateTaskBtn{height:28px;min-height:28px;padding:0 10px!important;font-size:12px;line-height:26px;border-radius:8px!important;white-space:nowrap;box-sizing:border-box}
+#panel-plan2027 .dash-topbar .btn-seg{display:inline-flex;gap:2px;padding:2px;border:0!important;border-radius:9px!important;overflow:visible;background:rgba(100,116,139,.14)!important}
+#panel-plan2027 .dash-topbar .btn-seg-btn{height:24px;padding:0 9px!important;font-size:12px!important;line-height:24px;border:0!important;border-radius:7px!important;background:transparent!important;color:var(--trk-meta)!important;font-weight:500;white-space:nowrap;transition:background .12s,color .12s}
+#panel-plan2027 .dash-topbar .btn-seg-btn:hover:not(.active){background:rgba(100,116,139,.14)!important;color:var(--trk-text)!important}
+#panel-plan2027 .dash-topbar .btn-seg-btn.active{background:#fff!important;color:#1d4ed8!important;font-weight:650;box-shadow:0 1px 2px rgba(15,23,42,.18),0 0 0 1px rgba(15,23,42,.05)}
+body:not(.trk-theme-light) #panel-plan2027 .dash-topbar .btn-seg{background:rgba(148,163,184,.14)!important}
+body:not(.trk-theme-light) #panel-plan2027 .dash-topbar .btn-seg-btn.active{background:#334155!important;color:#93c5fd!important;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+#panel-plan2027 .dash-topbar .btn-seg-btn:focus-visible{outline:2px solid #60a5fa;outline-offset:1px}
+
+@media (min-width:901px){
+  #panel-plan2027 .dash-wrap.dash-split-wrap{grid-template-columns:minmax(0,3fr) minmax(0,2fr)!important;gap:12px!important}
+}
+/* Квадратные клетки: ширина клетки = (ширина карты − столбец ТБ − зазоры)/12, не больше 46 px. */
+#panel-plan2027 .p27-heatmap{container-type:inline-size}
+#panel-plan2027 .p27-load-table{--p27cell:min(46px,calc((100cqw - 58px - 26px) / 12));max-width:calc(58px + 26px + 12 * 46px);margin-inline:auto}
+#panel-plan2027 .p27-load-table tbody td,
+#panel-plan2027 .p27-load-table tbody th{height:max(22px,var(--p27cell));padding:0;vertical-align:middle}
+#panel-plan2027 .p27-load-table tbody td{border-radius:5px}
+@media (max-width:520px){
+  #panel-plan2027 .p27-load-table{--p27cell:min(46px,calc((100cqw - 48px - 13px) / 12))}
+  #panel-plan2027 .p27-load-table tbody td,#panel-plan2027 .p27-load-table tbody th{height:max(18px,var(--p27cell))}
+}
+
+/* p27 toolbar v4.1: кнопка «Создать проверку» не переносится под список (иначе строка 62 px); на мобиле поля не выходят за край. */
+#panel-plan2027 .dash-topbar .dash-task-row{flex-wrap:nowrap!important}
+#panel-plan2027 .dash-topbar #plan2027TaskSelector{flex:1 1 0!important;width:0!important;min-width:120px!important;max-width:100%}
+#panel-plan2027 .dash-topbar select.form-control{max-width:100%;text-overflow:ellipsis}
+@media (max-width:520px){
+  #panel-plan2027 .dash-topbar .dash-field{flex-wrap:wrap!important;max-width:100%}
+  #panel-plan2027 .dash-topbar .dash-field-task{flex:1 1 100%!important}
+  #panel-plan2027 .dash-topbar .dash-field>.dash-label{flex:0 0 100%}
+  #panel-plan2027 .dash-topbar #plan2027PocketSelector{flex:1 1 auto;max-width:100%}
+  #panel-plan2027 .dash-topbar .btn-seg{max-width:100%}
+  #panel-plan2027 .dash-topbar .btn-seg-btn{padding:0 7px!important}
+}
+
+/* ===== p27 v5: сортировка вместо горизонта, зелёные гистограммы 40 %, палитра тепловой карты зелёный → тёмно-красный ===== */
+#panel-plan2027 .dash-topbar #plan2027SortSelector{min-width:150px;max-width:220px}
+#panel-plan2027 .p27-pocket-dir{font-size:10px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:999px;align-self:center;background:rgba(100,116,139,.16);color:var(--trk-meta)}
+#panel-plan2027 .p27-pocket-dir.p27-dir-corp{background:rgba(37,99,235,.12);color:#1d4ed8}
+#panel-plan2027 .p27-pocket-dir.p27-dir-retail{background:rgba(147,51,234,.12);color:#7e22ce}
+body:not(.trk-theme-light) #panel-plan2027 .p27-pocket-dir.p27-dir-corp{color:#93c5fd}
+body:not(.trk-theme-light) #panel-plan2027 .p27-pocket-dir.p27-dir-retail{color:#d8b4fe}
+#panel-plan2027 .p27-pocket-meta{color:var(--trk-text);opacity:.72;font-size:11.5px}
+/* Тепловая карта: 0 — нейтрально, 1 светло-зелёный … 5 тёмно-красный. */
+#panel-plan2027 .p27-load-table td[data-level="1"]{background:#bbf7d0!important;color:#14532d!important}
+#panel-plan2027 .p27-load-table td[data-level="2"]{background:#fde68a!important;color:#713f12!important}
+#panel-plan2027 .p27-load-table td[data-level="3"]{background:#fb923c!important;color:#431407!important}
+#panel-plan2027 .p27-load-table td[data-level="4"]{background:#dc2626!important;color:#fff!important}
+#panel-plan2027 .p27-load-table td[data-level="5"]{background:#7f1d1d!important;color:#fff!important}
+/* Гистограммы: зелёные столбики, та же ширина, что у тепловой карты (колонка 40 %, не шире 636 px, по центру). */
+#plan2027LoadContainer .dash-mini-bar{background:linear-gradient(180deg,#4ade80 0%,#16a34a 100%)!important}
+#plan2027LoadContainer .dash-mini-col.warn .dash-mini-bar{background:linear-gradient(180deg,#fbbf24 0%,#f59e0b 100%)!important}
+#plan2027LoadContainer .dash-mini-col.over .dash-mini-bar{background:linear-gradient(180deg,#f87171 0%,#b91c1c 100%)!important}
+#panel-plan2027 .p27-load-histograms .dash-bank-grid{max-width:calc(58px + 26px + 12 * 46px);margin-inline:auto;box-sizing:border-box}
+@media (min-width:901px){
+  #panel-plan2027 .dash-wrap.dash-split-wrap:has(.p27-load-histograms){grid-template-columns:minmax(0,3fr) minmax(0,2fr)!important}
+}
+/* Пустой слот под план — светлая зона с подсказкой; черновик — пунктирная полоса. Разные по виду. */
+#panel-plan2027 .p27-empty-slot{border:0!important;border-radius:4px;background:repeating-linear-gradient(90deg,rgba(100,116,139,.16) 0 2px,transparent 2px 8px)!important;height:14px!important;min-height:14px!important;margin-top:4px}
+#panel-plan2027 .p27-empty-slot[title]{background:rgba(20,184,166,.10)!important;box-shadow:inset 0 0 0 1px rgba(20,184,166,.35)}
+/* Слайдер сдвига шкалы: подпись и значение. */
+#panel-plan2027 .p27-slider-wrap{display:flex;align-items:center;gap:8px;margin:0 0 4px;padding:2px}
+#panel-plan2027 .p27-slider-wrap .dash-global-slider{flex:1 1 auto;min-width:0}
+#panel-plan2027 .p27-slider-lab,#panel-plan2027 .p27-slider-val{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--trk-meta);white-space:nowrap}
+#panel-plan2027 .p27-slider-val{min-width:68px;text-align:right;font-weight:600}
+#panel-plan2027 .p27-carry-lab{text-overflow:clip}
