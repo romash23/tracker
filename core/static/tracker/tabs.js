@@ -360,7 +360,9 @@ setTimeout(buildGanttTab, 1500);
     return (v === null || v === undefined || v === '') ? null : num(v);
   }
 
-  function planAbbr(name){
+  function planAbbr(name, shortName){
+    var sn = String(shortName||'').trim();
+    if (sn && /[A-Za-zА-Яа-яЁё]/.test(sn)) return sn;   /* departments.short_name из БД */
     var s = String(name||'').trim();
     if (!s) return '—';
     s = s.replace(/\s*банк\s*$/i,'').trim();   /* убираем хвост "банк" */
@@ -378,7 +380,7 @@ setTimeout(buildGanttTab, 1500);
     /* шапка: тер банки по столбцам; угловая ячейка «Показатель» вырезана */
     var head = '<thead><tr><th class="plan-corner"></th>';
     deps.forEach(function(d){
-      head += '<th class="plan-bankcol" title="'+esc(d.name)+'">'+'<span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span>'+'<span class="plan-bankabbr">'+esc(planAbbr(d.name))+'</span></th>';
+      head += '<th class="plan-bankcol" title="'+esc(d.name)+'">'+'<span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span>'+'<span class="plan-bankabbr">'+esc(planAbbr(d.name, d.short_name))+'</span></th>';
     });
     head += '</tr></thead>';
     /* строки */
@@ -497,7 +499,7 @@ setTimeout(buildGanttTab, 1500);
     /* шапка: угловая ячейка + банки (те же аббревиатуры, что в верхней таблице) */
     var head='<thead><tr><th class="plan-corner"></th>';
     deps.forEach(function(d){
-      head+='<th class="plan-bankcol" title="'+esc(d.name)+'"><span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span><span class="plan-bankabbr">'+esc(planAbbr(d.name))+'</span></th>';
+      head+='<th class="plan-bankcol" title="'+esc(d.name)+'"><span class="plan-dot" style="background:'+esc(d.color||'#7a9ab5')+';"></span><span class="plan-bankabbr">'+esc(planAbbr(d.name, d.short_name))+'</span></th>';
     });
     head+='</tr></thead>';
     var body='<tbody>';
@@ -2835,6 +2837,7 @@ function renderBankStatsPanel(bank){
     function p27GroupedLanes(){
         var groups=p27PlanGroups();p27PocketFilter();var html='';var used=new Set();
         var mode=p27SortMode();
+        var pocketNo=0, P27_HUES=8; // neighbouring pockets always get different colours
         // «По направлению»: direction → pocket. Other sorts: one flat list across the visible directions.
         var sections=mode==='dir'?['corp','retail','other']:['all'];
         sections.forEach(function(dir){
@@ -2845,7 +2848,8 @@ function renderBankStatsPanel(bank){
             html+='<section class="p27-direction" data-p27-direction="'+dir+'"><h3>'+(dir==='all'?escapeHtml('Все карманы · '+sortName):(dir==='corp'?'🏢 ':dir==='retail'?'👥 ':'')+escapeHtml(DASH_DIR_LABEL[dir]||'Без направления'))+'</h3>';
             gs.forEach(function(g){
                 var sm=p27PocketSummary(g);
-                html+='<details class="p27-pocket-group'+(g.name?'':' p27-no-pocket')+'" data-p27-pocket="'+escapeHtml(g.key)+'"'+(p27PocketOpen(g.key)?' open':'')+'><summary data-p27-select-pocket="'+escapeHtml(g.key)+'" title="'+escapeHtml(sm.tip)+'">'+sm.html+'</summary>';
+                var hue=g.name?(' data-p27-hue="'+(pocketNo++%P27_HUES)+'"'):'';
+                html+='<details class="p27-pocket-group'+(g.name?'':' p27-no-pocket')+'" data-p27-pocket="'+escapeHtml(g.key)+'"'+hue+(p27PocketOpen(g.key)?' open':'')+'><summary data-p27-select-pocket="'+escapeHtml(g.key)+'" title="'+escapeHtml(sm.tip)+'">'+sm.html+'</summary>';
                 if(!g.indices.length)html+='<div class="p27-pocket-empty">План проверок не задан</div>';
                 g.indices.forEach(function(i){used.add(i);var l=stateDash.lanes[i];html+=renderLaneBlock(l,i,i===stateDash.activeLane,plan2027TimeBounds(laneOffset(l)),!!l.draft,stateDash.lanes.length>1,!!l.pinned);});
                 html+='</details>';
@@ -3989,6 +3993,13 @@ function renderBankStatsPanel(bank){
         return rows;
     }
 
+    // Absolute scale: 1–2 green, 3–4 yellow, 5–6 red, 7+ burgundy.
+    function p27HeatLevel(count){
+        count = +count || 0;
+        if (count <= 0) return 0;
+        if (count <= 4) return count;
+        return count <= 6 ? 5 : 6;
+    }
     function plan2027LoadHeatmap(title, rows, maxCount, key){
         var html = '<section class="p27-heatmap" data-load-scope="' + key + '"><h3>' + escapeHtml(title) + '</h3>';
         if (!rows.length) return html + '<div class="p27-load-empty">Справочник банков пуст — данные загружаются…</div></section>';
@@ -4000,7 +4011,7 @@ function renderBankStatsPanel(bank){
             var name = row.dep.name || row.dep.id;
             html += '<tr><th scope="row" title="' + escapeHtml(name) + '">' + escapeHtml(p27Short(row.dep)) + '</th>';
             row.counts.forEach(function(count,m){
-                var level = count ? Math.max(1, Math.ceil(count / Math.max(1, maxCount) * 5)) : 0;
+                var level = p27HeatLevel(count);
                 var label = name + ' · ' + P27_MON[m] + ' 2027: ' + count;
                 html += '<td data-count="' + count + '" data-level="' + level + '" title="' + escapeHtml(label) + '" aria-label="' + escapeHtml(label) + '">' + count + '</td>';
             });
@@ -4029,7 +4040,19 @@ function renderBankStatsPanel(bank){
             renderHistograms(holder);
             var oldHead = holder.querySelector('.dash-load-head');
             if (oldHead) oldHead.remove();
+            var collapsed = holder.querySelectorAll('.dash-bank-card.is-collapsed').length;
+            var openAll = collapsed > 0;
+            body.insertAdjacentHTML('beforeend', '<div class="p27-banks-bar"><button id="plan2027BanksToggleAll" type="button" class="p27-banks-all" data-open-all="' + (openAll ? '1' : '0') + '">'
+                + (openAll ? '▾ Раскрыть все банки' : '▸ Скрыть все банки') + '</button></div>');
             while (holder.firstChild) body.appendChild(holder.firstChild); // Preserve histogram event handlers.
+            var allBtn = byId('plan2027BanksToggleAll');
+            if (allBtn) allBtn.onclick = function(){
+                var open = this.getAttribute('data-open-all') === '1';
+                stateDash.plan2027BankOpen = stateDash.plan2027BankOpen || {};
+                (st().departments || []).forEach(function(d){ stateDash.plan2027BankOpen[d.id] = open; });
+                renderLoad();
+                var b2 = byId('plan2027BanksToggleAll'); if (b2) b2.focus();
+            };
         } else {
             var allDeps = st().departments || [];
             var deps = allDeps.slice(0, 11);
@@ -4037,7 +4060,7 @@ function renderBankStatsPanel(bank){
             var key = String(stateDash.selectedPocketKey || '');
             var allRows = plan2027LoadMatrix(audits, deps, '');
             var maxCount = allRows.reduce(function(max,row){ return Math.max.apply(Math, [max].concat(row.counts)); }, 0);
-            body.innerHTML = '<p class="p27-load-note">2027 · число проверок · зелёный = свободно, тёмно-красный = максимум. С учётом черновиков.</p>'
+            body.innerHTML = '<p class="p27-load-note">2027 · число проверок у ТБ в месяц: 1–2 зелёный, 3–4 жёлтый, 5–6 красный, 7+ бордовый. С учётом черновиков.</p>'
                 + plan2027LoadHeatmap('Все проверки · все направления', allRows, maxCount, 'all');
             if (key) {
                 var split = key.indexOf('|');
